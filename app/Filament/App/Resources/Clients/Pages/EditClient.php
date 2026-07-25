@@ -6,6 +6,7 @@ use App\Filament\App\Resources\Clients\ClientResource;
 use App\Models\Company;
 use App\Services\Client\ClientService;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 
@@ -18,9 +19,17 @@ class EditClient extends EditRecord
         return [];
     }
 
-    protected function getSavedNotificationTitle(): ?string
+    protected function getSavedNotification(): ?Notification
     {
-        return 'Salvo';
+        return null;
+    }
+
+    protected function afterSave(): void
+    {
+        Notification::make()
+            ->success()
+            ->title('Salvo')
+            ->send();
     }
 
     protected function handleRecordUpdate(Model $record, array $data): Model
