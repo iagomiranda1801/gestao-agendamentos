@@ -1,0 +1,298 @@
+/* Agenda — visual alinhado ao Filament */
+
+.scheduling-filters-section {
+    margin-bottom: 0 !important;
+}
+
+.scheduling-calendar-host {
+    margin-top: 0.75rem;
+}
+
+.scheduling-calendar-card {
+    overflow: hidden;
+    border-radius: 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--gray-950) 10%, transparent);
+    background-color: var(--color-white);
+    box-shadow:
+        0 1px 2px 0 color-mix(in srgb, var(--gray-950) 5%, transparent),
+        0 1px 3px 0 color-mix(in srgb, var(--gray-950) 10%, transparent);
+}
+
+.dark .scheduling-calendar-card {
+    border-color: color-mix(in srgb, var(--color-white) 10%, transparent);
+    background-color: color-mix(in srgb, var(--gray-900) 40%, transparent);
+    box-shadow: none;
+}
+
+.scheduling-calendar {
+    min-height: 680px;
+    padding: 0;
+}
+
+/* Toolbar */
+.scheduling-calendar .fc-toolbar {
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    margin: 0;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--gray-950) 8%, transparent);
+    background-color: color-mix(in srgb, var(--gray-50) 80%, transparent);
+}
+
+.dark .scheduling-calendar .fc-toolbar {
+    border-bottom-color: color-mix(in srgb, var(--color-white) 8%, transparent);
+    background-color: color-mix(in srgb, var(--gray-950) 30%, transparent);
+}
+
+.scheduling-calendar .fc-toolbar-chunk {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.scheduling-calendar .fc-toolbar-title {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--gray-950);
+}
+
+.dark .scheduling-calendar .fc-toolbar-title {
+    color: var(--color-white);
+}
+
+/* Botões */
+.scheduling-calendar .fc-button-group {
+    display: inline-flex;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px 0 color-mix(in srgb, var(--gray-950) 5%, transparent);
+}
+
+.scheduling-calendar .fc-button {
+    margin: 0;
+    padding: 0.4375rem 0.875rem;
+    border: 1px solid color-mix(in srgb, var(--gray-950) 10%, transparent);
+    background-color: var(--color-white);
+    box-shadow: none;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    color: var(--gray-700);
+    text-transform: none;
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease;
+}
+
+.dark .scheduling-calendar .fc-button {
+    border-color: color-mix(in srgb, var(--color-white) 12%, transparent);
+    background-color: color-mix(in srgb, var(--gray-900) 50%, transparent);
+    color: var(--gray-300);
+}
+
+.scheduling-calendar .fc-button:hover,
+.scheduling-calendar .fc-button:focus {
+    z-index: 1;
+    border-color: color-mix(in srgb, var(--gray-950) 15%, transparent);
+    background-color: var(--gray-50);
+    color: var(--gray-950);
+    box-shadow: none;
+}
+
+.dark .scheduling-calendar .fc-button:hover,
+.dark .scheduling-calendar .fc-button:focus {
+    border-color: color-mix(in srgb, var(--color-white) 18%, transparent);
+    background-color: color-mix(in srgb, var(--gray-800) 80%, transparent);
+    color: var(--color-white);
+}
+
+.scheduling-calendar .fc-button-primary:not(:disabled).fc-button-active,
+.scheduling-calendar .fc-button-primary:not(:disabled):active,
+.scheduling-calendar .fc-button-primary:not(:disabled).fc-button-active:focus,
+.scheduling-calendar .fc-button-primary:not(:disabled):active:focus {
+    border-color: color-mix(in srgb, var(--primary-600) 40%, transparent);
+    background-color: color-mix(in srgb, var(--primary-500) 12%, transparent);
+    color: var(--primary-700);
+    box-shadow: inset 0 -2px 0 0 var(--primary-500);
+}
+
+.dark .scheduling-calendar .fc-button-primary:not(:disabled).fc-button-active,
+.dark .scheduling-calendar .fc-button-primary:not(:disabled):active {
+    border-color: color-mix(in srgb, var(--primary-400) 35%, transparent);
+    background-color: color-mix(in srgb, var(--primary-400) 15%, transparent);
+    color: var(--primary-300);
+    box-shadow: inset 0 -2px 0 0 var(--primary-400);
+}
+
+.scheduling-calendar .fc-button:disabled {
+    opacity: 0.45;
+}
+
+.scheduling-calendar .fc-today-button {
+    font-weight: 600;
+}
+
+/* Grade e células */
+.scheduling-calendar .fc-view-harness {
+    background-color: var(--color-white);
+}
+
+.dark .scheduling-calendar .fc-view-harness {
+    background-color: transparent;
+}
+
+.scheduling-calendar .fc-col-header-cell {
+    padding: 0.625rem 0.5rem;
+    border-color: color-mix(in srgb, var(--gray-950) 8%, transparent);
+    background-color: color-mix(in srgb, var(--gray-50) 60%, transparent);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--gray-500);
+}
+
+.dark .scheduling-calendar .fc-col-header-cell {
+    border-color: color-mix(in srgb, var(--color-white) 8%, transparent);
+    background-color: color-mix(in srgb, var(--gray-950) 40%, transparent);
+    color: var(--gray-400);
+}
+
+.scheduling-calendar .fc-timegrid-slot-label,
+.scheduling-calendar .fc-timegrid-axis-cushion {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--gray-500);
+}
+
+.dark .scheduling-calendar .fc-timegrid-slot-label,
+.dark .scheduling-calendar .fc-timegrid-axis-cushion {
+    color: var(--gray-400);
+}
+
+.scheduling-calendar .fc-timegrid-slot,
+.scheduling-calendar .fc-timegrid-col,
+.scheduling-calendar .fc-daygrid-day,
+.scheduling-calendar .fc-list-day-cushion,
+.scheduling-calendar .fc-scrollgrid,
+.scheduling-calendar .fc-scrollgrid td,
+.scheduling-calendar .fc-scrollgrid th {
+    border-color: color-mix(in srgb, var(--gray-950) 7%, transparent);
+}
+
+.dark .scheduling-calendar .fc-timegrid-slot,
+.dark .scheduling-calendar .fc-timegrid-col,
+.dark .scheduling-calendar .fc-daygrid-day,
+.dark .scheduling-calendar .fc-list-day-cushion,
+.dark .scheduling-calendar .fc-scrollgrid,
+.dark .scheduling-calendar .fc-scrollgrid td,
+.dark .scheduling-calendar .fc-scrollgrid th {
+    border-color: color-mix(in srgb, var(--color-white) 7%, transparent);
+}
+
+.scheduling-calendar .fc-daygrid-day-number,
+.scheduling-calendar .fc-list-day-text,
+.scheduling-calendar .fc-list-day-side-text {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--gray-700);
+}
+
+.dark .scheduling-calendar .fc-daygrid-day-number,
+.dark .scheduling-calendar .fc-list-day-text,
+.dark .scheduling-calendar .fc-list-day-side-text {
+    color: var(--gray-300);
+}
+
+.scheduling-calendar .fc-day-today {
+    background-color: color-mix(in srgb, var(--primary-500) 6%, transparent) !important;
+}
+
+.scheduling-calendar .fc-day-today .fc-daygrid-day-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.625rem;
+    height: 1.625rem;
+    border-radius: 9999px;
+    background-color: var(--primary-500);
+    color: var(--color-white);
+    font-weight: 600;
+}
+
+/* Eventos */
+.scheduling-calendar .fc-event {
+    border: none;
+    border-radius: 0.375rem;
+    box-shadow: 0 1px 2px 0 color-mix(in srgb, var(--gray-950) 10%, transparent);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.3;
+}
+
+.scheduling-calendar .fc-event .fc-event-main {
+    padding: 0.125rem 0.375rem;
+}
+
+.scheduling-calendar .fc-event:hover {
+    filter: brightness(0.97);
+}
+
+.scheduling-calendar .fc-timegrid-now-indicator-line {
+    border-color: var(--primary-500);
+    border-width: 2px;
+}
+
+.scheduling-calendar .fc-timegrid-now-indicator-arrow {
+    border-top-color: var(--primary-500);
+    border-bottom-color: var(--primary-500);
+}
+
+/* Lista */
+.scheduling-calendar .fc-list-event:hover td {
+    background-color: color-mix(in srgb, var(--primary-500) 5%, transparent);
+}
+
+.scheduling-calendar .fc-list-event-dot {
+    border-radius: 9999px;
+}
+
+/* Responsivo */
+@media (max-width: 1024px) {
+    .scheduling-calendar {
+        min-height: 600px;
+    }
+
+    .scheduling-calendar .fc-toolbar {
+        padding: 0.875rem 1rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .scheduling-calendar {
+        min-height: 520px;
+    }
+
+    .scheduling-calendar .fc-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .scheduling-calendar .fc-toolbar-chunk {
+        justify-content: center;
+    }
+
+    .scheduling-calendar .fc-toolbar-title {
+        width: 100%;
+        text-align: center;
+        font-size: 1rem;
+    }
+
+    .scheduling-calendar .fc-button {
+        padding: 0.375rem 0.625rem;
+        font-size: 0.75rem;
+    }
+}

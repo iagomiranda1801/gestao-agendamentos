@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
@@ -141,5 +142,53 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         return $membership->role instanceof CompanyRole
             ? $membership->role
             : CompanyRole::from($membership->role);
+    }
+
+    public function hasActiveRoleInCompany(Company $company, CompanyRole ...$roles): bool
+    {
+        if (! $this->is_active || ! $company->is_active) {
+            return false;
+        }
+
+        if ($roles === []) {
+            return $this->hasActiveCompanyMembershipWith($company);
+        }
+
+        $membership = $this->companies()
+            ->where('companies.id', $company->getKey())
+            ->where('companies.is_active', true)
+            ->wherePivot('is_active', true)
+            ->first();
+
+        if (! $membership?->pivot) {
+            return false;
+        }
+
+        $role = $membership->pivot->role instanceof CompanyRole
+            ? $membership->pivot->role
+            : CompanyRole::from($membership->pivot->role);
+
+        return in_array($role, $roles, true);
+    }
+
+    public function hasActiveCompanyMembershipWith(Company $company): bool
+    {
+        if (! $this->is_active || ! $company->is_active) {
+            return false;
+        }
+
+        return $this->companies()
+            ->where('companies.id', $company->getKey())
+            ->where('companies.is_active', true)
+            ->wherePivot('is_active', true)
+            ->exists();
+    }
+
+    /**
+     * @return HasMany<Professional, $this>
+     */
+    public function professionalProfiles(): HasMany
+    {
+        return $this->hasMany(Professional::class);
     }
 }

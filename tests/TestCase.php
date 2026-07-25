@@ -41,4 +41,17 @@ abstract class TestCase extends BaseTestCase
     {
         return Company::factory()->create($attributes);
     }
+
+    protected function authenticateForAppTenant(User $user, Company $company): void
+    {
+        $this->actingAs($user);
+
+        app()->setLocale('pt_BR');
+
+        $panel = Filament::getPanel('app');
+        Filament::setCurrentPanel($panel);
+        $panel->boot();
+        Filament::setServingStatus(true);
+        Filament::setTenant($company, isQuiet: true);
+    }
 }

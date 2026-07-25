@@ -1,0 +1,17 @@
+/* Correções de UX do painel Filament */
+
+.fi-no {
+    z-index: 9999 !important;
+}
+
+/*
+ * Toasts começam ocultos até o Alpine inicializar notificationComponent.
+ * Se o plugin não carregar a tempo, a mensagem ficava invisível.
+ */
+.fi-no .fi-no-notification[class*='fi-status-'] {
+    visibility: visible !important;
+}
+
+.fi-no .fi-no-notification .fi-no-notification-title {
+    display: block;
+}

@@ -13,6 +13,14 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             TenantFoundationSeeder::class,
+            MeasurementUnitSeeder::class,
+            DemoDataSeeder::class,
+            EstudioAnaCatalogSeeder::class,
+            EstudioAnaOpeningInventorySeeder::class,
+            EstudioAnaScheduleSeeder::class,
+            EstudioAnaPublicBookingSeeder::class,
+            EstudioAnaFinancialSettingsSeeder::class,
+            EstudioAnaFinanceStructureSeeder::class,
         ]);
     }
 }
