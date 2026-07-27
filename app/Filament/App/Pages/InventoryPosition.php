@@ -2,7 +2,9 @@
 
 namespace App\Filament\App\Pages;
 
+use App\Enums\CompanyModule;
 use App\Enums\ProductType;
+use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Filament\App\Widgets\InventoryPositionStatsWidget;
 use App\Models\Company;
 use App\Models\Product;
@@ -28,6 +30,7 @@ class InventoryPosition extends Page implements HasTable
     use InteractsWithTable {
         makeTable as makeBaseTable;
     }
+    use RequiresCompanyModule;
 
     protected static ?string $slug = 'estoque';
 
@@ -64,6 +67,10 @@ class InventoryPosition extends Page implements HasTable
 
     public static function canAccess(): bool
     {
+        if (! static::tenantHasRequiredModule()) {
+            return false;
+        }
+
         $user = auth()->user();
 
         return $user !== null && (new StockDocumentPolicy)->viewAny($user);
@@ -243,5 +250,10 @@ class InventoryPosition extends Page implements HasTable
                         fn (Builder $query): Builder => $query->where('quantity_on_hand', '<=', 0),
                     );
             });
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Stock;
     }
 }

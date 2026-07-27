@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\CompanyRole;
+use App\Enums\SubscriptionStatus;
 use Database\Factories\CompanyFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,6 +22,9 @@ use Illuminate\Support\Str;
     'logo_path',
     'timezone',
     'is_active',
+    'enabled_modules',
+    'trial_ends_at',
+    'subscription_status',
 ])]
 class Company extends Model
 {
@@ -62,6 +66,9 @@ class Company extends Model
     {
         return [
             'is_active' => 'boolean',
+            'enabled_modules' => 'array',
+            'trial_ends_at' => 'datetime',
+            'subscription_status' => SubscriptionStatus::class,
         ];
     }
 

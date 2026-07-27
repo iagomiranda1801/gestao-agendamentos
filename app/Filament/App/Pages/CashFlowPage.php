@@ -2,7 +2,9 @@
 
 namespace App\Filament\App\Pages;
 
+use App\Enums\CompanyModule;
 use App\Enums\FinancialDashboardPeriod;
+use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Filament\App\Pages\Concerns\HasFinancialPeriodFilters;
 use App\Models\Company;
 use App\Models\FinancialAccount;
@@ -22,6 +24,7 @@ class CashFlowPage extends Page
 {
     use HasFiltersForm;
     use HasFinancialPeriodFilters;
+    use RequiresCompanyModule;
 
     protected static ?string $slug = 'fluxo-de-caixa';
 
@@ -39,6 +42,10 @@ class CashFlowPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! static::tenantHasRequiredModule()) {
+            return false;
+        }
+
         $user = auth()->user();
 
         return $user !== null && (new FinancialReportPolicy)->viewAny($user);
@@ -110,5 +117,10 @@ class CashFlowPage extends Page
             'netFlow' => $summary->netFlow,
             'finalBalance' => $summary->finalBalance,
         ];
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Finance;
     }
 }

@@ -2,8 +2,10 @@
 
 namespace App\Filament\App\Resources\FinancialTransactions;
 
+use App\Enums\CompanyModule;
 use App\Enums\FinancialTransactionDirection;
 use App\Enums\FinancialTransactionType;
+use App\Filament\App\Concerns\RequiresCompanyModuleResource;
 use App\Filament\App\Resources\FinancialTransactions\Pages\ListFinancialTransactions;
 use App\Models\FinancialTransaction;
 use BackedEnum;
@@ -20,6 +22,8 @@ use UnitEnum;
 
 class FinancialTransactionResource extends Resource
 {
+    use RequiresCompanyModuleResource;
+
     protected static ?string $model = FinancialTransaction::class;
 
     protected static ?string $slug = 'transacoes-financeiras';
@@ -141,5 +145,10 @@ class FinancialTransactionResource extends Resource
     public static function canDelete(Model $record): bool
     {
         return false;
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Finance;
     }
 }

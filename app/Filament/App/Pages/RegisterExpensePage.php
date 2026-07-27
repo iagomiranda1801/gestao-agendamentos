@@ -2,7 +2,9 @@
 
 namespace App\Filament\App\Pages;
 
+use App\Enums\CompanyModule;
 use App\Enums\PaymentMethod;
+use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Models\Company;
 use App\Models\ExpenseCategory;
 use App\Models\FinancialAccount;
@@ -30,6 +32,8 @@ use UnitEnum;
 
 class RegisterExpensePage extends Page
 {
+    use RequiresCompanyModule;
+
     protected static ?string $slug = 'registrar-despesa';
 
     protected static ?string $navigationLabel = 'Registrar despesa';
@@ -49,6 +53,10 @@ class RegisterExpensePage extends Page
 
     public static function canAccess(): bool
     {
+        if (! static::tenantHasRequiredModule()) {
+            return false;
+        }
+
         $user = auth()->user();
 
         return $user !== null && (new PayablePolicy)->create($user);
@@ -267,5 +275,10 @@ class RegisterExpensePage extends Page
                         Actions::make($this->getFormActions()),
                     ]),
             ]);
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Finance;
     }
 }

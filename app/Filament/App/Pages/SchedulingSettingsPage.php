@@ -2,7 +2,9 @@
 
 namespace App\Filament\App\Pages;
 
+use App\Enums\CompanyModule;
 use App\Enums\Weekday;
+use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Models\Company;
 use App\Policies\CompanySchedulingSettingPolicy;
 use App\Services\Scheduling\CompanyBusinessHoursService;
@@ -30,6 +32,8 @@ use UnitEnum;
 
 class SchedulingSettingsPage extends Page
 {
+    use RequiresCompanyModule;
+
     protected static ?string $slug = 'configuracoes-agenda';
 
     protected static ?string $navigationLabel = 'Configurações da agenda';
@@ -49,6 +53,10 @@ class SchedulingSettingsPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! static::tenantHasRequiredModule()) {
+            return false;
+        }
+
         $user = auth()->user();
 
         return $user !== null && (new CompanySchedulingSettingPolicy)->viewAny($user);
@@ -384,5 +392,10 @@ class SchedulingSettingsPage extends Page
                         Actions::make($this->getFormActions()),
                     ]),
             ]);
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Scheduling;
     }
 }

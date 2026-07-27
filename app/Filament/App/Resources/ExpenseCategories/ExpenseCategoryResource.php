@@ -2,6 +2,8 @@
 
 namespace App\Filament\App\Resources\ExpenseCategories;
 
+use App\Enums\CompanyModule;
+use App\Filament\App\Concerns\RequiresCompanyModuleResource;
 use App\Filament\App\Resources\ExpenseCategories\Pages\CreateExpenseCategory;
 use App\Filament\App\Resources\ExpenseCategories\Pages\EditExpenseCategory;
 use App\Filament\App\Resources\ExpenseCategories\Pages\ListExpenseCategories;
@@ -18,6 +20,8 @@ use UnitEnum;
 
 class ExpenseCategoryResource extends Resource
 {
+    use RequiresCompanyModuleResource;
+
     protected static ?string $model = ExpenseCategory::class;
 
     protected static ?string $slug = 'categorias-despesas';
@@ -65,5 +69,10 @@ class ExpenseCategoryResource extends Resource
     public static function canDelete(Model $record): bool
     {
         return false;
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Finance;
     }
 }

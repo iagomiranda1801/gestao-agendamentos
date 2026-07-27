@@ -2,6 +2,8 @@
 
 namespace App\Filament\App\Resources\Suppliers;
 
+use App\Enums\CompanyModule;
+use App\Filament\App\Concerns\RequiresCompanyModuleResource;
 use App\Filament\App\Resources\Suppliers\Pages\CreateSupplier;
 use App\Filament\App\Resources\Suppliers\Pages\EditSupplier;
 use App\Filament\App\Resources\Suppliers\Pages\ListSuppliers;
@@ -17,6 +19,8 @@ use UnitEnum;
 
 class SupplierResource extends Resource
 {
+    use RequiresCompanyModuleResource;
+
     protected static ?string $model = Supplier::class;
 
     protected static ?string $slug = 'fornecedores';
@@ -67,5 +71,10 @@ class SupplierResource extends Resource
             'create' => CreateSupplier::route('/create'),
             'edit' => EditSupplier::route('/{record}/edit'),
         ];
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Stock;
     }
 }

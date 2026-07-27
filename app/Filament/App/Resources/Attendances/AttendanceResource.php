@@ -2,6 +2,8 @@
 
 namespace App\Filament\App\Resources\Attendances;
 
+use App\Enums\CompanyModule;
+use App\Filament\App\Concerns\RequiresCompanyModuleResource;
 use App\Filament\App\Resources\Attendances\Pages\ListAttendances;
 use App\Filament\App\Resources\Attendances\Pages\ViewAttendance;
 use App\Filament\App\Resources\Attendances\RelationManagers\HistoriesRelationManager;
@@ -25,6 +27,8 @@ use UnitEnum;
 
 class AttendanceResource extends Resource
 {
+    use RequiresCompanyModuleResource;
+
     protected static ?string $model = Attendance::class;
 
     protected static ?string $slug = 'atendimentos';
@@ -98,5 +102,10 @@ class AttendanceResource extends Resource
         }
 
         return app(AttendancePolicy::class)->scopeAccessibleToUser($query, $user, $company);
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Scheduling;
     }
 }

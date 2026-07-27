@@ -2,6 +2,8 @@
 
 namespace App\Filament\App\Resources\Products;
 
+use App\Enums\CompanyModule;
+use App\Filament\App\Concerns\RequiresCompanyModuleResource;
 use App\Filament\App\Resources\Products\Pages\CreateProduct;
 use App\Filament\App\Resources\Products\Pages\EditProduct;
 use App\Filament\App\Resources\Products\Pages\ListProducts;
@@ -18,6 +20,8 @@ use UnitEnum;
 
 class ProductResource extends Resource
 {
+    use RequiresCompanyModuleResource;
+
     protected static ?string $model = Product::class;
 
     protected static ?string $slug = 'produtos';
@@ -73,5 +77,10 @@ class ProductResource extends Resource
             'create' => CreateProduct::route('/create'),
             'edit' => EditProduct::route('/{record}/edit'),
         ];
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Stock;
     }
 }

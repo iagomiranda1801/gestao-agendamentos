@@ -3,6 +3,8 @@
 namespace App\Filament\App\Pages;
 
 use App\Enums\CommissionType;
+use App\Enums\CompanyModule;
+use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Models\Company;
 use App\Policies\CompanyFinancialSettingPolicy;
 use App\Services\Financial\CompanyFinancialSettingService;
@@ -26,6 +28,8 @@ use UnitEnum;
 
 class FinancialSettingsPage extends Page
 {
+    use RequiresCompanyModule;
+
     protected static ?string $slug = 'configuracoes-financeiras';
 
     protected static ?string $navigationLabel = 'Configurações financeiras';
@@ -45,6 +49,10 @@ class FinancialSettingsPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! static::tenantHasRequiredModule()) {
+            return false;
+        }
+
         $user = auth()->user();
 
         return $user !== null && (new CompanyFinancialSettingPolicy)->viewAny($user);
@@ -227,5 +235,10 @@ class FinancialSettingsPage extends Page
                         Actions::make($this->getFormActions()),
                     ]),
             ]);
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Finance;
     }
 }

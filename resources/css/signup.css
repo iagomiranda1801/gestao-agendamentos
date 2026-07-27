@@ -1,0 +1,234 @@
+@import 'tailwindcss';
+
+@source '../../resources/views/layouts/signup.blade.php';
+@source '../../resources/views/livewire/signup/**/*.blade.php';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+:root {
+    --signup-primary: #d97706;
+    --signup-primary-hover: #b45309;
+    --signup-border: #e2e8f0;
+    --signup-muted: #64748b;
+}
+
+body.signup-body {
+    margin: 0;
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    background: linear-gradient(180deg, #fffbeb 0%, #f8fafc 100%);
+    color: #0f172a;
+}
+
+.signup-shell {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+}
+
+.signup-header {
+    padding: 1.5rem 1rem 0;
+}
+
+.signup-brand {
+    max-width: 42rem;
+    margin: 0 auto;
+}
+
+.signup-brand__name {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.signup-brand__tagline {
+    display: block;
+    color: var(--signup-muted);
+    font-size: 0.95rem;
+}
+
+.signup-main {
+    flex: 1;
+    padding: 1.5rem 1rem 2rem;
+}
+
+.signup-card {
+    max-width: 42rem;
+    margin: 0 auto;
+    background: #fff;
+    border: 1px solid var(--signup-border);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 10px 30px rgb(15 23 42 / 0.06);
+}
+
+.signup-steps {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.signup-step {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: var(--signup-muted);
+}
+
+.signup-step.is-active {
+    background: #fef3c7;
+    color: #92400e;
+    font-weight: 600;
+}
+
+.signup-step.is-done {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.signup-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0 0 0.35rem;
+}
+
+.signup-subtitle {
+    margin: 0 0 1.25rem;
+    color: var(--signup-muted);
+    font-size: 0.95rem;
+}
+
+.signup-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.signup-grid--2 {
+    grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+    .signup-grid--2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.signup-field label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+
+.signup-field input,
+.signup-field select {
+    width: 100%;
+    border: 1px solid var(--signup-border);
+    border-radius: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    font: inherit;
+}
+
+.signup-field small {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--signup-muted);
+    font-size: 0.8rem;
+}
+
+.signup-modules {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.signup-module {
+    border: 1px solid var(--signup-border);
+    border-radius: 0.75rem;
+    padding: 0.85rem 1rem;
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+.signup-module input {
+    margin-top: 0.2rem;
+}
+
+.signup-module__title {
+    font-weight: 600;
+}
+
+.signup-module__desc {
+    color: var(--signup-muted);
+    font-size: 0.875rem;
+}
+
+.signup-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.signup-btn {
+    border: 0;
+    border-radius: 0.65rem;
+    padding: 0.7rem 1.1rem;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.signup-btn--primary {
+    background: var(--signup-primary);
+    color: #fff;
+}
+
+.signup-btn--primary:hover {
+    background: var(--signup-primary-hover);
+}
+
+.signup-btn--secondary {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.signup-error {
+    color: #dc2626;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+.signup-review {
+    display: grid;
+    gap: 0.75rem;
+    font-size: 0.95rem;
+}
+
+.signup-review dt {
+    font-weight: 600;
+}
+
+.signup-review dd {
+    margin: 0 0 0.5rem;
+    color: var(--signup-muted);
+}
+
+.signup-trial-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: #fef3c7;
+    color: #92400e;
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}

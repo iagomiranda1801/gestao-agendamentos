@@ -15,3 +15,43 @@
 .fi-no .fi-no-notification .fi-no-notification-title {
     display: block;
 }
+
+.fi-app-login-signup {
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+    text-align: center;
+}
+
+.fi-app-login-signup__text {
+    margin: 0 0 0.5rem;
+    font-size: 0.875rem;
+    color: rgb(100 116 139);
+}
+
+.dark .fi-app-login-signup__text {
+    color: rgb(148 163 184);
+}
+
+.fi-app-login-signup__link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: rgb(217 119 6);
+    text-decoration: none;
+}
+
+.fi-app-login-signup__link:hover {
+    color: rgb(180 83 9);
+    text-decoration: underline;
+}
+
+.dark .fi-app-login-signup__link {
+    color: rgb(251 191 36);
+}
+
+.dark .fi-app-login-signup__link:hover {
+    color: rgb(253 224 71);
+}

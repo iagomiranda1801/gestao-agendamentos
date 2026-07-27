@@ -2,7 +2,9 @@
 
 namespace App\Filament\App\Resources\Purchases;
 
+use App\Enums\CompanyModule;
 use App\Enums\StockDocumentType;
+use App\Filament\App\Concerns\RequiresCompanyModuleResource;
 use App\Filament\App\Resources\Purchases\Pages\CreatePurchase;
 use App\Filament\App\Resources\Purchases\Pages\EditPurchase;
 use App\Filament\App\Resources\Purchases\Pages\ListPurchases;
@@ -21,6 +23,8 @@ use UnitEnum;
 
 class PurchaseResource extends Resource
 {
+    use RequiresCompanyModuleResource;
+
     protected static ?string $model = StockDocument::class;
 
     protected static ?string $slug = 'compras';
@@ -80,5 +84,10 @@ class PurchaseResource extends Resource
             'create' => CreatePurchase::route('/create'),
             'edit' => EditPurchase::route('/{record}/edit'),
         ];
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Stock;
     }
 }

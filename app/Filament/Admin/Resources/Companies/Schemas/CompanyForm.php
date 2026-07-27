@@ -2,7 +2,12 @@
 
 namespace App\Filament\Admin\Resources\Companies\Schemas;
 
+use App\Enums\CompanyModule;
+use App\Enums\SubscriptionStatus;
 use App\Models\Company;
+use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
@@ -60,6 +65,35 @@ class CompanyForm
                         Toggle::make('is_active')
                             ->label('Empresa ativa')
                             ->default(true),
+                    ])
+                    ->columns(2),
+                Section::make('Módulos')
+                    ->schema([
+                        CheckboxList::make('enabled_modules')
+                            ->label('Módulos habilitados')
+                            ->options(CompanyModule::options())
+                            ->descriptions(collect(CompanyModule::cases())
+                                ->mapWithKeys(fn (CompanyModule $module) => [$module->value => $module->description()])
+                                ->all())
+                            ->columns(1)
+                            ->required()
+                            ->default([CompanyModule::Scheduling->value])
+                            ->bulkToggleable(),
+                    ]),
+                Section::make('Assinatura')
+                    ->schema([
+                        Select::make('subscription_status')
+                            ->label('Status da assinatura')
+                            ->options(SubscriptionStatus::options())
+                            ->default(SubscriptionStatus::Trial->value)
+                            ->required()
+                            ->native(false)
+                            ->live(),
+                        DateTimePicker::make('trial_ends_at')
+                            ->label('Trial até')
+                            ->native(false)
+                            ->default(fn (): ?\Illuminate\Support\Carbon => now()->addDays(7))
+                            ->visible(fn (callable $get): bool => $get('subscription_status') === SubscriptionStatus::Trial->value),
                     ])
                     ->columns(2),
             ]);

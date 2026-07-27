@@ -3,6 +3,8 @@
 namespace App\Filament\App\Pages;
 
 use App\Enums\CashSessionStatus;
+use App\Enums\CompanyModule;
+use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Models\CashRegister;
 use App\Models\CashSession;
 use App\Models\Company;
@@ -21,6 +23,8 @@ use UnitEnum;
 
 class CashPage extends Page
 {
+    use RequiresCompanyModule;
+
     protected static ?string $slug = 'caixa';
 
     protected static ?string $navigationLabel = 'Caixa';
@@ -39,6 +43,10 @@ class CashPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! static::tenantHasRequiredModule()) {
+            return false;
+        }
+
         $user = auth()->user();
 
         return $user !== null && (new CashSessionPolicy)->viewAny($user);
@@ -249,5 +257,10 @@ class CashPage extends Page
                     ->title('Caixa fechado')
                     ->send();
             });
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Finance;
     }
 }

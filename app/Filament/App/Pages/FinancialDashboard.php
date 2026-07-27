@@ -2,7 +2,9 @@
 
 namespace App\Filament\App\Pages;
 
+use App\Enums\CompanyModule;
 use App\Enums\FinancialDashboardPeriod;
+use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Filament\App\Widgets\FinancialStatsWidget;
 use App\Policies\ReceivablePolicy;
 use BackedEnum;
@@ -20,6 +22,7 @@ use UnitEnum;
 class FinancialDashboard extends BaseDashboard
 {
     use HasFiltersForm;
+    use RequiresCompanyModule;
 
     protected static string $routePath = '/dashboard-financeiro';
 
@@ -39,6 +42,10 @@ class FinancialDashboard extends BaseDashboard
 
     public static function canAccess(): bool
     {
+        if (! static::tenantHasRequiredModule()) {
+            return false;
+        }
+
         $user = auth()->user();
 
         return $user !== null && (new ReceivablePolicy)->viewAny($user);
@@ -95,5 +102,10 @@ class FinancialDashboard extends BaseDashboard
     public function getColumns(): int|array
     {
         return 1;
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Finance;
     }
 }

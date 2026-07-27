@@ -3,7 +3,9 @@
 namespace App\Filament\App\Pages;
 
 use App\Enums\AppointmentStatus;
+use App\Enums\CompanyModule;
 use App\Enums\CompanyRole;
+use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Filament\App\Resources\Appointments\AppointmentResource;
 use App\Models\Appointment;
 use App\Models\Client;
@@ -32,6 +34,8 @@ use UnitEnum;
 
 class CalendarPage extends Page
 {
+    use RequiresCompanyModule;
+
     protected static ?string $slug = 'agenda';
 
     protected static ?string $navigationLabel = 'Agenda';
@@ -54,6 +58,10 @@ class CalendarPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! static::tenantHasRequiredModule()) {
+            return false;
+        }
+
         $user = auth()->user();
 
         return $user !== null && (new AppointmentPolicy)->viewAny($user);
@@ -354,5 +362,10 @@ class CalendarPage extends Page
             'appointment_date' => $localStart->toDateString(),
             'appointment_time' => $localStart->format('H:i'),
         ]);
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Scheduling;
     }
 }

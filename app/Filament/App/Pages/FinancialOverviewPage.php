@@ -2,6 +2,8 @@
 
 namespace App\Filament\App\Pages;
 
+use App\Enums\CompanyModule;
+use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Filament\App\Pages\Concerns\HasFinancialPeriodFilters;
 use App\Filament\App\Widgets\FinancialOverviewStatsWidget;
 use App\Policies\FinancialReportPolicy;
@@ -18,6 +20,7 @@ class FinancialOverviewPage extends BaseDashboard
 {
     use HasFiltersForm;
     use HasFinancialPeriodFilters;
+    use RequiresCompanyModule;
 
     protected static string $routePath = '/visao-financeira';
 
@@ -35,6 +38,10 @@ class FinancialOverviewPage extends BaseDashboard
 
     public static function canAccess(): bool
     {
+        if (! static::tenantHasRequiredModule()) {
+            return false;
+        }
+
         $user = auth()->user();
 
         return $user !== null && (new FinancialReportPolicy)->viewAny($user);
@@ -74,5 +81,10 @@ class FinancialOverviewPage extends BaseDashboard
             'md' => 2,
             'xl' => 3,
         ];
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Finance;
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Filament\App\Resources\Receivables;
 
+use App\Enums\CompanyModule;
+use App\Filament\App\Concerns\RequiresCompanyModuleResource;
 use App\Filament\App\Resources\Receivables\Pages\ListReceivables;
 use App\Filament\App\Resources\Receivables\RelationManagers\PaymentsRelationManager;
 use App\Filament\App\Resources\Receivables\Tables\ReceivablesTable;
@@ -16,6 +18,8 @@ use UnitEnum;
 
 class ReceivableResource extends Resource
 {
+    use RequiresCompanyModuleResource;
+
     protected static ?string $model = Receivable::class;
 
     protected static ?string $slug = 'contas-a-receber';
@@ -73,5 +77,10 @@ class ReceivableResource extends Resource
     public static function canDelete(Model $record): bool
     {
         return false;
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Finance;
     }
 }

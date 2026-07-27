@@ -2,7 +2,9 @@
 
 namespace App\Filament\App\Pages;
 
+use App\Enums\CompanyModule;
 use App\Enums\FinancialDashboardPeriod;
+use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Filament\App\Pages\Concerns\HasFinancialPeriodFilters;
 use App\Models\Company;
 use App\Policies\FinancialReportPolicy;
@@ -21,6 +23,7 @@ class ExpenseByCategoryReportPage extends Page
 {
     use HasFiltersForm;
     use HasFinancialPeriodFilters;
+    use RequiresCompanyModule;
 
     protected static ?string $slug = 'despesas-por-categoria';
 
@@ -38,6 +41,10 @@ class ExpenseByCategoryReportPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! static::tenantHasRequiredModule()) {
+            return false;
+        }
+
         $user = auth()->user();
 
         return $user !== null && (new FinancialReportPolicy)->viewAny($user);
@@ -74,5 +81,10 @@ class ExpenseByCategoryReportPage extends Page
         );
 
         return app(FinancialOverviewAggregator::class)->expensesByCategory($company, $start, $end);
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Finance;
     }
 }

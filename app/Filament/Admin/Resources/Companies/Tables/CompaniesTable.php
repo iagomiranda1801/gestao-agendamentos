@@ -2,6 +2,8 @@
 
 namespace App\Filament\Admin\Resources\Companies\Tables;
 
+use App\Enums\CompanyModule;
+use App\Enums\SubscriptionStatus;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -25,16 +27,33 @@ class CompaniesTable
                     ->label('Slug')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('enabled_modules')
+                    ->label('Módulos')
+                    ->badge()
+                    ->formatStateUsing(fn (?array $state): array => collect($state ?? [])
+                        ->map(fn (string $value) => CompanyModule::tryFrom($value)?->label() ?? $value)
+                        ->all()),
+                TextColumn::make('subscription_status')
+                    ->label('Assinatura')
+                    ->badge()
+                    ->formatStateUsing(fn (?SubscriptionStatus $state): string => $state?->label() ?? '-'),
+                TextColumn::make('trial_ends_at')
+                    ->label('Trial até')
+                    ->dateTime('d/m/Y H:i')
+                    ->placeholder('-')
+                    ->toggleable(),
                 TextColumn::make('document')
                     ->label('Documento')
                     ->searchable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('phone')
                     ->label('Telefone')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('email')
                     ->label('E-mail')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('is_active')
                     ->label('Ativa')
                     ->boolean(),

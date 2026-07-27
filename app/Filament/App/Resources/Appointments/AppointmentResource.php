@@ -2,6 +2,8 @@
 
 namespace App\Filament\App\Resources\Appointments;
 
+use App\Enums\CompanyModule;
+use App\Filament\App\Concerns\RequiresCompanyModuleResource;
 use App\Filament\App\Resources\Appointments\Pages\CreateAppointment;
 use App\Filament\App\Resources\Appointments\Pages\EditAppointment;
 use App\Filament\App\Resources\Appointments\Pages\ListAppointments;
@@ -19,6 +21,8 @@ use UnitEnum;
 
 class AppointmentResource extends Resource
 {
+    use RequiresCompanyModuleResource;
+
     protected static ?string $model = Appointment::class;
 
     protected static ?string $slug = 'agendamentos';
@@ -64,5 +68,10 @@ class AppointmentResource extends Resource
             'view' => ViewAppointment::route('/{record}'),
             'edit' => EditAppointment::route('/{record}/edit'),
         ];
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Scheduling;
     }
 }

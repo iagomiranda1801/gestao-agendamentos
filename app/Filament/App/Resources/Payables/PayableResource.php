@@ -2,6 +2,8 @@
 
 namespace App\Filament\App\Resources\Payables;
 
+use App\Enums\CompanyModule;
+use App\Filament\App\Concerns\RequiresCompanyModuleResource;
 use App\Filament\App\Resources\Payables\Pages\ListPayables;
 use App\Filament\App\Resources\Payables\Tables\PayablesTable;
 use App\Models\Payable;
@@ -15,6 +17,8 @@ use UnitEnum;
 
 class PayableResource extends Resource
 {
+    use RequiresCompanyModuleResource;
+
     protected static ?string $model = Payable::class;
 
     protected static ?string $slug = 'contas-a-pagar';
@@ -70,5 +74,10 @@ class PayableResource extends Resource
     public static function canDelete(Model $record): bool
     {
         return false;
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Finance;
     }
 }

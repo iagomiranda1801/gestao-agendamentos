@@ -2,7 +2,9 @@
 
 namespace App\Filament\App\Resources\StockAdjustments;
 
+use App\Enums\CompanyModule;
 use App\Enums\StockDocumentType;
+use App\Filament\App\Concerns\RequiresCompanyModuleResource;
 use App\Filament\App\Resources\StockAdjustments\Pages\CreateStockAdjustment;
 use App\Filament\App\Resources\StockAdjustments\Pages\EditStockAdjustment;
 use App\Filament\App\Resources\StockAdjustments\Pages\ListStockAdjustments;
@@ -21,6 +23,8 @@ use UnitEnum;
 
 class StockAdjustmentResource extends Resource
 {
+    use RequiresCompanyModuleResource;
+
     protected static ?string $model = StockDocument::class;
 
     protected static ?string $slug = 'ajustes-estoque';
@@ -92,5 +96,10 @@ class StockAdjustmentResource extends Resource
             'create' => CreateStockAdjustment::route('/create'),
             'edit' => EditStockAdjustment::route('/{record}/edit'),
         ];
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Stock;
     }
 }

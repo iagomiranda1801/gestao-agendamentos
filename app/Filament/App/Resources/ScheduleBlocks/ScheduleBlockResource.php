@@ -2,6 +2,8 @@
 
 namespace App\Filament\App\Resources\ScheduleBlocks;
 
+use App\Enums\CompanyModule;
+use App\Filament\App\Concerns\RequiresCompanyModuleResource;
 use App\Filament\App\Resources\ScheduleBlocks\Pages\CreateScheduleBlock;
 use App\Filament\App\Resources\ScheduleBlocks\Pages\EditScheduleBlock;
 use App\Filament\App\Resources\ScheduleBlocks\Pages\ListScheduleBlocks;
@@ -17,6 +19,8 @@ use UnitEnum;
 
 class ScheduleBlockResource extends Resource
 {
+    use RequiresCompanyModuleResource;
+
     protected static ?string $model = ScheduleBlock::class;
 
     protected static ?string $slug = 'bloqueios-agenda';
@@ -59,5 +63,10 @@ class ScheduleBlockResource extends Resource
             'create' => CreateScheduleBlock::route('/create'),
             'edit' => EditScheduleBlock::route('/{record}/edit'),
         ];
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Scheduling;
     }
 }

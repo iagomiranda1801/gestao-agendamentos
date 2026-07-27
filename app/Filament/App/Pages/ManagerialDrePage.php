@@ -2,7 +2,9 @@
 
 namespace App\Filament\App\Pages;
 
+use App\Enums\CompanyModule;
 use App\Enums\FinancialDashboardPeriod;
+use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Filament\App\Pages\Concerns\HasFinancialPeriodFilters;
 use App\Models\Company;
 use App\Policies\FinancialReportPolicy;
@@ -20,6 +22,7 @@ class ManagerialDrePage extends Page
 {
     use HasFiltersForm;
     use HasFinancialPeriodFilters;
+    use RequiresCompanyModule;
 
     protected static ?string $slug = 'resultado-gerencial';
 
@@ -37,6 +40,10 @@ class ManagerialDrePage extends Page
 
     public static function canAccess(): bool
     {
+        if (! static::tenantHasRequiredModule()) {
+            return false;
+        }
+
         $user = auth()->user();
 
         return $user !== null && (new FinancialReportPolicy)->viewAny($user);
@@ -91,5 +98,10 @@ class ManagerialDrePage extends Page
             'businessReserve' => $summary->businessReserve,
             'ownerAllocation' => $summary->ownerAllocation,
         ];
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Finance;
     }
 }

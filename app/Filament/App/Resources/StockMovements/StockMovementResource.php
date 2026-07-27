@@ -2,6 +2,8 @@
 
 namespace App\Filament\App\Resources\StockMovements;
 
+use App\Enums\CompanyModule;
+use App\Filament\App\Concerns\RequiresCompanyModuleResource;
 use App\Filament\App\Resources\StockMovements\Pages\ListStockMovements;
 use App\Filament\App\Resources\StockMovements\Tables\StockMovementsTable;
 use App\Models\StockMovement;
@@ -14,6 +16,8 @@ use UnitEnum;
 
 class StockMovementResource extends Resource
 {
+    use RequiresCompanyModuleResource;
+
     protected static ?string $model = StockMovement::class;
 
     protected static ?string $slug = 'movimentacoes-estoque';
@@ -59,5 +63,10 @@ class StockMovementResource extends Resource
         return [
             'index' => ListStockMovements::route('/'),
         ];
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Stock;
     }
 }

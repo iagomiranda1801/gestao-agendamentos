@@ -2,6 +2,8 @@
 
 namespace App\Filament\App\Resources\Transfers;
 
+use App\Enums\CompanyModule;
+use App\Filament\App\Concerns\RequiresCompanyModuleResource;
 use App\Filament\App\Resources\Transfers\Pages\ListTransfers;
 use App\Models\FinancialTransfer;
 use BackedEnum;
@@ -15,6 +17,8 @@ use UnitEnum;
 
 class TransferResource extends Resource
 {
+    use RequiresCompanyModuleResource;
+
     protected static ?string $model = FinancialTransfer::class;
 
     protected static ?string $slug = 'transferencias';
@@ -88,5 +92,10 @@ class TransferResource extends Resource
     public static function canDelete(Model $record): bool
     {
         return false;
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Finance;
     }
 }

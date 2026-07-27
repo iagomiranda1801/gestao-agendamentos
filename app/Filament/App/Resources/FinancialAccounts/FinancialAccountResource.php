@@ -2,6 +2,8 @@
 
 namespace App\Filament\App\Resources\FinancialAccounts;
 
+use App\Enums\CompanyModule;
+use App\Filament\App\Concerns\RequiresCompanyModuleResource;
 use App\Filament\App\Resources\FinancialAccounts\Pages\CreateFinancialAccount;
 use App\Filament\App\Resources\FinancialAccounts\Pages\EditFinancialAccount;
 use App\Filament\App\Resources\FinancialAccounts\Pages\ListFinancialAccounts;
@@ -19,6 +21,8 @@ use UnitEnum;
 
 class FinancialAccountResource extends Resource
 {
+    use RequiresCompanyModuleResource;
+
     protected static ?string $model = FinancialAccount::class;
 
     protected static ?string $slug = 'contas-financeiras';
@@ -71,5 +75,10 @@ class FinancialAccountResource extends Resource
     public static function canDelete(Model $record): bool
     {
         return false;
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Finance;
     }
 }
