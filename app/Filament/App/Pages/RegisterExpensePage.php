@@ -23,6 +23,7 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use UnitEnum;
@@ -133,7 +134,12 @@ class RegisterExpensePage extends Page
     public function defaultForm(Schema $schema): Schema
     {
         return $schema
-            ->statePath('data')
+            ->statePath('data');
+    }
+
+    public function form(Schema $schema): Schema
+    {
+        return $schema
             ->components([
                 Section::make('Despesa')
                     ->schema([
@@ -195,42 +201,42 @@ class RegisterExpensePage extends Page
                                 ->orderBy('name')
                                 ->pluck('name', 'id')
                                 ->all())
-                            ->required(fn (callable $get): bool => (bool) $get('paid_now'))
-                            ->visible(fn (callable $get): bool => (bool) $get('paid_now'))
+                            ->required(fn (Get $get): bool => (bool) $get('paid_now'))
+                            ->visible(fn (Get $get): bool => (bool) $get('paid_now'))
                             ->native(false),
                         Select::make('method')
                             ->label('Forma de pagamento')
                             ->options(PaymentMethod::options())
-                            ->required(fn (callable $get): bool => (bool) $get('paid_now'))
-                            ->visible(fn (callable $get): bool => (bool) $get('paid_now'))
+                            ->required(fn (Get $get): bool => (bool) $get('paid_now'))
+                            ->visible(fn (Get $get): bool => (bool) $get('paid_now'))
                             ->native(false),
                         TextInput::make('interest_amount')
                             ->label('Juros')
                             ->numeric()
                             ->default('0.00')
-                            ->visible(fn (callable $get): bool => (bool) $get('paid_now')),
+                            ->visible(fn (Get $get): bool => (bool) $get('paid_now')),
                         TextInput::make('penalty_amount')
                             ->label('Multa')
                             ->numeric()
                             ->default('0.00')
-                            ->visible(fn (callable $get): bool => (bool) $get('paid_now')),
+                            ->visible(fn (Get $get): bool => (bool) $get('paid_now')),
                         TextInput::make('fee_amount')
                             ->label('Tarifa')
                             ->numeric()
                             ->default('0.00')
-                            ->visible(fn (callable $get): bool => (bool) $get('paid_now')),
+                            ->visible(fn (Get $get): bool => (bool) $get('paid_now')),
                         TextInput::make('discount_amount')
                             ->label('Desconto')
                             ->numeric()
                             ->default('0.00')
-                            ->visible(fn (callable $get): bool => (bool) $get('paid_now')),
+                            ->visible(fn (Get $get): bool => (bool) $get('paid_now')),
                         TextInput::make('reference')
                             ->label('Referência')
                             ->maxLength(255)
-                            ->visible(fn (callable $get): bool => (bool) $get('paid_now')),
+                            ->visible(fn (Get $get): bool => (bool) $get('paid_now')),
                     ])
                     ->columns(2)
-                    ->visible(fn (callable $get): bool => (bool) $get('paid_now')),
+                    ->visible(fn (Get $get): bool => (bool) $get('paid_now')),
                 Textarea::make('notes')
                     ->label('Observação')
                     ->rows(3)
@@ -238,6 +244,9 @@ class RegisterExpensePage extends Page
             ]);
     }
 
+    /**
+     * @return array<Action>
+     */
     protected function getFormActions(): array
     {
         return [
@@ -252,10 +261,11 @@ class RegisterExpensePage extends Page
         return $schema
             ->components([
                 Form::make([EmbeddedSchema::make('form')])
-                    ->id('form')
-                    ->livewireSubmitHandler('save'),
-                Actions::make($this->getFormActions())
-                    ->alignment('start'),
+                    ->id('register-expense-form')
+                    ->livewireSubmitHandler('save')
+                    ->footer([
+                        Actions::make($this->getFormActions()),
+                    ]),
             ]);
     }
 }
