@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\MultiTenancy;
 
+use App\Enums\CompanyRole;
 use App\Filament\Admin\Resources\Companies\Pages\ListCompanies;
 use App\Filament\Admin\Resources\Users\Pages\ListUsers;
 use App\Models\User;
@@ -27,6 +28,19 @@ class AdminPanelAccessTest extends TestCase
         $this->actingAs($user)
             ->get('/admin')
             ->assertForbidden();
+    }
+
+    public function test_company_admin_can_access_app_but_not_admin_panel(): void
+    {
+        $company = $this->createCompany();
+        $companyAdmin = $this->createCompanyUser($company, [], CompanyRole::CompanyAdmin);
+
+        $this->actingAs($companyAdmin)
+            ->get('/admin')
+            ->assertForbidden();
+
+        $this->assertFalse($companyAdmin->canAccessPanel(Filament::getPanel('admin')));
+        $this->assertTrue($companyAdmin->canAccessPanel(Filament::getPanel('app')));
     }
 
     public function test_inactive_user_cannot_access_admin_panel(): void
