@@ -5,9 +5,13 @@ namespace Tests\Feature\Services;
 use App\Enums\CompanyRole;
 use App\Filament\App\Resources\Services\Pages\ListServices;
 use App\Filament\App\Resources\Services\ServiceResource;
+use App\Models\Professional;
+use App\Models\ProfessionalWorkingHour;
 use App\Models\Service;
 use App\Policies\ServicePolicy;
+use App\Services\PublicBooking\OnlineBookingCatalogService;
 use App\Services\Service\ServiceCatalogService;
+use App\Services\Service\ServiceProfessionalSyncService;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -64,6 +68,56 @@ class ServiceResourceTest extends TestCase
         ]);
 
         $this->assertSame($company->id, $service->company_id);
+    }
+
+    public function test_service_linked_to_professional_appears_in_online_booking_catalog(): void
+    {
+        $company = $this->createCompany();
+        $professional = Professional::factory()->forCompany($company)->create([
+            'is_active' => true,
+            'is_bookable' => true,
+        ]);
+        ProfessionalWorkingHour::factory()->forCompany($company)->create([
+            'professional_id' => $professional->getKey(),
+        ]);
+
+        $service = app(ServiceCatalogService::class)->create($company, [
+            'name' => 'Design Simples',
+            'slug' => 'design-simples',
+            'price' => 35,
+            'duration_minutes' => 30,
+            'sort_order' => 1,
+            'is_bookable' => true,
+            'is_online_booking_enabled' => true,
+            'is_active' => true,
+        ]);
+
+        app(ServiceProfessionalSyncService::class)->sync($company, $service, [$professional->getKey()]);
+
+        $services = app(OnlineBookingCatalogService::class)->getEligibleServices($company);
+
+        $this->assertTrue($services->contains('id', $service->getKey()));
+    }
+
+    public function test_service_professional_sync_preserves_existing_custom_pivot_values(): void
+    {
+        $company = $this->createCompany();
+        $professional = Professional::factory()->forCompany($company)->create();
+        $service = Service::factory()->forCompany($company)->create();
+
+        $service->professionals()->attach($professional->getKey(), [
+            'company_id' => $company->getKey(),
+            'custom_price' => 75,
+            'custom_duration_minutes' => 45,
+            'is_active' => true,
+        ]);
+
+        app(ServiceProfessionalSyncService::class)->sync($company, $service, [$professional->getKey()]);
+
+        $link = $service->professionals()->whereKey($professional->getKey())->firstOrFail()->pivot;
+
+        $this->assertSame('75.00', (string) $link->custom_price);
+        $this->assertSame(45, (int) $link->custom_duration_minutes);
     }
 
     public function test_service_from_other_company_is_not_listed(): void

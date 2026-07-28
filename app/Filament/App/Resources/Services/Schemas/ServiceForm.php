@@ -2,7 +2,11 @@
 
 namespace App\Filament\App\Resources\Services\Schemas;
 
+use App\Models\Company;
+use App\Models\Professional;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\ColorPicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -81,10 +85,21 @@ class ServiceForm
                             ->live(),
                         Toggle::make('is_online_booking_enabled')
                             ->label('Disponível no agendamento online')
-                            ->default(true),
+                            ->default(true)
+                            ->live(),
                         Toggle::make('is_active')
                             ->label('Serviço ativo')
                             ->default(true),
+                        Select::make('professional_ids')
+                            ->label('Profissionais que realizam este serviço')
+                            ->multiple()
+                            ->searchable()
+                            ->preload()
+                            ->native(false)
+                            ->options(fn (): array => self::activeProfessionalOptions())
+                            ->required(fn ($get): bool => (bool) $get('is_online_booking_enabled'))
+                            ->helperText('Para aparecer no agendamento online, o serviço precisa estar vinculado a pelo menos um profissional com horários configurados.')
+                            ->columnSpanFull(),
                     ])
                     ->columns(2),
                 Section::make('Informações adicionais')
@@ -95,5 +110,27 @@ class ServiceForm
                             ->columnSpanFull(),
                     ]),
             ]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected static function activeProfessionalOptions(): array
+    {
+        /** @var Company|null $company */
+        $company = Filament::getTenant();
+
+        if (! $company) {
+            return [];
+        }
+
+        return Professional::query()
+            ->where('company_id', $company->getKey())
+            ->where('is_active', true)
+            ->where('is_bookable', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
     }
 }
