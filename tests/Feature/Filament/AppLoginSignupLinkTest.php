@@ -10,8 +10,18 @@ class AppLoginSignupLinkTest extends TestCase
     {
         $this->get('/app/login')
             ->assertOk()
+            ->assertSee('images/aqui.png', false)
+            ->assertSee('Bem-vindo de volta', false)
+            ->assertSee('Plataforma segura', false)
             ->assertSee('Criar conta — 7 dias grátis', false)
             ->assertSee(route('signup.company'), false);
+    }
+
+    public function test_admin_login_page_shows_agendaqui_logo(): void
+    {
+        $this->get('/admin/login')
+            ->assertOk()
+            ->assertSee('images/aqui.png', false);
     }
 
     public function test_admin_login_page_does_not_show_signup_link(): void

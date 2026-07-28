@@ -55,3 +55,10 @@
 .dark .fi-app-login-signup__link:hover {
     color: rgb(253 224 71);
 }
+
+.fi-logo {
+    width: auto;
+    max-width: 100%;
+    border-radius: 0.5rem;
+    object-fit: contain;
+}

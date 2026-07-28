@@ -70,6 +70,14 @@ body.booking-body {
     flex-shrink: 0;
 }
 
+.booking-brand__logo--platform {
+    width: auto;
+    max-width: 10rem;
+    height: 2.25rem;
+    object-fit: contain;
+    box-shadow: none;
+}
+
 .booking-brand__text {
     display: flex;
     flex-direction: column;

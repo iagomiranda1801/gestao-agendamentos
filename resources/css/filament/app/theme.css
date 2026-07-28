@@ -1,0 +1,687 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament/App/**/*';
+@source '../../../../resources/views/filament/app/**/*';
+@source '../../../../resources/views/components/agendaqui/**/*';
+
+/* -------------------------------------------------------------------------- */
+/* Agendaqui auth — structure                                                 */
+/* -------------------------------------------------------------------------- */
+
+.agendaqui-auth-root {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+}
+
+.agendaqui-login-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 58%) minmax(420px, 42%);
+    grid-template-rows: minmax(0, 1fr);
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-height: 100dvh;
+    overflow: hidden;
+    background: #f5f8fc;
+    color: #0f172a;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Showcase panel — single column, image as full background                   */
+/* -------------------------------------------------------------------------- */
+
+.agendaqui-showcase {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #082a67;
+}
+
+.agendaqui-showcase-background {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center bottom;
+    pointer-events: none;
+}
+
+.agendaqui-showcase-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(
+        90deg,
+        rgb(3 20 57 / 0.25),
+        rgb(3 20 57 / 0.05)
+    );
+}
+
+.agendaqui-showcase-brand {
+    position: absolute;
+    top: 0.5rem;
+    left: clamp(1.5rem, 5vw, 4rem);
+    z-index: 2;
+    width: min(27rem, 78%);
+}
+
+.agendaqui-showcase-brand__logo {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 5.5rem;
+    object-fit: contain;
+}
+
+.agendaqui-showcase-content {
+    position: absolute;
+    top: 28%;
+    left: clamp(1.5rem, 5vw, 4rem);
+    z-index: 2;
+    width: min(440px, 86%);
+    max-height: calc(100% - 32%);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+}
+
+.agendaqui-showcase-content::-webkit-scrollbar {
+    display: none;
+}
+
+.agendaqui-marketing-copy {
+    padding: clamp(1rem, 2vw, 1.5rem);
+    border: 1px solid rgb(255 255 255 / 0.12);
+    border-radius: 1rem;
+    background: rgb(8 42 103 / 0.55);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px rgb(0 0 0 / 0.15);
+}
+
+.agendaqui-showcase-headline {
+    margin: 0 0 0.625rem;
+    font-size: clamp(1.25rem, 2vw, 1.85rem);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: #fff;
+}
+
+.agendaqui-showcase-headline-accent {
+    background: linear-gradient(90deg, #19d3f3 0%, #18d5a5 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.agendaqui-showcase-subtitle {
+    margin: 0 0 1rem;
+    font-size: clamp(0.8125rem, 1.2vw, 0.9375rem);
+    line-height: 1.5;
+    color: rgb(255 255 255 / 0.82);
+}
+
+.agendaqui-features {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+/* Feature items */
+
+.agendaqui-feature-item {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+    min-width: 0;
+    padding: 0.625rem;
+    border: 1px solid rgb(255 255 255 / 0.12);
+    border-radius: 0.75rem;
+    background: rgb(255 255 255 / 0.06);
+    backdrop-filter: blur(8px);
+}
+
+.agendaqui-feature-item__icon {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgb(25 211 243 / 0.35);
+    background: rgb(18 107 255 / 0.15);
+    color: #19d3f3;
+}
+
+.agendaqui-feature-item__icon svg {
+    width: 0.95rem;
+    height: 0.95rem;
+}
+
+.agendaqui-feature-item__body {
+    min-width: 0;
+}
+
+.agendaqui-feature-item__title {
+    margin: 0 0 0.15rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #fff;
+}
+
+.agendaqui-feature-item__description {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: rgb(255 255 255 / 0.72);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Login panel                                                                */
+/* -------------------------------------------------------------------------- */
+
+.agendaqui-login-panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    padding: 2rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: #f5f8fc;
+}
+
+.agendaqui-login-panel__glow {
+    position: absolute;
+    top: 20%;
+    left: 50%;
+    width: 420px;
+    height: 420px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgb(18 139 255 / 0.12) 0%, transparent 70%);
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.agendaqui-auth-mobile-header {
+    display: none;
+    width: 100%;
+    max-width: 32rem;
+    margin-bottom: 1.25rem;
+    text-align: center;
+}
+
+.agendaqui-auth-mobile-header__logo {
+    display: block;
+    width: min(100%, 22rem);
+    height: auto;
+    max-height: 6.5rem;
+    margin: 0 auto 0.75rem;
+    object-fit: contain;
+}
+
+.agendaqui-auth-mobile-header__title {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.agendaqui-auth-card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 33.75rem;
+    padding: clamp(1.25rem, 2.5vw, 1.75rem);
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    background: #fff;
+    box-shadow:
+        0 2px 4px rgb(15 23 42 / 0.04),
+        0 10px 24px rgb(15 23 42 / 0.06);
+    animation: agendaqui-card-enter 0.6s ease-out;
+}
+
+.agendaqui-auth-card__header {
+    margin-bottom: 0.875rem;
+    text-align: center;
+}
+
+.agendaqui-auth-card__logo {
+    display: block;
+    width: 100%;
+    height: auto;
+    min-height: 2.5rem;
+    max-height: 4.25rem;
+    margin: 0 auto 0.75rem;
+    object-fit: contain;
+}
+
+.agendaqui-auth-card__title {
+    margin: 0 0 0.2rem;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+}
+
+.agendaqui-auth-card__subtitle {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: #64748b;
+}
+
+.agendaqui-auth-card__form {
+    margin-bottom: 0.625rem;
+}
+
+.agendaqui-auth-card__security {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.agendaqui-auth-card__security-icon {
+    flex-shrink: 0;
+    color: #126bff;
+}
+
+.agendaqui-auth-card__security-icon svg {
+    width: 1.1rem;
+    height: 1.1rem;
+}
+
+.agendaqui-auth-card__security-title {
+    display: block;
+    margin-bottom: 0.1rem;
+    font-size: 0.8125rem;
+    color: #0f172a;
+}
+
+.agendaqui-auth-card__security-text {
+    margin: 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: #64748b;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Filament form overrides inside auth card                                   */
+/* -------------------------------------------------------------------------- */
+
+.agendaqui-auth-card .fi-simple-page,
+.agendaqui-auth-card .fi-simple-page-content {
+    padding: 0;
+    margin: 0;
+    max-width: none;
+}
+
+.agendaqui-auth-card .fi-fo-field-wrp {
+    margin-bottom: 0.25rem;
+}
+
+.agendaqui-auth-card .fi-fo-field-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.agendaqui-auth-card .fi-input-wrp {
+    border-radius: 0.75rem;
+    border-color: #e2e8f0;
+    background: #f8fafc;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.agendaqui-auth-card .fi-input-wrp:focus-within {
+    border-color: #126bff;
+    box-shadow: 0 0 0 3px rgb(18 107 255 / 0.15);
+    background: #fff;
+}
+
+.agendaqui-auth-card .fi-input {
+    min-height: 2.5rem;
+    font-size: 0.9rem;
+}
+
+.agendaqui-auth-card .fi-input::placeholder {
+    color: #94a3b8;
+}
+
+.agendaqui-auth-card .fi-fo-checkbox {
+    margin-top: 0.25rem;
+}
+
+.agendaqui-auth-card .fi-fo-checkbox-label {
+    font-size: 0.875rem;
+    color: #475569;
+}
+
+.agendaqui-auth-card .fi-ac-actions {
+    margin-top: 1rem;
+}
+
+.agendaqui-auth-card .fi-ac-btn-action {
+    width: 100%;
+    min-height: 2.65rem;
+    border: 0;
+    border-radius: 0.75rem;
+    background: linear-gradient(135deg, #168bff 0%, #0757f8 100%);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #fff;
+    box-shadow: 0 8px 20px rgb(7 87 248 / 0.25);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.agendaqui-auth-card .fi-ac-btn-action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 28px rgb(7 87 248 / 0.32);
+}
+
+.agendaqui-auth-card .fi-ac-btn-action:disabled {
+    opacity: 0.65;
+    transform: none;
+    cursor: not-allowed;
+}
+
+.agendaqui-auth-card .fi-fo-field-wrp-label-hint {
+    font-size: 0.8rem;
+}
+
+.agendaqui-auth-card .fi-fo-field-wrp-label-hint a {
+    color: #126bff;
+}
+
+.agendaqui-auth-card .fi-fo-field-error-message {
+    font-size: 0.8rem;
+    color: #dc2626;
+}
+
+.agendaqui-auth-card .fi-app-login-signup {
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.agendaqui-auth-card .fi-app-login-signup__text {
+    color: #64748b;
+}
+
+.agendaqui-auth-card .fi-app-login-signup__link {
+    color: #d97706;
+}
+
+/* Hide default Filament simple page chrome on auth layout */
+.fi-simple-layout:has(.agendaqui-login-shell) {
+    padding: 0;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+}
+
+.fi-simple-layout:has(.agendaqui-login-shell) .fi-simple-main-ctn,
+.fi-simple-layout:has(.agendaqui-login-shell) .fi-simple-main {
+    max-width: none;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+}
+
+/* Force light appearance on auth page regardless of system dark mode */
+.agendaqui-login-shell,
+.agendaqui-login-panel,
+.agendaqui-auth-card {
+    color-scheme: light;
+}
+
+.dark .agendaqui-auth-card {
+    background: #fff;
+    color: #0f172a;
+}
+
+.dark .agendaqui-auth-card__title {
+    color: #0f172a;
+}
+
+.dark .agendaqui-auth-card .fi-fo-field-label {
+    color: #334155;
+}
+
+.dark .agendaqui-auth-card .fi-input-wrp {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+}
+
+.dark .agendaqui-auth-card .fi-input {
+    color: #0f172a;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Responsive                                                                 */
+/* -------------------------------------------------------------------------- */
+
+@media (max-width: 1279px) {
+    .agendaqui-login-shell {
+        grid-template-columns: minmax(0, 54%) minmax(380px, 46%);
+    }
+
+    .agendaqui-showcase-content {
+        top: 26%;
+        left: clamp(1.25rem, 4vw, 3rem);
+        width: min(400px, 88%);
+    }
+
+    .agendaqui-showcase-brand {
+        left: clamp(1.25rem, 4vw, 3rem);
+        width: min(23rem, 76%);
+    }
+
+    .agendaqui-marketing-copy {
+        padding: 1rem 1.25rem;
+    }
+
+    .agendaqui-showcase-headline {
+        font-size: clamp(1.2rem, 2vw, 1.65rem);
+    }
+
+    .agendaqui-showcase-subtitle {
+        margin-bottom: 0.875rem;
+        font-size: 0.8125rem;
+    }
+
+    .agendaqui-features {
+        gap: 0.45rem;
+    }
+
+    .agendaqui-feature-item {
+        padding: 0.55rem 0.625rem;
+    }
+
+    .agendaqui-feature-item__description {
+        font-size: 0.72rem;
+    }
+}
+
+@media (max-width: 1023px) and (min-width: 768px) {
+    .agendaqui-login-shell {
+        grid-template-columns: minmax(0, 52%) minmax(340px, 48%);
+    }
+
+    .agendaqui-showcase-content {
+        top: 24%;
+        left: 1rem;
+        width: min(380px, 90%);
+    }
+
+    .agendaqui-showcase-brand {
+        left: 1rem;
+        width: min(19rem, 78%);
+    }
+
+    .agendaqui-features {
+        grid-template-columns: 1fr;
+    }
+
+    .agendaqui-feature-item:nth-child(n + 3) {
+        display: none;
+    }
+
+    .agendaqui-login-panel {
+        padding: 1.5rem;
+    }
+
+    .agendaqui-auth-card {
+        max-width: 30rem;
+    }
+}
+
+@media (max-height: 820px) {
+    .agendaqui-showcase-content {
+        top: 24%;
+        max-height: calc(100% - 28%);
+    }
+
+    .agendaqui-showcase-brand {
+        top: 0.375rem;
+        width: min(18rem, 76%);
+    }
+
+    .agendaqui-showcase-brand__logo {
+        max-height: 4rem;
+    }
+
+    .agendaqui-marketing-copy {
+        padding: 0.875rem 1rem;
+    }
+
+    .agendaqui-showcase-headline {
+        margin-bottom: 0.45rem;
+        font-size: clamp(1.15rem, 1.8vw, 1.5rem);
+    }
+
+    .agendaqui-showcase-subtitle {
+        margin-bottom: 0.625rem;
+        font-size: 0.78rem;
+    }
+
+    .agendaqui-features {
+        gap: 0.4rem;
+    }
+
+    .agendaqui-feature-item {
+        padding: 0.45rem 0.55rem;
+    }
+
+    .agendaqui-feature-item__title {
+        font-size: 0.78rem;
+    }
+
+    .agendaqui-feature-item__description {
+        font-size: 0.68rem;
+    }
+}
+
+@media (max-width: 767px) {
+    .agendaqui-login-shell {
+        grid-template-columns: 1fr;
+    }
+
+    .agendaqui-showcase {
+        display: none;
+    }
+
+    .agendaqui-login-panel {
+        min-height: 100dvh;
+        padding: 1.25rem 1.25rem 2rem;
+        justify-content: flex-start;
+        padding-top: 2rem;
+    }
+
+    .agendaqui-auth-mobile-header {
+        display: block;
+    }
+
+    .agendaqui-auth-card {
+        max-width: 100%;
+        padding: 1rem 1.125rem 0.875rem;
+        border-radius: 1rem;
+    }
+
+    .agendaqui-auth-card__header .agendaqui-auth-card__logo {
+        width: 100%;
+        min-height: 2.25rem;
+        max-height: 3.75rem;
+    }
+
+    .agendaqui-auth-card__title {
+        font-size: 1.25rem;
+    }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Animations                                                                 */
+/* -------------------------------------------------------------------------- */
+
+@keyframes agendaqui-card-enter {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes agendaqui-glow-pulse {
+    0%,
+    100% {
+        opacity: 0.35;
+    }
+
+    50% {
+        opacity: 0.55;
+    }
+}
+
+@keyframes agendaqui-wave-drift {
+    0%,
+    100% {
+        transform: translate(0, 0) scale(1);
+    }
+
+    50% {
+        transform: translate(-12px, 8px) scale(1.03);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .agendaqui-auth-card {
+        animation: none;
+    }
+
+    .agendaqui-auth-card .fi-input-wrp,
+    .agendaqui-auth-card .fi-ac-btn-action {
+        transition: none;
+    }
+}

@@ -7,6 +7,8 @@
 
         @stack('head')
 
+        <link rel="icon" type="image/png" href="{{ \App\Support\Branding::faviconUrl() }}">
+
         @fonts
 
         @vite(['resources/css/public-booking.css'])
@@ -33,6 +35,8 @@
                                 alt="{{ e($company->name) }}"
                                 class="booking-brand__logo"
                             >
+                        @else
+                            <x-branding.logo class="booking-brand__logo booking-brand__logo--platform" />
                         @endif
                         <div class="booking-brand__text">
                             <span class="booking-brand__name">{{ e($company->name) }}</span>

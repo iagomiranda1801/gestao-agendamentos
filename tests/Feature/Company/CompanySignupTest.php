@@ -25,7 +25,8 @@ class CompanySignupTest extends TestCase
     public function test_signup_page_is_accessible(): void
     {
         $this->get(route('signup.company'))
-            ->assertOk();
+            ->assertOk()
+            ->assertSee('images/aqui.png', false);
     }
 
     public function test_provisioning_service_creates_company_user_and_trial(): void

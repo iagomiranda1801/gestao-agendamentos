@@ -2,9 +2,11 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\App\Pages\Auth\Login as AppLogin;
 use App\Filament\App\Pages\Dashboard;
 use App\Http\Middleware\EnsureCompanySubscriptionIsActive;
 use App\Models\Company;
+use App\Support\Branding;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -30,8 +32,24 @@ class AppPanelProvider extends PanelProvider
         return $panel
             ->id('app')
             ->path('app')
-            ->login()
-            ->brandName(fn (): string => filament()->getTenant()?->name ?? 'Gestão de Agendamentos')
+            ->login(AppLogin::class)
+            ->viteTheme('resources/css/filament/app/theme.css')
+            ->brandName(fn (): string => filament()->getTenant()?->name ?? Branding::name())
+            ->brandLogo(function (): ?string {
+                $tenant = filament()->getTenant();
+
+                if ($tenant instanceof Company && filled($tenant->logo_path)) {
+                    return $tenant->logo_path;
+                }
+
+                if ($tenant === null) {
+                    return Branding::logoUrl();
+                }
+
+                return null;
+            })
+            ->brandLogoHeight(Branding::logoHeight())
+            ->favicon(Branding::faviconUrl())
             ->colors([
                 'primary' => Color::Amber,
             ])
