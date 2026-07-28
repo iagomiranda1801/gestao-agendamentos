@@ -11,8 +11,8 @@ use App\Services\PublicBooking\OnlineBookingService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\WhatsAppConfirmationMessageBuilder;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Tests\Concerns\CreatesPublicBookingFixtures;
 use Tests\Concerns\CreatesSchedulingFixtures;
@@ -25,7 +25,7 @@ class WhatsAppConfirmationTest extends TestCase
 
     public function test_booking_dispatches_whatsapp_job(): void
     {
-        Bus::fake();
+        Queue::fake();
 
         $setup = $this->createBookableSetup();
         $this->enablePublicBooking($setup['company'], [
@@ -45,7 +45,7 @@ class WhatsAppConfirmationTest extends TestCase
 
         $this->assertTrue($result->whatsappQueued);
 
-        Bus::assertDispatchedAfterResponse(SendWhatsAppAppointmentConfirmationJob::class, function (
+        Queue::assertPushed(SendWhatsAppAppointmentConfirmationJob::class, function (
             SendWhatsAppAppointmentConfirmationJob $job,
         ) use ($result): bool {
             return $job->appointmentId === $result->appointment->getKey()
@@ -223,7 +223,7 @@ class WhatsAppConfirmationTest extends TestCase
 
     public function test_listener_dispatches_job(): void
     {
-        Bus::fake();
+        Queue::fake();
 
         $setup = $this->createBookableSetup();
         $this->enablePublicBooking($setup['company']);
@@ -241,9 +241,9 @@ class WhatsAppConfirmationTest extends TestCase
             new OnlineAppointmentCreated($result->appointment, $result->manageUrl),
         );
 
-        Bus::assertDispatchedAfterResponse(SendWhatsAppAppointmentConfirmationJob::class);
-        Bus::assertDispatchedAfterResponse(SendWhatsAppStaffBookingAlertJob::class);
-        Bus::assertDispatched(NotifyStaffOfOnlineBookingJob::class);
+        Queue::assertPushed(SendWhatsAppAppointmentConfirmationJob::class);
+        Queue::assertPushed(SendWhatsAppStaffBookingAlertJob::class);
+        Queue::assertPushed(NotifyStaffOfOnlineBookingJob::class);
     }
 
     public function test_settings_require_instance_and_sender_phone_when_enabled(): void

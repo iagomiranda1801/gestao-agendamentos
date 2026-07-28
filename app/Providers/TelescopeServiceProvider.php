@@ -2,8 +2,11 @@
 
 namespace App\Providers;
 
+use App\Jobs\SendWhatsAppAppointmentConfirmationJob;
+use App\Jobs\SendWhatsAppStaffBookingAlertJob;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
+use Laravel\Telescope\EntryType;
 use Laravel\Telescope\IncomingEntry;
 use Laravel\Telescope\Telescope;
 use Laravel\Telescope\TelescopeApplicationServiceProvider;
@@ -22,8 +25,21 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
                 || $entry->isFailedRequest()
                 || $entry->isFailedJob()
                 || $entry->isScheduledTask()
+                || $this->isWhatsAppBookingJob($entry)
                 || $entry->hasMonitoredTag();
         });
+    }
+
+    protected function isWhatsAppBookingJob(IncomingEntry $entry): bool
+    {
+        if ($entry->type !== EntryType::JOB) {
+            return false;
+        }
+
+        return in_array($entry->content['name'] ?? null, [
+            SendWhatsAppAppointmentConfirmationJob::class,
+            SendWhatsAppStaffBookingAlertJob::class,
+        ], true);
     }
 
     protected function hideSensitiveRequestDetails(): void
