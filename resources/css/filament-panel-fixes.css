@@ -62,3 +62,29 @@
     border-radius: 0.5rem;
     object-fit: contain;
 }
+
+.fi-header {
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.fi-header-actions-ctn {
+    max-width: 100%;
+}
+
+.fi-header-actions-ctn > .fi-ac {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 0.5rem;
+}
+
+.fi-header-actions-ctn .fi-btn,
+.fi-header-actions-ctn .fi-icon-btn {
+    min-height: 2.25rem;
+}
+
+.fi-header-actions-ctn .fi-btn {
+    padding-inline: 0.75rem;
+    font-size: 0.8125rem;
+}

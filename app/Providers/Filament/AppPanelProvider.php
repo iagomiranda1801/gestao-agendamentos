@@ -16,6 +16,7 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Assets\Css;
 use Filament\Support\Colors\Color;
+use Filament\Support\Enums\Width;
 use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -34,6 +35,7 @@ class AppPanelProvider extends PanelProvider
             ->path('app')
             ->login(AppLogin::class)
             ->viteTheme('resources/css/filament/app/theme.css')
+            ->maxContentWidth(Width::Full)
             ->brandName(fn (): string => filament()->getTenant()?->name ?? Branding::name())
             ->brandLogo(function (): ?string {
                 $tenant = filament()->getTenant();

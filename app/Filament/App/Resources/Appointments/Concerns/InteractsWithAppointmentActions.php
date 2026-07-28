@@ -34,6 +34,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Wizard\Step;
+use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
@@ -47,8 +48,11 @@ trait InteractsWithAppointmentActions
     {
         return [
             Action::make('copyPublicLink')
-                ->label('Copiar link público')
+                ->label('Link público')
                 ->icon('heroicon-o-link')
+                ->iconButton()
+                ->tooltip('Copiar link público')
+                ->size(Size::Small)
                 ->visible(fn (): bool => $this->getRecord()->origin === AppointmentOrigin::Online
                     && Gate::allows('view', $this->getRecord()))
                 ->action(function (): void {
@@ -71,6 +75,9 @@ trait InteractsWithAppointmentActions
                 ->label('Confirmar')
                 ->icon('heroicon-o-check-badge')
                 ->color('success')
+                ->iconButton()
+                ->tooltip('Confirmar agendamento')
+                ->size(Size::Small)
                 ->requiresConfirmation()
                 ->visible(fn (): bool => $this->getRecord()->canBeConfirmed() && Gate::allows('confirm', $this->getRecord()))
                 ->action(function (): void {
@@ -83,9 +90,10 @@ trait InteractsWithAppointmentActions
                     Notification::make()->success()->title('Agendamento confirmado')->send();
                 }),
             Action::make('start')
-                ->label('Iniciar atendimento')
+                ->label('Iniciar')
                 ->icon('heroicon-o-play')
                 ->color('info')
+                ->size(Size::Small)
                 ->requiresConfirmation()
                 ->visible(fn (): bool => $this->getRecord()->status === AppointmentStatus::Confirmed && Gate::allows('start', $this->getRecord()))
                 ->action(function (): void {
@@ -101,6 +109,9 @@ trait InteractsWithAppointmentActions
                 ->label('Remarcar')
                 ->icon('heroicon-o-calendar-days')
                 ->color('warning')
+                ->iconButton()
+                ->tooltip('Remarcar')
+                ->size(Size::Small)
                 ->visible(fn (): bool => $this->getRecord()->canBeRescheduled() && Gate::allows('reschedule', $this->getRecord()))
                 ->schema([
                     Select::make('professional_id')
@@ -140,6 +151,9 @@ trait InteractsWithAppointmentActions
                 ->label('Cancelar')
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
+                ->iconButton()
+                ->tooltip('Cancelar agendamento')
+                ->size(Size::Small)
                 ->visible(fn (): bool => $this->getRecord()->canBeCancelled() && Gate::allows('cancel', $this->getRecord()))
                 ->schema([
                     Textarea::make('cancellation_reason')
@@ -165,6 +179,9 @@ trait InteractsWithAppointmentActions
                 ->label('Não compareceu')
                 ->icon('heroicon-o-user-minus')
                 ->color('gray')
+                ->iconButton()
+                ->tooltip('Marcar como não compareceu')
+                ->size(Size::Small)
                 ->requiresConfirmation()
                 ->visible(fn (): bool => in_array($this->getRecord()->status, [
                     AppointmentStatus::Pending,
@@ -186,9 +203,10 @@ trait InteractsWithAppointmentActions
     protected function makeCompleteAppointmentAction(): Action
     {
         return Action::make('complete')
-            ->label('Concluir atendimento')
+            ->label('Concluir')
             ->icon('heroicon-o-check-circle')
             ->color('success')
+            ->size(Size::Small)
             ->modalWidth(Width::SevenExtraLarge)
             ->visible(fn (): bool => Gate::allows('complete', $this->getRecord()))
             ->fillForm(fn (): array => $this->getCompleteAppointmentFormDefaults())

@@ -12,6 +12,7 @@ use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Size;
 
 class ViewAppointment extends ViewRecord
 {
@@ -23,6 +24,9 @@ class ViewAppointment extends ViewRecord
     {
         return [
             EditAction::make()
+                ->iconButton()
+                ->tooltip('Editar agendamento')
+                ->size(Size::Small)
                 ->visible(fn (Appointment $record): bool => auth()->user()?->can('update', $record) ?? false),
             ...$this->getAppointmentActions(),
         ];
