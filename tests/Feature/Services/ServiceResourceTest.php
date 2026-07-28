@@ -3,6 +3,8 @@
 namespace Tests\Feature\Services;
 
 use App\Enums\CompanyRole;
+use App\Filament\App\Resources\Services\Pages\CreateService;
+use App\Filament\App\Resources\Services\Pages\EditService;
 use App\Filament\App\Resources\Services\Pages\ListServices;
 use App\Filament\App\Resources\Services\ServiceResource;
 use App\Models\Professional;
@@ -68,6 +70,65 @@ class ServiceResourceTest extends TestCase
         ]);
 
         $this->assertSame($company->id, $service->company_id);
+    }
+
+    public function test_service_can_be_created_with_professionals_from_form(): void
+    {
+        $company = $this->createCompany(['slug' => 'estudio-ana']);
+        $admin = $this->createCompanyUser($company);
+        $professional = Professional::factory()->forCompany($company)->create();
+
+        $this->authenticateForAppTenant($admin, $company);
+
+        Livewire::test(CreateService::class)
+            ->fillForm([
+                'name' => 'Design Simples',
+                'slug' => 'design-simples',
+                'price' => 35,
+                'duration_minutes' => 30,
+                'buffer_before_minutes' => 0,
+                'buffer_after_minutes' => 0,
+                'sort_order' => 1,
+                'is_bookable' => true,
+                'is_online_booking_enabled' => true,
+                'is_active' => true,
+                'professional_ids' => [$professional->getKey()],
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $service = Service::query()->where('company_id', $company->getKey())->where('slug', 'design-simples')->firstOrFail();
+
+        $this->assertTrue($service->professionals()->whereKey($professional->getKey())->exists());
+    }
+
+    public function test_service_professionals_can_be_updated_from_form(): void
+    {
+        $company = $this->createCompany(['slug' => 'estudio-ana']);
+        $admin = $this->createCompanyUser($company);
+        $service = Service::factory()->forCompany($company)->create();
+        $professional = Professional::factory()->forCompany($company)->create();
+
+        $this->authenticateForAppTenant($admin, $company);
+
+        Livewire::test(EditService::class, ['record' => $service->getKey()])
+            ->fillForm([
+                'name' => $service->name,
+                'slug' => $service->slug,
+                'price' => $service->price,
+                'duration_minutes' => $service->duration_minutes,
+                'buffer_before_minutes' => 0,
+                'buffer_after_minutes' => 0,
+                'sort_order' => $service->sort_order,
+                'is_bookable' => true,
+                'is_online_booking_enabled' => true,
+                'is_active' => true,
+                'professional_ids' => [$professional->getKey()],
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertTrue($service->refresh()->professionals()->whereKey($professional->getKey())->exists());
     }
 
     public function test_service_linked_to_professional_appears_in_online_booking_catalog(): void
