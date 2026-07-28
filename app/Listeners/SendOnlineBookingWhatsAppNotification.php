@@ -13,12 +13,12 @@ class SendOnlineBookingWhatsAppNotification
     {
         $appointmentId = $event->appointment->getKey();
 
-        SendWhatsAppAppointmentConfirmationJob::dispatch(
+        SendWhatsAppAppointmentConfirmationJob::dispatchAfterResponse(
             $appointmentId,
             $event->manageUrl,
         );
 
-        SendWhatsAppStaffBookingAlertJob::dispatch(
+        SendWhatsAppStaffBookingAlertJob::dispatchAfterResponse(
             $appointmentId,
             $event->manageUrl,
         );
