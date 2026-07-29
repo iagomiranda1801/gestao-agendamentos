@@ -158,4 +158,12 @@ class Attendance extends Model
     {
         return $this->hasOne(StockDocument::class);
     }
+
+    /**
+     * @return HasOne<Payable, $this>
+     */
+    public function commissionPayable(): HasOne
+    {
+        return $this->hasOne(Payable::class);
+    }
 }

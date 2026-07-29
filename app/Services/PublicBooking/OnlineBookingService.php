@@ -225,7 +225,7 @@ class OnlineBookingService
         [$appointment, $plainToken, $manageUrl] = $result;
 
         $whatsappQueued = (bool) ($settings->whatsapp_notifications_enabled ?? false)
-            && filled($settings->whatsapp_instance)
+            && filled($settings->whatsapp_instance ?: config('services.evolution.instance'))
             && filled($appointment->client_phone_snapshot);
 
         return new OnlineBookingResult(

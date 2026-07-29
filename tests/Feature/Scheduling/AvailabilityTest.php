@@ -227,6 +227,23 @@ class AvailabilityTest extends TestCase
         $this->assertFalse($result->available);
     }
 
+    public function test_all_day_schedule_block_can_be_created_without_times(): void
+    {
+        $setup = $this->createBookableSetup();
+
+        $block = app(ScheduleBlockService::class)->create($setup['company'], $setup['admin'], [
+            'type' => ScheduleBlockType::Manual,
+            'title' => 'Bloqueio dia inteiro',
+            'is_all_day' => true,
+            'start_date' => $setup['localStart']->toDateString(),
+            'end_date' => $setup['localStart']->toDateString(),
+        ]);
+
+        $this->assertTrue($block->is_all_day);
+        $this->assertSame('00:01', CompanyDateTime::utcToLocal($setup['company'], $block->start_at)->format('H:i'));
+        $this->assertSame('23:59', CompanyDateTime::utcToLocal($setup['company'], $block->end_at)->format('H:i'));
+    }
+
     public function test_different_timezone_company_works_correctly(): void
     {
         $company = $this->createSchedulingCompany(['timezone' => 'America/Manaus']);

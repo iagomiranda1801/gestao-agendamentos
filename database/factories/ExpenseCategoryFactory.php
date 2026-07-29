@@ -49,6 +49,17 @@ class ExpenseCategoryFactory extends Factory
         ]);
     }
 
+    public function professionalCommissions(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'name' => 'Comissões profissionais',
+            'code' => 'professional-commissions',
+            'type' => ExpenseCategoryType::Personnel,
+            'affects_managerial_result' => false,
+            'is_system' => true,
+        ]);
+    }
+
     public function system(): static
     {
         return $this->state(fn (array $attributes) => [

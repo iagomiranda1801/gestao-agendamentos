@@ -306,16 +306,16 @@ class SchedulingSettingsPage extends Page
                         app(CompanySchedulingSettingService::class)->getOrCreate(Filament::getTenant()),
                     )),
                 Section::make('WhatsApp (Evolution API)')
-                    ->description('Cada empresa precisa da própria instância Evolution com o WhatsApp dela conectado (QR). Esse número é o remetente das confirmações.')
+                    ->description('Use uma instância Evolution da empresa ou a instância padrão configurada no servidor. Esse número é o remetente das confirmações.')
                     ->schema([
                         Toggle::make('whatsapp_notifications_enabled')
                             ->label('Enviar confirmação no WhatsApp')
-                            ->helperText('Requer EVOLUTION_API_URL e EVOLUTION_API_KEY no servidor. Configure a instância e o número desta empresa abaixo.')
+                            ->helperText('Requer EVOLUTION_API_URL e EVOLUTION_API_KEY no servidor. A instância abaixo sobrescreve EVOLUTION_INSTANCE.')
                             ->live(),
                         TextInput::make('whatsapp_instance')
                             ->label('Instância Evolution')
-                            ->helperText('Crie uma instância na Evolution, conecte o WhatsApp da empresa via QR e cole o nome aqui. Essa instância define o número que envia.')
-                            ->required(fn (Get $get): bool => (bool) $get('whatsapp_notifications_enabled'))
+                            ->helperText('Opcional quando EVOLUTION_INSTANCE está configurada no servidor.')
+                            ->required(fn (Get $get): bool => (bool) $get('whatsapp_notifications_enabled') && blank(config('services.evolution.instance')))
                             ->maxLength(120),
                         TextInput::make('whatsapp_sender_phone')
                             ->label('Número remetente (WhatsApp da empresa)')

@@ -100,7 +100,7 @@ class WhatsAppConfirmationTest extends TestCase
         });
     }
 
-    public function test_job_does_not_fallback_to_env_instance(): void
+    public function test_job_falls_back_to_env_instance(): void
     {
         config([
             'services.evolution.url' => 'https://evolution.test',
@@ -108,7 +108,9 @@ class WhatsAppConfirmationTest extends TestCase
             'services.evolution.instance' => 'default-global',
         ]);
 
-        Http::fake();
+        Http::fake([
+            'evolution.test/*' => Http::response(['key' => ['id' => 'ok']], 200),
+        ]);
 
         $setup = $this->createBookableSetup();
         $this->enablePublicBooking($setup['company']);
@@ -132,7 +134,7 @@ class WhatsAppConfirmationTest extends TestCase
             ),
         );
 
-        $this->assertFalse($result->whatsappQueued);
+        $this->assertTrue($result->whatsappQueued);
 
         (new SendWhatsAppAppointmentConfirmationJob(
             $result->appointment->getKey(),
@@ -142,7 +144,7 @@ class WhatsAppConfirmationTest extends TestCase
             app(WhatsAppConfirmationMessageBuilder::class),
         );
 
-        Http::assertNothingSent();
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://evolution.test/message/sendText/default-global');
     }
 
     public function test_job_is_noop_when_whatsapp_disabled(): void
@@ -248,6 +250,8 @@ class WhatsAppConfirmationTest extends TestCase
 
     public function test_settings_require_instance_and_sender_phone_when_enabled(): void
     {
+        config(['services.evolution.instance' => null]);
+
         $setup = $this->createBookableSetup();
         $this->enablePublicBooking($setup['company']);
 
@@ -273,6 +277,24 @@ class WhatsAppConfirmationTest extends TestCase
 
         $this->assertTrue($setting->whatsapp_notifications_enabled);
         $this->assertSame('estudio-ana', $setting->whatsapp_instance);
+        $this->assertSame('11988887777', $setting->whatsapp_sender_phone);
+    }
+
+    public function test_settings_accept_global_whatsapp_instance_when_enabled(): void
+    {
+        config(['services.evolution.instance' => 'default-global']);
+
+        $setup = $this->createBookableSetup();
+        $this->enablePublicBooking($setup['company']);
+
+        $setting = app(CompanySchedulingSettingService::class)->update($setup['company'], [
+            'whatsapp_notifications_enabled' => true,
+            'whatsapp_instance' => null,
+            'whatsapp_sender_phone' => '(11) 98888-7777',
+        ]);
+
+        $this->assertTrue($setting->whatsapp_notifications_enabled);
+        $this->assertNull($setting->whatsapp_instance);
         $this->assertSame('11988887777', $setting->whatsapp_sender_phone);
     }
 }

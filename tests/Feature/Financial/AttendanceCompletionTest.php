@@ -10,6 +10,8 @@ use App\Enums\AppointmentStatus;
 use App\Enums\AttendanceHistoryType;
 use App\Enums\CommissionType;
 use App\Enums\CompanyRole;
+use App\Enums\PayableOrigin;
+use App\Enums\PayableStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\ReceivableStatus;
 use App\Enums\StockDocumentType;
@@ -18,11 +20,16 @@ use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\FinancialAccount;
 use App\Models\InventoryBalance;
+use App\Models\Payable;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\Financial\AttendanceCompletionService;
 use App\Services\Financial\CompanyFinancialSettingService;
+use App\Services\Financial\ManagerialDreAggregator;
+use App\Services\Financial\PayableService;
 use App\Services\Scheduling\AppointmentStatusService;
+use App\Support\CompanyDateTime;
+use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -277,6 +284,77 @@ class AttendanceCompletionTest extends TestCase
         $this->assertSame('10.00', (string) $attendance->business_reserve_amount);
         $this->assertSame('65.00', (string) $attendance->owner_allocation_amount);
         $this->assertSame('85.00', (string) $attendance->operational_result);
+    }
+
+    public function test_completion_creates_open_payable_for_professional_commission(): void
+    {
+        $appointment = $this->createCompletableAppointment(AppointmentStatus::Confirmed, '100.00');
+
+        $attendance = $this->complete($appointment);
+        $payable = $attendance->commissionPayable()->with(['installments', 'expenseCategory'])->first();
+
+        $this->assertNotNull($payable);
+        $this->assertSame(PayableOrigin::ProfessionalCommission, $payable->origin);
+        $this->assertSame(PayableStatus::Open, $payable->status);
+        $this->assertSame('15.00', (string) $payable->total_amount);
+        $this->assertSame($attendance->professional_id, $payable->professional_id);
+        $this->assertSame("attendance:{$attendance->getKey()}:professional-commission", $payable->reference_key);
+        $this->assertFalse($payable->expenseCategory->affects_managerial_result);
+        $this->assertTrue($payable->expenseCategory->is_system);
+        $this->assertSame('Comissões profissionais', $payable->expenseCategory->name);
+        $this->assertSame('15.00', (string) $payable->installments->first()->outstanding_amount);
+    }
+
+    public function test_completion_does_not_create_payable_when_commission_is_zero(): void
+    {
+        app(CompanyFinancialSettingService::class)->update($this->company, [
+            'default_commission_type' => CommissionType::None->value,
+            'default_commission_value' => '0',
+        ]);
+
+        $appointment = $this->createCompletableAppointment(AppointmentStatus::Confirmed, '100.00');
+
+        $attendance = $this->complete($appointment);
+
+        $this->assertSame('0.00', (string) $attendance->commission_amount);
+        $this->assertNull($attendance->commissionPayable);
+        $this->assertDatabaseCount('payables', 0);
+    }
+
+    public function test_commission_payable_generation_is_idempotent(): void
+    {
+        $appointment = $this->createCompletableAppointment(AppointmentStatus::Confirmed, '100.00');
+
+        $attendance = $this->complete($appointment);
+        $firstPayable = $attendance->commissionPayable()->firstOrFail();
+
+        $secondPayable = app(PayableService::class)->createFromAttendanceCommission(
+            $this->company,
+            $attendance->refresh(),
+            $this->user,
+        );
+
+        $this->assertNotNull($secondPayable);
+        $this->assertTrue($firstPayable->is($secondPayable));
+        $this->assertSame(1, Payable::query()->count());
+    }
+
+    public function test_commission_payable_does_not_double_count_in_managerial_dre(): void
+    {
+        $appointment = $this->createCompletableAppointment(AppointmentStatus::Confirmed, '100.00');
+
+        $this->complete($appointment);
+
+        $timezone = CompanyDateTime::timezone($this->company);
+        $summary = app(ManagerialDreAggregator::class)->aggregate(
+            $this->company,
+            CarbonImmutable::parse(now($timezone)->toDateString().' 00:00:00', $timezone),
+            CarbonImmutable::parse(now($timezone)->toDateString().' 23:59:59', $timezone),
+        );
+
+        $this->assertSame('15.00', $summary->commissions);
+        $this->assertSame('0.00', $summary->operationalExpenses);
+        $this->assertSame('85.00', $summary->operationalResult);
     }
 
     public function test_records_completion_histories(): void

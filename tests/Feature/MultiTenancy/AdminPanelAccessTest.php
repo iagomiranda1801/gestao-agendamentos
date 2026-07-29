@@ -87,4 +87,17 @@ class AdminPanelAccessTest extends TestCase
         Livewire::test(ListCompanies::class)
             ->assertSuccessful();
     }
+
+    public function test_super_admin_can_access_company_resource_with_records(): void
+    {
+        $superAdmin = $this->createSuperAdmin();
+        $this->createCompany();
+
+        Filament::setCurrentPanel('admin');
+
+        $this->actingAs($superAdmin);
+
+        Livewire::test(ListCompanies::class)
+            ->assertSuccessful();
+    }
 }

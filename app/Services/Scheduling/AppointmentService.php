@@ -250,10 +250,19 @@ class AppointmentService
         $this->applyCalendarAuthorization($query, $company, $user);
         $this->applyCalendarFilters($query, $filters);
 
-        return $query
+        $appointments = $query
             ->orderBy('start_at')
             ->get()
             ->map(fn (Appointment $appointment): array => $this->formatCalendarEvent($company, $user, $appointment))
+            ->all();
+
+        $blocks = $this->fetchCalendarBlocks($company, $user, $visibleStartUtc, $visibleEndUtc, $filters)
+            ->map(fn (ScheduleBlock $block): array => $this->formatCalendarBlock($company, $block))
+            ->all();
+
+        return collect([...$appointments, ...$blocks])
+            ->sortBy('start')
+            ->values()
             ->all();
     }
 
@@ -491,6 +500,34 @@ class AppointmentService
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    protected function formatCalendarBlock(Company $company, ScheduleBlock $block): array
+    {
+        $localStart = CompanyDateTime::utcToLocal($company, $block->start_at);
+        $localEnd = CompanyDateTime::utcToLocal($company, $block->end_at);
+        $scope = $block->professional?->name ?? 'Toda a empresa';
+
+        return [
+            'id' => 'block-'.$block->getKey(),
+            'title' => "Bloqueio: {$block->title} · {$scope}",
+            'start' => $localStart->toIso8601String(),
+            'end' => $localEnd->toIso8601String(),
+            'allDay' => $block->is_all_day,
+            'backgroundColor' => '#64748b',
+            'borderColor' => '#475569',
+            'textColor' => '#ffffff',
+            'extendedProps' => [
+                'type' => 'schedule_block',
+                'blockType' => $block->type->value,
+                'blockTypeLabel' => $block->type->label(),
+                'professional' => $scope,
+                'editable' => false,
+            ],
+        ];
+    }
+
     protected function resolveEventColor(Appointment $appointment): string
     {
         return match ($appointment->status) {
@@ -510,6 +547,7 @@ class AppointmentService
      */
     public function fetchCalendarBlocks(
         Company $company,
+        User $user,
         CarbonImmutable $visibleStartUtc,
         CarbonImmutable $visibleEndUtc,
         array $filters = [],
@@ -520,6 +558,8 @@ class AppointmentService
             ->inPeriod($visibleStartUtc, $visibleEndUtc)
             ->with(['professional']);
 
+        $this->applyCalendarBlockAuthorization($query, $company, $user);
+
         if (filled($filters['professional_id'] ?? null)) {
             $query->where(function (Builder $builder) use ($filters): void {
                 $builder
@@ -529,5 +569,37 @@ class AppointmentService
         }
 
         return $query->get();
+    }
+
+    /**
+     * @param  Builder<ScheduleBlock>  $query
+     */
+    protected function applyCalendarBlockAuthorization(Builder $query, Company $company, User $user): void
+    {
+        if ($user->is_super_admin || $user->hasActiveRoleInCompany(
+            $company,
+            CompanyRole::CompanyAdmin,
+            CompanyRole::Manager,
+        )) {
+            return;
+        }
+
+        $professionalId = Professional::query()
+            ->where('company_id', $company->getKey())
+            ->where('user_id', $user->getKey())
+            ->where('is_active', true)
+            ->value('id');
+
+        if (! $professionalId) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->where(function (Builder $builder) use ($professionalId): void {
+            $builder
+                ->whereNull('professional_id')
+                ->orWhere('professional_id', $professionalId);
+        });
     }
 }

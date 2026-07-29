@@ -25,6 +25,7 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
                 || $entry->isFailedRequest()
                 || $entry->isFailedJob()
                 || $entry->isScheduledTask()
+                || $entry->type === EntryType::JOB
                 || $this->isWhatsAppBookingJob($entry)
                 || $entry->hasMonitoredTag();
         });

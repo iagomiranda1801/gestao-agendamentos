@@ -90,4 +90,11 @@ class PayableFactory extends Factory
             'origin' => PayableOrigin::Recurring,
         ]);
     }
+
+    public function professionalCommission(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'origin' => PayableOrigin::ProfessionalCommission,
+        ]);
+    }
 }

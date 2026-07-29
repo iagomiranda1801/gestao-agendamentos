@@ -30,9 +30,15 @@ class CompaniesTable
                 TextColumn::make('enabled_modules')
                     ->label('Módulos')
                     ->badge()
-                    ->formatStateUsing(fn (?array $state): array => collect($state ?? [])
-                        ->map(fn (string $value) => CompanyModule::tryFrom($value)?->label() ?? $value)
-                        ->all()),
+                    ->formatStateUsing(function (array|string|null $state): array|string {
+                        if (is_string($state)) {
+                            return CompanyModule::tryFrom($state)?->label() ?? $state;
+                        }
+
+                        return collect($state ?? [])
+                            ->map(fn (string $value) => CompanyModule::tryFrom($value)?->label() ?? $value)
+                            ->all();
+                    }),
                 TextColumn::make('subscription_status')
                     ->label('Assinatura')
                     ->badge()

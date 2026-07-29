@@ -5,6 +5,7 @@ namespace App\Filament\App\Pages;
 use App\Enums\AppointmentStatus;
 use App\Enums\CompanyModule;
 use App\Enums\CompanyRole;
+use App\Enums\ScheduleBlockType;
 use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Filament\App\Resources\Appointments\AppointmentResource;
 use App\Models\Appointment;
@@ -15,14 +16,19 @@ use App\Models\Service;
 use App\Policies\AppointmentPolicy;
 use App\Services\Scheduling\AppointmentService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
+use App\Services\Scheduling\ScheduleBlockService;
 use App\Support\CompanyDateTime;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Form;
@@ -112,6 +118,10 @@ class CalendarPage extends Page
         );
 
         return array_map(function (array $event) use ($company): array {
+            if (($event['extendedProps']['type'] ?? null) === 'schedule_block') {
+                return $event;
+            }
+
             $event['extendedProps']['viewUrl'] = AppointmentResource::getUrl('view', [
                 'tenant' => $company,
                 'record' => $event['id'],
@@ -136,6 +146,26 @@ class CalendarPage extends Page
         Notification::make()
             ->success()
             ->title('Agendamento criado')
+            ->send();
+
+        $this->dispatch('scheduling-calendar:refresh');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function createBlockFromSelection(array $data): void
+    {
+        abort_unless($this->canManageCalendar(), 403);
+
+        /** @var Company $company */
+        $company = Filament::getTenant();
+
+        app(ScheduleBlockService::class)->create($company, auth()->user(), $data);
+
+        Notification::make()
+            ->success()
+            ->title('Bloqueio criado')
             ->send();
 
         $this->dispatch('scheduling-calendar:refresh');
@@ -347,6 +377,71 @@ class CalendarPage extends Page
                 ->action(function (array $data): void {
                     $this->createFromSelection($data);
                 }),
+            Action::make('createBlockFromSelection')
+                ->label('Novo bloqueio')
+                ->icon('heroicon-o-no-symbol')
+                ->color('gray')
+                ->schema([
+                    Select::make('type')
+                        ->label('Tipo')
+                        ->options(ScheduleBlockType::options())
+                        ->default(ScheduleBlockType::Manual->value)
+                        ->required()
+                        ->native(false),
+                    TextInput::make('title')
+                        ->label('Título')
+                        ->default('Bloqueio')
+                        ->required()
+                        ->maxLength(255),
+                    Select::make('professional_id')
+                        ->label('Profissional')
+                        ->options(fn (): array => Professional::query()
+                            ->where('company_id', Filament::getTenant()?->getKey())
+                            ->active()
+                            ->orderBy('name')
+                            ->pluck('name', 'id')
+                            ->all())
+                        ->searchable()
+                        ->nullable()
+                        ->live()
+                        ->native(false),
+                    Placeholder::make('company_wide_warning')
+                        ->label('')
+                        ->content('Este bloqueio afetará todos os profissionais da empresa.')
+                        ->visible(fn (callable $get): bool => blank($get('professional_id'))),
+                    Toggle::make('is_all_day')
+                        ->label('Dia inteiro')
+                        ->default(false)
+                        ->live(),
+                    DatePicker::make('start_date')
+                        ->label('Data inicial')
+                        ->required()
+                        ->native(false),
+                    TimePicker::make('start_time')
+                        ->label('Hora inicial')
+                        ->seconds(false)
+                        ->required(fn (callable $get): bool => ! $get('is_all_day'))
+                        ->hidden(fn (callable $get): bool => (bool) $get('is_all_day')),
+                    DatePicker::make('end_date')
+                        ->label('Data final')
+                        ->required()
+                        ->native(false),
+                    TimePicker::make('end_time')
+                        ->label('Hora final')
+                        ->seconds(false)
+                        ->required(fn (callable $get): bool => ! $get('is_all_day'))
+                        ->hidden(fn (callable $get): bool => (bool) $get('is_all_day')),
+                    Textarea::make('reason')
+                        ->label('Motivo')
+                        ->rows(3)
+                        ->columnSpanFull(),
+                    Toggle::make('is_active')
+                        ->label('Ativo')
+                        ->default(true),
+                ])
+                ->action(function (array $data): void {
+                    $this->createBlockFromSelection($data);
+                }),
         ];
     }
 
@@ -361,6 +456,28 @@ class CalendarPage extends Page
         $this->mountAction('createFromSelection', [
             'appointment_date' => $localStart->toDateString(),
             'appointment_time' => $localStart->format('H:i'),
+        ]);
+    }
+
+    public function openCreateBlockFromSelection(string $startIso, ?string $endIso = null): void
+    {
+        abort_unless($this->canManageCalendar(), 403);
+
+        /** @var Company $company */
+        $company = Filament::getTenant();
+        $localStart = CarbonImmutable::parse($startIso)->setTimezone(CompanyDateTime::timezone($company));
+        $localEnd = $endIso !== null
+            ? CarbonImmutable::parse($endIso)->setTimezone(CompanyDateTime::timezone($company))
+            : $localStart->addHour();
+
+        $this->mountAction('createBlockFromSelection', [
+            'type' => ScheduleBlockType::Manual->value,
+            'title' => 'Bloqueio',
+            'start_date' => $localStart->toDateString(),
+            'start_time' => $localStart->format('H:i'),
+            'end_date' => $localEnd->toDateString(),
+            'end_time' => $localEnd->format('H:i'),
+            'is_active' => true,
         ]);
     }
 

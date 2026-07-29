@@ -3,10 +3,12 @@
 namespace App\Services\Financial;
 
 use App\DataTransferObjects\Financial\PayablePaymentData;
+use App\Enums\ExpenseCategoryType;
 use App\Enums\PayableOrigin;
 use App\Enums\PayableStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\StockDocumentType;
+use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\ExpenseCategory;
 use App\Models\FinancialAccount;
@@ -69,6 +71,8 @@ class PayableService
                 'notes' => $data['notes'] ?? null,
                 'stock_document_id' => $data['stock_document_id'] ?? null,
                 'recurring_expense_template_id' => $data['recurring_expense_template_id'] ?? null,
+                'attendance_id' => $data['attendance_id'] ?? null,
+                'professional_id' => $data['professional_id'] ?? null,
             ]);
             $payable->company()->associate($company);
             $payable->expenseCategory()->associate($category);
@@ -323,6 +327,70 @@ class PayableService
         });
     }
 
+    public function createFromAttendanceCommission(
+        Company $company,
+        Attendance $attendance,
+        User $user,
+    ): ?Payable {
+        return DB::transaction(function () use ($company, $attendance, $user): ?Payable {
+            $lockedAttendance = Attendance::query()
+                ->whereKey($attendance->getKey())
+                ->where('company_id', $company->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $commissionAmount = (string) $lockedAttendance->commission_amount;
+
+            if (bccomp($commissionAmount, '0', 2) <= 0) {
+                return null;
+            }
+
+            $referenceKey = "attendance:{$lockedAttendance->getKey()}:professional-commission";
+
+            $existing = Payable::query()
+                ->where('company_id', $company->getKey())
+                ->where(function ($query) use ($lockedAttendance, $referenceKey): void {
+                    $query
+                        ->where('attendance_id', $lockedAttendance->getKey())
+                        ->orWhere('reference_key', $referenceKey);
+                })
+                ->first();
+
+            if ($existing !== null) {
+                return $existing->refresh()->load(['installments', 'professional', 'attendance']);
+            }
+
+            $category = $this->getOrCreateProfessionalCommissionCategory($company);
+            $completedAt = Carbon::parse($lockedAttendance->completed_at ?? now());
+            $professionalName = $lockedAttendance->professional_name_snapshot ?: $lockedAttendance->professional?->name;
+            $description = "Comissão profissional - Atendimento #{$lockedAttendance->getKey()}";
+
+            if (filled($professionalName)) {
+                $description .= " - {$professionalName}";
+            }
+
+            $payable = $this->createDraft($company, $category, [
+                'origin' => PayableOrigin::ProfessionalCommission,
+                'description' => $description,
+                'reference_key' => $referenceKey,
+                'issue_date' => $completedAt->toDateString(),
+                'competence_date' => $completedAt->toDateString(),
+                'total_amount' => $commissionAmount,
+                'notes' => 'Conta gerada automaticamente a partir da comissão do atendimento.',
+                'attendance_id' => $lockedAttendance->getKey(),
+                'professional_id' => $lockedAttendance->professional_id,
+            ], $user);
+
+            $this->createInstallments($company, $payable, [[
+                'due_date' => $completedAt->toDateString(),
+                'amount' => $commissionAmount,
+            ]]);
+
+            return $this->launch($company, $payable->refresh())
+                ->load(['installments', 'professional', 'attendance']);
+        });
+    }
+
     /**
      * @param  array<string, mixed>  $data
      */
@@ -532,5 +600,47 @@ class PayableService
                 'reference_key' => 'Já existe uma conta a pagar com esta referência.',
             ]);
         }
+    }
+
+    protected function getOrCreateProfessionalCommissionCategory(Company $company): ExpenseCategory
+    {
+        $category = ExpenseCategory::query()
+            ->where('company_id', $company->getKey())
+            ->where('code', 'professional-commissions')
+            ->first();
+
+        $category ??= ExpenseCategory::query()
+            ->where('company_id', $company->getKey())
+            ->where('name', 'Comissões profissionais')
+            ->whereNull('code')
+            ->first();
+
+        if ($category !== null) {
+            $category->forceFill([
+                'name' => 'Comissões profissionais',
+                'code' => 'professional-commissions',
+                'type' => ExpenseCategoryType::Personnel,
+                'affects_managerial_result' => false,
+                'is_system' => true,
+                'is_active' => true,
+            ])->save();
+
+            return $category->refresh();
+        }
+
+        $category = new ExpenseCategory([
+            'name' => 'Comissões profissionais',
+            'code' => 'professional-commissions',
+            'type' => ExpenseCategoryType::Personnel,
+            'description' => 'Comissões geradas automaticamente na finalização de atendimentos.',
+            'affects_managerial_result' => false,
+            'is_system' => true,
+            'is_active' => true,
+            'sort_order' => 10,
+        ]);
+        $category->company()->associate($company);
+        $category->save();
+
+        return $category->refresh();
     }
 }

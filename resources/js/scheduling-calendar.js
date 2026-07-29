@@ -53,10 +53,19 @@ window.initSchedulingCalendar = function initSchedulingCalendar({ element, wire,
                 return;
             }
 
-            wire.openCreateFromSelection(info.startStr, info.endStr);
+            if (info.jsEvent?.shiftKey) {
+                wire.openCreateBlockFromSelection(info.startStr, info.endStr);
+            } else {
+                wire.openCreateFromSelection(info.startStr, info.endStr);
+            }
+
             calendar.unselect();
         },
         eventClick: (info) => {
+            if (info.event.extendedProps?.type === 'schedule_block') {
+                return;
+            }
+
             const url = info.event.extendedProps?.viewUrl;
 
             if (url) {

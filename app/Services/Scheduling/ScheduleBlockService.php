@@ -71,6 +71,11 @@ class ScheduleBlockService
     {
         unset($data['company_id'], $data['created_by']);
 
+        if ($data['is_all_day'] ?? false) {
+            $data['start_time'] = '00:01';
+            $data['end_time'] = '23:59';
+        }
+
         if (isset($data['start_date'], $data['start_time'])) {
             $data['start_at'] = CompanyDateTime::localToUtc(
                 $company,
@@ -85,13 +90,6 @@ class ScheduleBlockService
                 CompanyDateTime::parseLocal($company, $data['end_date'], $data['end_time']),
             );
             unset($data['end_date'], $data['end_time']);
-        }
-
-        if (($data['is_all_day'] ?? false) && isset($data['start_at'], $data['end_at'])) {
-            $localStart = CompanyDateTime::utcToLocal($company, CarbonImmutable::parse($data['start_at']));
-            $localEnd = CompanyDateTime::utcToLocal($company, CarbonImmutable::parse($data['end_at']));
-            $data['start_at'] = CompanyDateTime::localToUtc($company, $localStart->startOfDay());
-            $data['end_at'] = CompanyDateTime::localToUtc($company, $localEnd->endOfDay());
         }
 
         return $data;

@@ -149,6 +149,14 @@ class Professional extends Model
         return $this->hasMany(Attendance::class);
     }
 
+    /**
+     * @return HasMany<Payable, $this>
+     */
+    public function commissionPayables(): HasMany
+    {
+        return $this->hasMany(Payable::class);
+    }
+
     public function hasConfiguredWorkingHours(): bool
     {
         return $this->workingHours()->active()->exists();

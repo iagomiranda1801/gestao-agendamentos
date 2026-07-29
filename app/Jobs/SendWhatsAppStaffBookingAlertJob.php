@@ -39,7 +39,7 @@ class SendWhatsAppStaffBookingAlertJob implements ShouldQueue
             return;
         }
 
-        $instance = trim((string) ($settings->whatsapp_instance ?? ''));
+        $instance = $client->resolveInstance($settings->whatsapp_instance ?? null);
 
         if ($instance === '') {
             Log::warning('WhatsApp staff alert skipped: missing company instance.', [

@@ -7,14 +7,20 @@ use App\Enums\CommissionType;
 use App\Enums\CompanyRole;
 use App\Filament\App\Resources\Appointments\Pages\ViewAppointment;
 use App\Filament\App\Resources\Attendances\Pages\ListAttendances;
+use App\Filament\App\Resources\Payables\Pages\ListPayables;
 use App\Filament\App\Resources\Receivables\Pages\ListReceivables;
+use App\Enums\PaymentMethod;
+use App\Enums\PayableStatus;
 use App\Models\Appointment;
 use App\Models\Attendance;
 use App\Models\Company;
+use App\Models\ExpenseCategory;
+use App\Models\FinancialAccount;
 use App\Models\Professional;
 use App\Models\Receivable;
 use App\Models\User;
 use App\Services\Financial\CompanyFinancialSettingService;
+use App\Services\Financial\PayableService;
 use App\Services\Financial\ReceivableService;
 use App\Services\Scheduling\AppointmentService;
 use Livewire\Livewire;
@@ -67,6 +73,49 @@ class FinancialResourceAuthorizationTest extends TestCase
         $this->authenticateForAppTenant($employee, $this->company);
 
         Livewire::test(ListReceivables::class)->assertForbidden();
+    }
+
+    public function test_manager_can_pay_open_payable_from_table(): void
+    {
+        $manager = $this->createCompanyUser($this->company, [], CompanyRole::Manager);
+        $category = ExpenseCategory::factory()->forCompany($this->company)->create();
+        $account = FinancialAccount::factory()
+            ->forCompany($this->company)
+            ->allowNegativeBalance()
+            ->create();
+
+        $payableService = app(PayableService::class);
+        $payable = $payableService->createDraft($this->company, $category, [
+            'description' => 'Comissão profissional',
+            'total_amount' => '15.00',
+            'competence_date' => now()->toDateString(),
+        ], $this->admin);
+        $installments = $payableService->createInstallments($this->company, $payable, [[
+            'due_date' => now()->toDateString(),
+            'amount' => '15.00',
+        ]]);
+        $payable = $payableService->launch($this->company, $payable->refresh());
+
+        $this->authenticateForAppTenant($manager, $this->company);
+
+        Livewire::test(ListPayables::class)
+            ->assertSuccessful()
+            ->assertCanSeeTableRecords([$payable])
+            ->assertTableActionVisible('registerPayment', $payable)
+            ->callTableAction('registerPayment', $payable, [
+                'payable_installment_id' => $installments->first()->getKey(),
+                'settled_principal_amount' => '15.00',
+                'interest_amount' => '0.00',
+                'penalty_amount' => '0.00',
+                'fee_amount' => '0.00',
+                'discount_amount' => '0.00',
+                'method' => PaymentMethod::Pix->value,
+                'financial_account_id' => $account->getKey(),
+                'paid_at' => now()->toDateTimeString(),
+            ]);
+
+        $this->assertSame(PayableStatus::Paid, $payable->fresh()->status);
+        $this->assertSame('-15.00', $account->fresh()->getCurrentBalance());
     }
 
     public function test_employee_can_list_own_attendances_only(): void

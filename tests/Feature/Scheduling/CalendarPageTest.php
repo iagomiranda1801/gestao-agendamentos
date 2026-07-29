@@ -4,8 +4,10 @@ namespace Tests\Feature\Scheduling;
 
 use App\Enums\AppointmentStatus;
 use App\Enums\CompanyRole;
+use App\Enums\ScheduleBlockType;
 use App\Models\Professional;
 use App\Services\Scheduling\AppointmentService;
+use App\Services\Scheduling\ScheduleBlockService;
 use Carbon\CarbonImmutable;
 use Tests\Concerns\CreatesSchedulingFixtures;
 use Tests\TestCase;
@@ -50,6 +52,58 @@ class CalendarPageTest extends TestCase
         );
 
         $this->assertCount(1, $events);
+    }
+
+    public function test_calendar_loads_schedule_blocks(): void
+    {
+        $setup = $this->createBookableSetup();
+
+        app(ScheduleBlockService::class)->create($setup['company'], $setup['admin'], [
+            'type' => ScheduleBlockType::Manual,
+            'title' => 'Reunião interna',
+            'professional_id' => $setup['professional']->getKey(),
+            'start_date' => $setup['localStart']->toDateString(),
+            'start_time' => '09:30',
+            'end_date' => $setup['localStart']->toDateString(),
+            'end_time' => '10:30',
+        ]);
+
+        $events = app(AppointmentService::class)->fetchCalendarEvents(
+            $setup['company'],
+            $setup['admin'],
+            $setup['localStart']->startOfDay()->utc(),
+            $setup['localStart']->endOfDay()->utc(),
+        );
+
+        $this->assertCount(1, $events);
+        $this->assertSame('schedule_block', $events[0]['extendedProps']['type']);
+        $this->assertStringStartsWith('Bloqueio: Reunião interna', $events[0]['title']);
+        $this->assertArrayNotHasKey('viewUrl', $events[0]['extendedProps']);
+    }
+
+    public function test_calendar_block_filter_includes_company_wide_blocks(): void
+    {
+        $setup = $this->createBookableSetup();
+
+        app(ScheduleBlockService::class)->create($setup['company'], $setup['admin'], [
+            'type' => ScheduleBlockType::Manual,
+            'title' => 'Feriado',
+            'start_date' => $setup['localStart']->toDateString(),
+            'start_time' => '09:30',
+            'end_date' => $setup['localStart']->toDateString(),
+            'end_time' => '10:30',
+        ]);
+
+        $events = app(AppointmentService::class)->fetchCalendarEvents(
+            $setup['company'],
+            $setup['admin'],
+            $setup['localStart']->startOfDay()->utc(),
+            $setup['localStart']->endOfDay()->utc(),
+            ['professional_id' => $setup['professional']->getKey()],
+        );
+
+        $this->assertCount(1, $events);
+        $this->assertSame('Toda a empresa', $events[0]['extendedProps']['professional']);
     }
 
     public function test_professional_filter_works(): void

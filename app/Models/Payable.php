@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'expense_category_id',
     'stock_document_id',
     'recurring_expense_template_id',
+    'attendance_id',
+    'professional_id',
     'origin',
     'status',
     'description',
@@ -96,6 +98,22 @@ class Payable extends Model
     public function recurringExpenseTemplate(): BelongsTo
     {
         return $this->belongsTo(RecurringExpenseTemplate::class);
+    }
+
+    /**
+     * @return BelongsTo<Attendance, $this>
+     */
+    public function attendance(): BelongsTo
+    {
+        return $this->belongsTo(Attendance::class);
+    }
+
+    /**
+     * @return BelongsTo<Professional, $this>
+     */
+    public function professional(): BelongsTo
+    {
+        return $this->belongsTo(Professional::class);
     }
 
     /**

@@ -142,9 +142,9 @@ class CompanySchedulingSettingService
         }
 
         if ((bool) ($payload['whatsapp_notifications_enabled'] ?? false)) {
-            if (blank($payload['whatsapp_instance'] ?? null)) {
+            if (blank($payload['whatsapp_instance'] ?? null) && blank(config('services.evolution.instance'))) {
                 throw ValidationException::withMessages([
-                    'whatsapp_instance' => 'Informe a instância Evolution desta empresa.',
+                    'whatsapp_instance' => 'Informe a instância Evolution desta empresa ou configure EVOLUTION_INSTANCE no servidor.',
                 ]);
             }
 

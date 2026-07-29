@@ -8,6 +8,11 @@ use RuntimeException;
 
 class EvolutionApiClient
 {
+    public function resolveInstance(?string $companyInstance = null): string
+    {
+        return trim((string) ($companyInstance ?: config('services.evolution.instance')));
+    }
+
     public function sendText(string $instance, string $phoneDigits, string $message): void
     {
         $baseUrl = rtrim((string) config('services.evolution.url'), '/');
@@ -16,6 +21,8 @@ class EvolutionApiClient
         if ($baseUrl === '' || $apiKey === '') {
             throw new RuntimeException('Evolution API não configurada (EVOLUTION_API_URL / EVOLUTION_API_KEY).');
         }
+
+        $instance = $this->resolveInstance($instance);
 
         if ($instance === '') {
             throw new RuntimeException('Instância Evolution não configurada.');

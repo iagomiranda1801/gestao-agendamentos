@@ -42,7 +42,7 @@ class EditScheduleBlock extends EditRecord
     protected function mutateFormDataBeforeSave(array $data): array
     {
         if ($data['is_all_day'] ?? false) {
-            $data['start_time'] = '00:00';
+            $data['start_time'] = '00:01';
             $data['end_time'] = '23:59';
         }
 

@@ -37,6 +37,7 @@ class AttendanceCompletionService
         protected AttendanceFinancialCalculator $calculator,
         protected CommissionResolver $commissionResolver,
         protected CompanyFinancialSettingService $financialSettingService,
+        protected PayableService $payableService,
         protected ReceivableService $receivableService,
         protected StockDocumentService $stockDocumentService,
         protected StockDocumentPostingService $stockDocumentPostingService,
@@ -176,6 +177,7 @@ class AttendanceCompletionService
             ])->save();
 
             $receivable = $this->receivableService->createForAttendance($company, $attendance, $user);
+            $this->payableService->createFromAttendanceCommission($company, $attendance, $user);
 
             foreach ($data->payments as $paymentData) {
                 $this->receivableService->registerPayment(
@@ -211,6 +213,7 @@ class AttendanceCompletionService
                 'receivable',
                 'payments',
                 'stockDocument',
+                'commissionPayable.installments',
             ]);
         });
     }

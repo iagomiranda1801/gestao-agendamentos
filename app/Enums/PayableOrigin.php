@@ -7,6 +7,7 @@ enum PayableOrigin: string
     case Manual = 'manual';
     case StockPurchase = 'stock_purchase';
     case Recurring = 'recurring';
+    case ProfessionalCommission = 'professional_commission';
     case Import = 'import';
 
     public function label(): string
@@ -15,6 +16,7 @@ enum PayableOrigin: string
             self::Manual => 'Lançamento manual',
             self::StockPurchase => 'Compra de estoque',
             self::Recurring => 'Despesa recorrente',
+            self::ProfessionalCommission => 'Comissão profissional',
             self::Import => 'Importação',
         };
     }
