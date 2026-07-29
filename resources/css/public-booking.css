@@ -241,6 +241,14 @@ body.booking-body {
     border: 1px solid var(--booking-primary-ring);
 }
 
+.booking-reason-list {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0.5rem 0 0;
+    padding-left: 1.125rem;
+    list-style: disc;
+}
+
 .booking-btn {
     display: inline-flex;
     align-items: center;

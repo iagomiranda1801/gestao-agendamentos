@@ -249,6 +249,8 @@ class ManageAppointment extends Component
             'localEnd' => CompanyDateTime::utcToLocal($this->company, CarbonImmutable::parse($this->appointment->end_at)),
             'canCancel' => $this->canCancel(),
             'canReschedule' => $this->canReschedule(),
+            'cancelUnavailableReason' => $this->cancelUnavailableReason(),
+            'rescheduleUnavailableReason' => $this->rescheduleUnavailableReason(),
             'isViewOnly' => $this->isViewOnly(),
             'rescheduleDates' => $rescheduleDates,
             'rescheduleSlots' => $rescheduleSlots,
@@ -267,56 +269,82 @@ class ManageAppointment extends Component
 
     public function canCancel(): bool
     {
+        return $this->cancelUnavailableReason() === null;
+    }
+
+    public function cancelUnavailableReason(): ?string
+    {
         if ($this->isViewOnly()) {
-            return false;
+            return 'Este agendamento já foi cancelado.';
         }
 
         $settings = $this->company->schedulingSetting;
 
-        if (! $settings?->allow_public_cancellation || ! $this->appointment->canBeCancelled()) {
-            return false;
+        if (! $settings?->allow_public_cancellation) {
+            return 'O cancelamento online não está habilitado para este agendamento.';
+        }
+
+        if (! $this->appointment->canBeCancelled()) {
+            return 'Este agendamento não está mais disponível para cancelamento.';
         }
 
         if (CarbonImmutable::parse($this->appointment->start_at)->lte(now())) {
-            return false;
+            return 'Este agendamento já iniciou ou já passou.';
         }
 
         $minimumMinutes = (int) ($settings->cancellation_minimum_advance_minutes ?? 0);
 
         if ($minimumMinutes <= 0) {
-            return true;
+            return null;
         }
 
         $deadline = CarbonImmutable::parse($this->appointment->start_at)->subMinutes($minimumMinutes);
 
-        return now()->lte($deadline);
+        if (now()->gt($deadline)) {
+            return 'O prazo para cancelamento online expirou.';
+        }
+
+        return null;
     }
 
     public function canReschedule(): bool
     {
+        return $this->rescheduleUnavailableReason() === null;
+    }
+
+    public function rescheduleUnavailableReason(): ?string
+    {
         if ($this->isViewOnly()) {
-            return false;
+            return 'Este agendamento já foi cancelado.';
         }
 
         $settings = $this->company->schedulingSetting;
 
-        if (! $settings?->allow_public_reschedule || ! $this->appointment->canBeRescheduled()) {
-            return false;
+        if (! $settings?->allow_public_reschedule) {
+            return 'A remarcação online não está habilitada para este agendamento.';
+        }
+
+        if (! $this->appointment->canBeRescheduled()) {
+            return 'Este agendamento não está mais disponível para remarcação.';
         }
 
         if (CarbonImmutable::parse($this->appointment->start_at)->lte(now())) {
-            return false;
+            return 'Este agendamento já iniciou ou já passou.';
         }
 
         $minimumMinutes = (int) ($settings->reschedule_minimum_advance_minutes ?? 0);
 
         if ($minimumMinutes <= 0) {
-            return true;
+            return null;
         }
 
         $deadline = CarbonImmutable::parse($this->appointment->start_at)->subMinutes($minimumMinutes);
 
-        return now()->lte($deadline);
+        if (now()->gt($deadline)) {
+            return 'O prazo para remarcação online expirou.';
+        }
+
+        return null;
     }
 
     public function statusBadgeClass(): string

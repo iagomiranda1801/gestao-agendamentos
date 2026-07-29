@@ -110,6 +110,18 @@
             <div class="booking-alert booking-alert--info" role="status">
                 Este agendamento foi cancelado. Não é possível realizar alterações.
             </div>
+        @elseif (! $canCancel && ! $canReschedule)
+            <div class="booking-alert booking-alert--info" role="status">
+                <strong>Alterações online indisponíveis.</strong>
+                <ul class="booking-reason-list">
+                    @if ($cancelUnavailableReason)
+                        <li>{{ e($cancelUnavailableReason) }}</li>
+                    @endif
+                    @if ($rescheduleUnavailableReason && $rescheduleUnavailableReason !== $cancelUnavailableReason)
+                        <li>{{ e($rescheduleUnavailableReason) }}</li>
+                    @endif
+                </ul>
+            </div>
         @endif
     </div>
 

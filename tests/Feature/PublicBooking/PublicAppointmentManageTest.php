@@ -204,6 +204,21 @@ class PublicAppointmentManageTest extends TestCase
         );
     }
 
+    public function test_manage_page_explains_when_public_actions_are_unavailable(): void
+    {
+        $context = $this->createOnlineAppointment([], [
+            'cancellation_minimum_advance_minutes' => 120,
+            'reschedule_minimum_advance_minutes' => 120,
+        ]);
+
+        $this->travelTo($context['localStart']->subMinutes(30)->utc());
+
+        Livewire::test(ManageAppointment::class, ['token' => $context['plainToken']])
+            ->assertSee('Alterações online indisponíveis.')
+            ->assertSee('O prazo para cancelamento online expirou.')
+            ->assertSee('O prazo para remarcação online expirou.');
+    }
+
     public function test_cancelled_appointment_is_view_only_in_livewire(): void
     {
         $context = $this->createOnlineAppointment();
