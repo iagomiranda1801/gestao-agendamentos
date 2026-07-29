@@ -26,6 +26,9 @@ class ProductForm
                         TextInput::make('sku')
                             ->label('SKU')
                             ->maxLength(255),
+                        TextInput::make('barcode')
+                            ->label('Código de barras')
+                            ->maxLength(255),
                         Select::make('type')
                             ->label('Tipo')
                             ->options(ProductType::options())
@@ -60,6 +63,14 @@ class ProductForm
                             ->minValue(0)
                             ->default(0)
                             ->required(),
+                        TextInput::make('sale_price')
+                            ->label('Preço de venda')
+                            ->numeric()
+                            ->prefix('R$')
+                            ->step(0.01)
+                            ->minValue(0)
+                            ->default(0)
+                            ->required(),
                         TextInput::make('minimum_stock')
                             ->label('Estoque mínimo')
                             ->numeric()
@@ -69,6 +80,9 @@ class ProductForm
                             ->required(),
                         Toggle::make('tracks_stock')
                             ->label('Controlar estoque')
+                            ->default(true),
+                        Toggle::make('is_sellable')
+                            ->label('Disponível para venda')
                             ->default(true),
                         Toggle::make('is_active')
                             ->label('Produto ativo')

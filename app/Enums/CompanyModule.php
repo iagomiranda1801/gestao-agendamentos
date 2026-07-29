@@ -7,6 +7,7 @@ enum CompanyModule: string
     case Scheduling = 'scheduling';
     case Stock = 'stock';
     case Finance = 'finance';
+    case Sales = 'sales';
 
     public function label(): string
     {
@@ -14,6 +15,7 @@ enum CompanyModule: string
             self::Scheduling => 'Agenda',
             self::Stock => 'Estoque',
             self::Finance => 'Financeiro',
+            self::Sales => 'Vendas/PDV',
         };
     }
 
@@ -23,6 +25,7 @@ enum CompanyModule: string
             self::Scheduling => 'Agenda, agendamentos, bloqueios, atendimentos e configurações da agenda.',
             self::Stock => 'Produtos, fornecedores, compras, ajustes e movimentações de estoque.',
             self::Finance => 'Contas a pagar/receber, caixa, transferências, relatórios e configurações financeiras.',
+            self::Sales => 'Venda rápida, PDV, carrinho de produtos e checkout.',
         };
     }
 

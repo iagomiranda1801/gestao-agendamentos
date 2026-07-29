@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'attendance_id',
+    'sale_id',
     'supplier_id',
     'type',
     'status',
@@ -81,6 +82,14 @@ class StockDocument extends Model
     public function attendance(): BelongsTo
     {
         return $this->belongsTo(Attendance::class);
+    }
+
+    /**
+     * @return BelongsTo<Sale, $this>
+     */
+    public function sale(): BelongsTo
+    {
+        return $this->belongsTo(Sale::class);
     }
 
     /**

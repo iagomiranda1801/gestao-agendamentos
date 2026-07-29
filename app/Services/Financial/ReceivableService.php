@@ -12,6 +12,7 @@ use App\Models\FinancialAccount;
 use App\Models\FinancialTransaction;
 use App\Models\Payment;
 use App\Models\Receivable;
+use App\Models\Sale;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
@@ -66,6 +67,56 @@ class ReceivableService
             ]);
             $receivable->company()->associate($company);
             $receivable->attendance()->associate($attendance);
+
+            if ($user !== null) {
+                $receivable->creator()->associate($user);
+            }
+
+            $receivable->save();
+
+            return $receivable->refresh();
+        });
+    }
+
+    public function createForSale(
+        Company $company,
+        Sale $sale,
+        ?User $user = null,
+        ?Carbon $dueDate = null,
+    ): Receivable {
+        return DB::transaction(function () use ($company, $sale, $user, $dueDate): Receivable {
+            $this->ensureSaleBelongsToCompany($company, $sale);
+
+            if ($sale->receivable()->exists()) {
+                throw ValidationException::withMessages([
+                    'sale_id' => 'Esta venda já possui uma conta a receber.',
+                ]);
+            }
+
+            $settings = $this->financialSettingService->getOrCreate($company);
+            $originalAmount = (string) $sale->final_amount;
+
+            if (bccomp($originalAmount, '0', 2) <= 0) {
+                throw ValidationException::withMessages([
+                    'final_amount' => 'O valor final da venda deve ser maior que zero.',
+                ]);
+            }
+
+            if ($dueDate === null && $settings->default_payment_due_days > 0) {
+                $dueDate = now()->addDays($settings->default_payment_due_days)->startOfDay();
+            }
+
+            $receivable = new Receivable([
+                'client_id' => $sale->client_id,
+                'original_amount' => $originalAmount,
+                'paid_amount' => '0.00',
+                'outstanding_amount' => $originalAmount,
+                'status' => ReceivableStatus::Open,
+                'due_date' => $dueDate,
+                'settled_at' => null,
+            ]);
+            $receivable->company()->associate($company);
+            $receivable->sale()->associate($sale);
 
             if ($user !== null) {
                 $receivable->creator()->associate($user);
@@ -183,6 +234,7 @@ class ReceivableService
             $payment->company()->associate($company);
             $payment->receivable()->associate($lockedReceivable);
             $payment->attendance()->associate($lockedReceivable->attendance);
+            $payment->sale()->associate($lockedReceivable->sale);
             $payment->financialAccount()->associate($account);
             $payment->registrar()->associate($user);
             $payment->save();
@@ -216,7 +268,9 @@ class ReceivableService
             }
 
             $this->recalculateValues($lockedReceivable->refresh());
-            $this->recalculateAttendanceFinancials($lockedReceivable->attendance()->firstOrFail());
+            if ($lockedReceivable->attendance_id !== null) {
+                $this->recalculateAttendanceFinancials($lockedReceivable->attendance()->firstOrFail());
+            }
 
             return $payment->refresh();
         });
@@ -252,7 +306,9 @@ class ReceivableService
 
             $receivable = $lockedPayment->receivable()->firstOrFail();
             $this->recalculateValues($receivable);
-            $this->recalculateAttendanceFinancials($receivable->attendance);
+            if ($receivable->attendance_id !== null) {
+                $this->recalculateAttendanceFinancials($receivable->attendance);
+            }
 
             return $lockedPayment->refresh();
         });
@@ -385,6 +441,15 @@ class ReceivableService
         if ((int) $attendance->company_id !== (int) $company->getKey()) {
             throw ValidationException::withMessages([
                 'attendance_id' => 'O atendimento informado não pertence a esta empresa.',
+            ]);
+        }
+    }
+
+    protected function ensureSaleBelongsToCompany(Company $company, Sale $sale): void
+    {
+        if ((int) $sale->company_id !== (int) $company->getKey()) {
+            throw ValidationException::withMessages([
+                'sale_id' => 'A venda informada não pertence a esta empresa.',
             ]);
         }
     }

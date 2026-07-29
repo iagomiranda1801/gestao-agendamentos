@@ -36,6 +36,10 @@ class ProductsTable
                     ->label('Custo unitário de referência')
                     ->money('BRL', locale: 'pt_BR', decimalPlaces: 6)
                     ->sortable(),
+                TextColumn::make('sale_price')
+                    ->label('Preço de venda')
+                    ->money('BRL', locale: 'pt_BR')
+                    ->sortable(),
                 TextColumn::make('minimum_stock')
                     ->label('Estoque mínimo')
                     ->numeric(decimalPlaces: 4)
@@ -67,6 +71,10 @@ class ProductsTable
                 IconColumn::make('tracks_stock')
                     ->label('Controla estoque')
                     ->boolean(),
+                IconColumn::make('is_sellable')
+                    ->label('Vendável')
+                    ->boolean()
+                    ->toggleable(),
                 IconColumn::make('is_active')
                     ->label('Status')
                     ->boolean()

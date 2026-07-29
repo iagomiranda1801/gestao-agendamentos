@@ -81,9 +81,30 @@ class ProductService
     {
         $this->assertNameIsUniqueInCompany($company, $payload['name'] ?? '', $ignore);
         $this->assertSkuIsUniqueInCompany($company, $payload['sku'] ?? null, $ignore);
+        $this->assertBarcodeIsUniqueInCompany($company, $payload['barcode'] ?? null, $ignore);
         $this->assertNonNegativeDecimal($payload['reference_unit_cost'] ?? 0, 'reference_unit_cost', 'O custo unitário de referência não pode ser negativo.');
+        $this->assertNonNegativeDecimal($payload['sale_price'] ?? 0, 'sale_price', 'O preço de venda não pode ser negativo.');
         $this->assertNonNegativeDecimal($payload['minimum_stock'] ?? 0, 'minimum_stock', 'O estoque mínimo não pode ser negativo.');
         $this->assertMeasurementUnitIsActive($payload['measurement_unit_id'] ?? null);
+    }
+
+    protected function assertBarcodeIsUniqueInCompany(Company $company, ?string $barcode, ?Product $ignore = null): void
+    {
+        if (blank($barcode)) {
+            return;
+        }
+
+        $exists = Product::query()
+            ->where('company_id', $company->getKey())
+            ->where('barcode', $barcode)
+            ->when($ignore, fn ($query) => $query->whereKeyNot($ignore->getKey()))
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'barcode' => 'Já existe um produto com este código de barras nesta empresa.',
+            ]);
+        }
     }
 
     protected function assertNameIsUniqueInCompany(Company $company, string $name, ?Product $ignore = null): void

@@ -219,7 +219,8 @@ class StockDocumentService
             StockDocumentType::ManualEntry => $this->validateInboundItem($item, $index, requireUnitCost: true),
             StockDocumentType::ManualExit,
             StockDocumentType::Loss,
-            StockDocumentType::ServiceConsumption => $this->validateOutboundItem($item, $index),
+            StockDocumentType::ServiceConsumption,
+            StockDocumentType::ProductSale => $this->validateOutboundItem($item, $index),
             StockDocumentType::InventoryCount => $this->validateInventoryItem($item, $index),
             default => throw ValidationException::withMessages([
                 'type' => 'Tipo de documento inválido.',

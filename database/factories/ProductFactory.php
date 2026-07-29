@@ -25,11 +25,14 @@ class ProductFactory extends Factory
             'measurement_unit_id' => MeasurementUnit::factory(),
             'name' => fake()->unique()->words(2, true),
             'sku' => fake()->optional()->bothify('SKU-####'),
+            'barcode' => null,
             'type' => ProductType::Consumable,
             'description' => fake()->optional()->sentence(),
             'reference_unit_cost' => fake()->randomFloat(6, 0.01, 100),
+            'sale_price' => fake()->randomFloat(2, 1, 200),
             'minimum_stock' => fake()->randomFloat(4, 0, 50),
             'tracks_stock' => true,
+            'is_sellable' => true,
             'notes' => fake()->optional()->sentence(),
             'is_active' => true,
         ];
@@ -67,6 +70,13 @@ class ProductFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'is_active' => false,
+        ]);
+    }
+
+    public function notSellable(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_sellable' => false,
         ]);
     }
 }

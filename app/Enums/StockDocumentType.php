@@ -12,6 +12,7 @@ enum StockDocumentType: string
     case InventoryCount = 'inventory_count';
     case Reversal = 'reversal';
     case ServiceConsumption = 'service_consumption';
+    case ProductSale = 'product_sale';
 
     public function label(): string
     {
@@ -24,6 +25,7 @@ enum StockDocumentType: string
             self::InventoryCount => 'Inventário por contagem',
             self::Reversal => 'Estorno',
             self::ServiceConsumption => 'Consumo de atendimento',
+            self::ProductSale => 'Venda de produto',
         };
     }
 
@@ -53,6 +55,7 @@ enum StockDocumentType: string
             self::ManualExit,
             self::Loss,
             self::ServiceConsumption,
+            self::ProductSale,
         ], true);
     }
 

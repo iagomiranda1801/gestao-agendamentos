@@ -97,7 +97,8 @@ class StockDocumentPostingService
             StockDocumentType::ManualEntry => $this->processManualEntry($company, $document, $item, $product, $user, $occurredAt),
             StockDocumentType::ManualExit,
             StockDocumentType::Loss,
-            StockDocumentType::ServiceConsumption => $this->processOutbound($company, $document, $item, $product, $user, $occurredAt),
+            StockDocumentType::ServiceConsumption,
+            StockDocumentType::ProductSale => $this->processOutbound($company, $document, $item, $product, $user, $occurredAt),
             StockDocumentType::InventoryCount => $this->processInventoryCount($company, $document, $item, $product, $user, $occurredAt),
             default => throw ValidationException::withMessages([
                 'type' => 'Tipo de documento não pode ser lançado.',

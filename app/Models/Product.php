@@ -16,11 +16,14 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'measurement_unit_id',
     'name',
     'sku',
+    'barcode',
     'type',
     'description',
     'reference_unit_cost',
+    'sale_price',
     'minimum_stock',
     'tracks_stock',
+    'is_sellable',
     'notes',
     'is_active',
 ])]
@@ -44,8 +47,10 @@ class Product extends Model
         return [
             'type' => ProductType::class,
             'reference_unit_cost' => 'decimal:6',
+            'sale_price' => 'decimal:2',
             'minimum_stock' => 'decimal:4',
             'tracks_stock' => 'boolean',
+            'is_sellable' => 'boolean',
             'is_active' => 'boolean',
         ];
     }
@@ -88,6 +93,14 @@ class Product extends Model
     public function stockMovements(): HasMany
     {
         return $this->hasMany(StockMovement::class);
+    }
+
+    /**
+     * @return HasMany<SaleItem, $this>
+     */
+    public function saleItems(): HasMany
+    {
+        return $this->hasMany(SaleItem::class);
     }
 
     public function getCurrentStockQuantity(): string
@@ -164,6 +177,15 @@ class Product extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    /**
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeSellable(Builder $query): Builder
+    {
+        return $query->where('is_sellable', true);
     }
 
     /**

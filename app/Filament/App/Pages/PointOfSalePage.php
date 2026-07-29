@@ -1,0 +1,392 @@
+<?php
+
+namespace App\Filament\App\Pages;
+
+use App\DataTransferObjects\Financial\PaymentData;
+use App\Enums\CompanyModule;
+use App\Enums\PaymentMethod;
+use App\Enums\SaleItemType;
+use App\Enums\SaleOrigin;
+use App\Filament\App\Concerns\RequiresCompanyModule;
+use App\Models\Client;
+use App\Models\Company;
+use App\Models\FinancialAccount;
+use App\Models\Product;
+use App\Policies\SalePolicy;
+use App\Services\Sales\SaleService;
+use BackedEnum;
+use Carbon\Carbon;
+use Filament\Actions\Action;
+use Filament\Facades\Filament;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
+use Filament\Pages\Page;
+use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\EmbeddedSchema;
+use Filament\Schemas\Components\Form;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
+use UnitEnum;
+
+class PointOfSalePage extends Page
+{
+    use RequiresCompanyModule;
+
+    protected static ?string $slug = 'pdv';
+
+    protected static ?string $navigationLabel = 'PDV';
+
+    protected static ?string $title = 'PDV';
+
+    protected static string|UnitEnum|null $navigationGroup = 'Vendas';
+
+    protected static ?int $navigationSort = 30;
+
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShoppingCart;
+
+    /**
+     * @var array<string, mixed>|null
+     */
+    public ?array $data = [];
+
+    public static function canAccess(): bool
+    {
+        if (! static::tenantHasRequiredModule()) {
+            return false;
+        }
+
+        $user = auth()->user();
+
+        return $user !== null && (new SalePolicy)->create($user);
+    }
+
+    public function mount(): void
+    {
+        abort_unless(static::canAccess(), 403);
+
+        $this->fillDefaultForm();
+    }
+
+    public function save(): void
+    {
+        /** @var Company $company */
+        $company = Filament::getTenant();
+        $state = $this->form->getState();
+
+        $payments = collect($state['payments'] ?? [])
+            ->filter(fn (array $payment): bool => filled($payment['amount'] ?? null))
+            ->map(fn (array $payment): PaymentData => new PaymentData(
+                amount: (string) $payment['amount'],
+                feeAmount: (string) ($payment['fee_amount'] ?? '0.00'),
+                method: PaymentMethod::from($payment['method']),
+                paidAt: Carbon::parse($payment['paid_at'] ?? now()),
+                financialAccountId: (int) $payment['financial_account_id'],
+                notes: $payment['notes'] ?? null,
+            ))
+            ->values()
+            ->all();
+
+        $sale = app(SaleService::class)->complete($company, auth()->user(), [
+            'client_id' => $state['client_id'] ?? null,
+            'origin' => SaleOrigin::Pos->value,
+            'sold_at' => $state['sold_at'] ?? now(),
+            'discount_amount' => $state['discount_amount'] ?? '0.00',
+            'notes' => $state['notes'] ?? null,
+            'items' => collect($state['items'] ?? [])
+                ->map(fn (array $item): array => [
+                    'item_type' => SaleItemType::Product->value,
+                    'product_id' => $item['product_id'] ?? null,
+                    'quantity' => $item['quantity'] ?? '1',
+                    'unit_price' => $item['unit_price'] ?? '0.00',
+                    'discount_amount' => $item['discount_amount'] ?? '0.00',
+                ])
+                ->all(),
+            'payments' => $payments,
+        ]);
+
+        Notification::make()
+            ->success()
+            ->title("Venda #{$sale->getKey()} finalizada")
+            ->send();
+
+        $this->fillDefaultForm();
+    }
+
+    public function defaultForm(Schema $schema): Schema
+    {
+        return $schema
+            ->statePath('data');
+    }
+
+    public function form(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Section::make('Venda')
+                    ->schema([
+                        Select::make('client_id')
+                            ->label('Cliente')
+                            ->options(fn (): array => Client::query()
+                                ->where('company_id', Filament::getTenant()?->getKey())
+                                ->active()
+                                ->orderBy('name')
+                                ->pluck('name', 'id')
+                                ->all())
+                            ->searchable()
+                            ->native(false),
+                        DateTimePicker::make('sold_at')
+                            ->label('Data da venda')
+                            ->default(now())
+                            ->required()
+                            ->native(false),
+                        TextInput::make('discount_amount')
+                            ->label('Desconto geral')
+                            ->numeric()
+                            ->prefix('R$')
+                            ->step(0.01)
+                            ->minValue(0)
+                            ->default('0.00')
+                            ->live(onBlur: true),
+                    ])
+                    ->columns(3),
+                Section::make('Itens')
+                    ->schema([
+                        Repeater::make('items')
+                            ->label('Produtos')
+                            ->schema([
+                                Select::make('product_id')
+                                    ->label('Produto')
+                                    ->options(fn (): array => self::productOptions())
+                                    ->searchable()
+                                    ->required()
+                                    ->live()
+                                    ->afterStateUpdated(function (?int $state, Set $set): void {
+                                        if ($state === null) {
+                                            return;
+                                        }
+
+                                        $product = Product::query()
+                                            ->where('company_id', Filament::getTenant()?->getKey())
+                                            ->find($state);
+
+                                        if ($product !== null) {
+                                            $set('unit_price', (string) $product->sale_price);
+                                        }
+                                    })
+                                    ->native(false),
+                                TextInput::make('quantity')
+                                    ->label('Qtd.')
+                                    ->numeric()
+                                    ->step(0.0001)
+                                    ->minValue(0.0001)
+                                    ->default('1')
+                                    ->required()
+                                    ->live(onBlur: true),
+                                TextInput::make('unit_price')
+                                    ->label('Preço')
+                                    ->numeric()
+                                    ->prefix('R$')
+                                    ->step(0.01)
+                                    ->minValue(0)
+                                    ->default('0.00')
+                                    ->required()
+                                    ->live(onBlur: true),
+                                TextInput::make('discount_amount')
+                                    ->label('Desc.')
+                                    ->numeric()
+                                    ->prefix('R$')
+                                    ->step(0.01)
+                                    ->minValue(0)
+                                    ->default('0.00')
+                                    ->live(onBlur: true),
+                                TextInput::make('line_total')
+                                    ->label('Total')
+                                    ->prefix('R$')
+                                    ->disabled()
+                                    ->dehydrated(false)
+                                    ->formatStateUsing(fn ($state, Get $get): string => self::formatMoney(
+                                        self::lineTotal($get('quantity'), $get('unit_price'), $get('discount_amount')),
+                                    )),
+                            ])
+                            ->columns(5)
+                            ->defaultItems(1)
+                            ->addActionLabel('Adicionar produto')
+                            ->columnSpanFull(),
+                        TextInput::make('items_total')
+                            ->label('Subtotal dos itens')
+                            ->prefix('R$')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->formatStateUsing(fn ($state, Get $get): string => self::formatMoney(self::itemsTotal($get('items') ?? []))),
+                        TextInput::make('sale_total')
+                            ->label('Total da venda')
+                            ->prefix('R$')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->formatStateUsing(fn ($state, Get $get): string => self::formatMoney(
+                                max(0, self::itemsTotal($get('items') ?? []) - (float) ($get('discount_amount') ?? 0)),
+                            )),
+                    ])
+                    ->columns(2),
+                Section::make('Pagamentos')
+                    ->schema([
+                        Repeater::make('payments')
+                            ->label('Pagamentos')
+                            ->schema([
+                                TextInput::make('amount')
+                                    ->label('Valor')
+                                    ->numeric()
+                                    ->prefix('R$')
+                                    ->step(0.01)
+                                    ->minValue(0.01)
+                                    ->required(),
+                                TextInput::make('fee_amount')
+                                    ->label('Taxa')
+                                    ->numeric()
+                                    ->prefix('R$')
+                                    ->step(0.01)
+                                    ->minValue(0)
+                                    ->default('0.00'),
+                                Select::make('method')
+                                    ->label('Forma')
+                                    ->options(PaymentMethod::options())
+                                    ->default(PaymentMethod::Pix->value)
+                                    ->required()
+                                    ->native(false),
+                                Select::make('financial_account_id')
+                                    ->label('Conta')
+                                    ->options(fn (): array => FinancialAccount::query()
+                                        ->where('company_id', Filament::getTenant()?->getKey())
+                                        ->where('is_active', true)
+                                        ->orderBy('name')
+                                        ->pluck('name', 'id')
+                                        ->all())
+                                    ->searchable()
+                                    ->required()
+                                    ->native(false),
+                                DateTimePicker::make('paid_at')
+                                    ->label('Pago em')
+                                    ->default(now())
+                                    ->required()
+                                    ->native(false),
+                                Textarea::make('notes')
+                                    ->label('Obs.')
+                                    ->rows(2),
+                            ])
+                            ->columns(3)
+                            ->defaultItems(1)
+                            ->addActionLabel('Adicionar pagamento')
+                            ->columnSpanFull(),
+                    ]),
+                Textarea::make('notes')
+                    ->label('Observações')
+                    ->rows(3)
+                    ->columnSpanFull(),
+            ]);
+    }
+
+    /**
+     * @return array<Action>
+     */
+    protected function getFormActions(): array
+    {
+        return [
+            Action::make('save')
+                ->label('Finalizar venda')
+                ->icon('heroicon-o-check-circle')
+                ->submit('save'),
+        ];
+    }
+
+    public function content(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Form::make([EmbeddedSchema::make('form')])
+                    ->id('point-of-sale-form')
+                    ->livewireSubmitHandler('save')
+                    ->footer([
+                        Actions::make($this->getFormActions()),
+                    ]),
+            ]);
+    }
+
+    protected static function requiredCompanyModule(): CompanyModule
+    {
+        return CompanyModule::Sales;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected static function productOptions(): array
+    {
+        /** @var Company $company */
+        $company = Filament::getTenant();
+
+        return Product::query()
+            ->where('company_id', $company->getKey())
+            ->active()
+            ->sellable()
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (Product $product): array => [
+                $product->getKey() => sprintf(
+                    '%s · R$ %s · estoque %s',
+                    $product->name,
+                    number_format((float) $product->sale_price, 2, ',', '.'),
+                    $product->tracks_stock ? $product->getCurrentStockQuantity() : 'sem controle',
+                ),
+            ])
+            ->all();
+    }
+
+    protected static function lineTotal(mixed $quantity, mixed $unitPrice, mixed $discount): float
+    {
+        return max(0, ((float) $quantity * (float) $unitPrice) - (float) $discount);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $items
+     */
+    protected static function itemsTotal(array $items): float
+    {
+        return collect($items)
+            ->sum(fn (array $item): float => self::lineTotal(
+                $item['quantity'] ?? 0,
+                $item['unit_price'] ?? 0,
+                $item['discount_amount'] ?? 0,
+            ));
+    }
+
+    protected static function formatMoney(float $amount): string
+    {
+        return number_format($amount, 2, ',', '.');
+    }
+
+    protected function fillDefaultForm(): void
+    {
+        $this->form->fill([
+            'sold_at' => now(),
+            'discount_amount' => '0.00',
+            'items' => [[
+                'quantity' => '1',
+                'unit_price' => '0.00',
+                'discount_amount' => '0.00',
+            ]],
+            'payments' => [[
+                'amount' => null,
+                'fee_amount' => '0.00',
+                'method' => PaymentMethod::Pix->value,
+                'paid_at' => now(),
+            ]],
+        ]);
+    }
+}
