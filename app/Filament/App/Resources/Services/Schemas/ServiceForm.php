@@ -2,8 +2,10 @@
 
 namespace App\Filament\App\Resources\Services\Schemas;
 
+use App\Enums\CompanyModule;
 use App\Models\Company;
 use App\Models\Professional;
+use App\Services\Company\CompanyModuleService;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Select;
@@ -85,7 +87,9 @@ class ServiceForm
                             ->live(),
                         Toggle::make('is_sellable')
                             ->label('Disponível para venda no PDV')
-                            ->default(true),
+                            ->default(fn (): bool => self::hasSalesModule())
+                            ->visible(fn (): bool => self::hasSalesModule())
+                            ->dehydrated(fn (): bool => self::hasSalesModule()),
                         Toggle::make('is_online_booking_enabled')
                             ->label('Disponível no agendamento online')
                             ->default(true)
@@ -99,9 +103,9 @@ class ServiceForm
                             ->searchable()
                             ->preload()
                             ->native(false)
-                            ->options(fn (): array => self::activeProfessionalOptions())
+                            ->options(fn ($get): array => self::activeProfessionalOptions((bool) $get('is_online_booking_enabled')))
                             ->required(fn ($get): bool => (bool) $get('is_online_booking_enabled'))
-                            ->helperText('Para aparecer no agendamento online, o serviço precisa estar vinculado a pelo menos um profissional com horários configurados.')
+                            ->helperText('Para aparecer no agendamento online, selecione pelo menos um profissional com jornada ativa.')
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
@@ -118,7 +122,7 @@ class ServiceForm
     /**
      * @return array<int, string>
      */
-    protected static function activeProfessionalOptions(): array
+    protected static function activeProfessionalOptions(bool $onlyOnlineReady = false): array
     {
         /** @var Company|null $company */
         $company = Filament::getTenant();
@@ -131,9 +135,21 @@ class ServiceForm
             ->where('company_id', $company->getKey())
             ->where('is_active', true)
             ->where('is_bookable', true)
+            ->when($onlyOnlineReady, fn ($query) => $query->whereHas('workingHours', fn ($hours) => $hours->active()))
             ->orderBy('sort_order')
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();
+    }
+
+    protected static function hasSalesModule(): bool
+    {
+        $company = Filament::getTenant();
+
+        if (! $company instanceof Company) {
+            return true;
+        }
+
+        return app(CompanyModuleService::class)->hasModule($company, CompanyModule::Sales);
     }
 }

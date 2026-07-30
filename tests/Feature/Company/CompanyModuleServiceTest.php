@@ -3,6 +3,7 @@
 namespace Tests\Feature\Company;
 
 use App\Enums\CompanyModule;
+use App\Enums\CompanyProfile;
 use App\Enums\SubscriptionStatus;
 use App\Models\Company;
 use App\Services\Company\CompanyModuleService;
@@ -46,6 +47,34 @@ class CompanyModuleServiceTest extends TestCase
 
         $this->assertTrue(app(CompanyModuleService::class)->hasModule($company->refresh(), CompanyModule::WhatsApp));
         $this->assertTrue(app(CompanyModuleService::class)->hasModule($company, CompanyModule::Marketing));
+    }
+
+    public function test_missing_modules_fall_back_to_company_profile_defaults(): void
+    {
+        $company = $this->createCompany([
+            'business_profile' => CompanyProfile::Professional,
+            'enabled_modules' => null,
+        ]);
+
+        $service = app(CompanyModuleService::class);
+
+        $this->assertTrue($service->hasModule($company, CompanyModule::Scheduling));
+        $this->assertTrue($service->hasModule($company, CompanyModule::WhatsApp));
+        $this->assertFalse($service->hasModule($company, CompanyModule::Sales));
+    }
+
+    public function test_missing_modules_for_custom_profile_fall_back_to_scheduling_only(): void
+    {
+        $company = $this->createCompany([
+            'business_profile' => CompanyProfile::Custom,
+            'enabled_modules' => [],
+        ]);
+
+        $service = app(CompanyModuleService::class);
+
+        $this->assertTrue($service->hasModule($company, CompanyModule::Scheduling));
+        $this->assertFalse($service->hasModule($company, CompanyModule::Sales));
+        $this->assertFalse($service->hasModule($company, CompanyModule::Stock));
     }
 
     public function test_trial_access_is_allowed_before_expiration(): void

@@ -3,6 +3,7 @@
 namespace App\Services\Company;
 
 use App\Enums\CompanyModule;
+use App\Enums\CompanyProfile;
 use App\Enums\SubscriptionStatus;
 use App\Models\Company;
 use Carbon\CarbonInterface;
@@ -19,7 +20,7 @@ class CompanyModuleService
         $raw = $company->enabled_modules;
 
         if (! is_array($raw) || $raw === []) {
-            return CompanyModule::cases();
+            return $this->defaultModulesFor($company);
         }
 
         return collect($raw)
@@ -28,6 +29,20 @@ class CompanyModuleService
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * @return list<CompanyModule>
+     */
+    protected function defaultModulesFor(Company $company): array
+    {
+        $profile = $company->business_profile;
+
+        if ($profile instanceof CompanyProfile) {
+            return $profile->defaultModules();
+        }
+
+        return CompanyModule::trialDefaults();
     }
 
     public function hasModule(Company $company, CompanyModule $module): bool

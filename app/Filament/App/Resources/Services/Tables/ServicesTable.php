@@ -2,8 +2,10 @@
 
 namespace App\Filament\App\Resources\Services\Tables;
 
+use App\Enums\CompanyModule;
 use App\Models\Company;
 use App\Models\Service;
+use App\Services\Company\CompanyModuleService;
 use App\Services\Service\ServiceCatalogService;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -47,7 +49,8 @@ class ServicesTable
                     ->boolean(),
                 IconColumn::make('is_sellable')
                     ->label('PDV')
-                    ->boolean(),
+                    ->boolean()
+                    ->visible(fn (): bool => self::hasSalesModule()),
                 IconColumn::make('is_active')
                     ->label('Status')
                     ->boolean()
@@ -76,7 +79,8 @@ class ServicesTable
                     ->label('PDV')
                     ->trueLabel('Disponíveis no PDV')
                     ->falseLabel('Fora do PDV')
-                    ->placeholder('Todos'),
+                    ->placeholder('Todos')
+                    ->visible(fn (): bool => self::hasSalesModule()),
             ])
             ->defaultSort('sort_order')
             ->recordActions([
@@ -109,5 +113,16 @@ class ServicesTable
                     }),
             ])
             ->searchable();
+    }
+
+    protected static function hasSalesModule(): bool
+    {
+        $company = Filament::getTenant();
+
+        if (! $company instanceof Company) {
+            return true;
+        }
+
+        return app(CompanyModuleService::class)->hasModule($company, CompanyModule::Sales);
     }
 }

@@ -2,8 +2,10 @@
 
 namespace App\Services\Service;
 
+use App\Enums\CompanyModule;
 use App\Models\Company;
 use App\Models\Service;
+use App\Services\Company\CompanyModuleService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -15,7 +17,7 @@ class ServiceCatalogService
     public function create(Company $company, array $data): Service
     {
         return DB::transaction(function () use ($company, $data): Service {
-            $payload = $this->preparePayload($data);
+            $payload = $this->preparePayload($company, $data);
 
             $this->validateBusinessRules($company, $payload);
 
@@ -40,7 +42,7 @@ class ServiceCatalogService
         return DB::transaction(function () use ($company, $service, $data): Service {
             $this->ensureBelongsToCompany($company, $service);
 
-            $payload = $this->preparePayload($data);
+            $payload = $this->preparePayload($company, $data);
 
             $this->validateBusinessRules($company, $payload, $service);
 
@@ -71,9 +73,13 @@ class ServiceCatalogService
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    protected function preparePayload(array $data): array
+    protected function preparePayload(Company $company, array $data): array
     {
         unset($data['company_id']);
+
+        if (! app(CompanyModuleService::class)->hasModule($company, CompanyModule::Sales)) {
+            $data['is_sellable'] = false;
+        }
 
         return $data;
     }

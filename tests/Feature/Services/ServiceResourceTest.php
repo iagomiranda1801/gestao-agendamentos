@@ -3,6 +3,7 @@
 namespace Tests\Feature\Services;
 
 use App\Enums\CompanyRole;
+use App\Enums\CompanyModule;
 use App\Filament\App\Resources\Services\Pages\CreateService;
 use App\Filament\App\Resources\Services\Pages\EditService;
 use App\Filament\App\Resources\Services\Pages\ListServices;
@@ -72,11 +73,55 @@ class ServiceResourceTest extends TestCase
         $this->assertSame($company->id, $service->company_id);
     }
 
+    public function test_service_is_not_sellable_when_company_does_not_have_sales_module(): void
+    {
+        $company = $this->createCompany([
+            'enabled_modules' => [
+                CompanyModule::Scheduling->value,
+                CompanyModule::WhatsApp->value,
+            ],
+        ]);
+
+        $service = app(ServiceCatalogService::class)->create($company, [
+            'name' => 'Consulta Psicologica',
+            'slug' => 'consulta-psicologica',
+            'price' => 180,
+            'duration_minutes' => 50,
+            'sort_order' => 1,
+            'is_bookable' => true,
+            'is_sellable' => true,
+            'is_online_booking_enabled' => true,
+            'is_active' => true,
+        ]);
+
+        $this->assertFalse($service->is_sellable);
+    }
+
+    public function test_service_form_hides_pos_field_when_company_does_not_have_sales_module(): void
+    {
+        $company = $this->createCompany([
+            'enabled_modules' => [
+                CompanyModule::Scheduling->value,
+                CompanyModule::WhatsApp->value,
+            ],
+        ]);
+        $admin = $this->createCompanyUser($company);
+
+        $this->authenticateForAppTenant($admin, $company);
+
+        Livewire::test(CreateService::class)
+            ->assertSuccessful()
+            ->assertDontSee('Disponível para venda no PDV');
+    }
+
     public function test_service_can_be_created_with_professionals_from_form(): void
     {
         $company = $this->createCompany(['slug' => 'estudio-ana']);
         $admin = $this->createCompanyUser($company);
         $professional = Professional::factory()->forCompany($company)->create();
+        ProfessionalWorkingHour::factory()->forCompany($company)->create([
+            'professional_id' => $professional->getKey(),
+        ]);
 
         $this->authenticateForAppTenant($admin, $company);
 
@@ -108,6 +153,9 @@ class ServiceResourceTest extends TestCase
         $admin = $this->createCompanyUser($company);
         $service = Service::factory()->forCompany($company)->create();
         $professional = Professional::factory()->forCompany($company)->create();
+        ProfessionalWorkingHour::factory()->forCompany($company)->create([
+            'professional_id' => $professional->getKey(),
+        ]);
 
         $this->authenticateForAppTenant($admin, $company);
 
