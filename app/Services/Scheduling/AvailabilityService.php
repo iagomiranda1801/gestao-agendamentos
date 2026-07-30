@@ -162,6 +162,58 @@ class AvailabilityService
         return $slots;
     }
 
+    public function hasAvailableSlot(
+        Company $company,
+        Professional $professional,
+        Service $service,
+        CarbonImmutable $localDate,
+    ): bool {
+        $settings = $this->settingsService->getOrCreate($company);
+        $snapshots = $this->snapshotResolver->resolve($company, $professional, $service);
+        $duration = $snapshots['duration_minutes_snapshot'];
+        $bufferBefore = $snapshots['buffer_before_minutes_snapshot'];
+        $bufferAfter = $snapshots['buffer_after_minutes_snapshot'];
+
+        $weekday = $localDate->dayOfWeek;
+        $businessRanges = $this->getBusinessRangesForDay($company, $weekday);
+        $workingRanges = $this->getWorkingRangesForDay($company, $professional, $localDate, $weekday);
+
+        $ranges = $this->intersectRanges($businessRanges, $workingRanges);
+
+        if ($ranges === []) {
+            return false;
+        }
+
+        $now = CompanyDateTime::nowLocal($company);
+
+        foreach ($ranges as $range) {
+            for ($minute = $range['start']; $minute + $duration <= $range['end']; $minute += $settings->slot_interval_minutes) {
+                $time = CompanyDateTime::minutesToTime($minute);
+                $localStart = CompanyDateTime::parseLocal($company, $localDate->format('Y-m-d'), substr($time, 0, 5));
+
+                if ($localStart->lt($now)) {
+                    continue;
+                }
+
+                $result = $this->assertAvailable(
+                    $company,
+                    $professional,
+                    $service,
+                    $localStart,
+                    $duration,
+                    $bufferBefore,
+                    $bufferAfter,
+                );
+
+                if ($result->available) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     protected function isWithinBusinessHours(Company $company, CarbonImmutable $localStart, CarbonImmutable $localEnd): bool
     {
         $ranges = $this->getBusinessRangesForDay($company, $localStart->dayOfWeek);

@@ -103,9 +103,7 @@ class OnlineBookingCatalogService
         $cursor = $rangeStart->startOfDay();
 
         while ($cursor->lte($rangeEnd)) {
-            $slots = $this->getAvailableSlots($company, $service, $professionalId, $cursor);
-
-            if ($slots->isNotEmpty()) {
+            if ($this->hasAvailableSlot($company, $service, $professionalId, $cursor)) {
                 $dates->push($cursor->startOfDay());
             }
 
@@ -176,6 +174,36 @@ class OnlineBookingCatalogService
         }
 
         return $slots->sortBy(fn (CarbonImmutable $slot) => $slot->timestamp)->values();
+    }
+
+    protected function hasAvailableSlot(
+        Company $company,
+        Service $service,
+        ?int $professionalId,
+        CarbonImmutable $localDate,
+    ): bool {
+        if ($professionalId === null) {
+            $professionals = $this->professionalResolver->listEligibleProfessionals($company, $service);
+
+            foreach ($professionals as $professional) {
+                if ($this->availabilityService->hasAvailableSlot($company, $professional, $service, $localDate)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        $professional = Professional::query()
+            ->where('company_id', $company->getKey())
+            ->whereKey($professionalId)
+            ->first();
+
+        if ($professional === null) {
+            return false;
+        }
+
+        return $this->availabilityService->hasAvailableSlot($company, $professional, $service, $localDate);
     }
 
     protected function assertServiceBelongsToCompany(Company $company, Service $service): void

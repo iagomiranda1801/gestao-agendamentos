@@ -7,8 +7,11 @@ use App\Enums\AppointmentOrigin;
 use App\Enums\AppointmentStatus;
 use App\Models\Appointment;
 use App\Models\AppointmentPublicAccessToken;
+use App\Services\PublicBooking\OnlineBookingCatalogService;
 use App\Services\PublicBooking\OnlineBookingService;
 use App\Services\PublicBooking\PublicAppointmentTokenService;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -44,6 +47,40 @@ class OnlineBookingServiceTest extends TestCase
             'company_id' => $setup['company']->getKey(),
             'origin' => AppointmentOrigin::Online->value,
         ]);
+    }
+
+    public function test_august_public_booking_dates_include_mondays_without_excessive_queries(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-07-30 12:00:00', 'America/Sao_Paulo'));
+
+        try {
+            $setup = $this->createBookableSetup();
+            $this->enablePublicBooking($setup['company']);
+
+            $queries = 0;
+            DB::listen(function () use (&$queries): void {
+                $queries++;
+            });
+
+            $dates = app(OnlineBookingCatalogService::class)->getAvailableDatesInRange(
+                $setup['company'],
+                $setup['service'],
+                $setup['professional']->getKey(),
+                CarbonImmutable::parse('2026-08-01', $setup['company']->timezone),
+                CarbonImmutable::parse('2026-08-31', $setup['company']->timezone),
+            );
+
+            $dateKeys = $dates->map(fn (CarbonImmutable $date): string => $date->toDateString())->all();
+
+            $this->assertContains('2026-08-03', $dateKeys);
+            $this->assertContains('2026-08-10', $dateKeys);
+            $this->assertContains('2026-08-17', $dateKeys);
+            $this->assertContains('2026-08-24', $dateKeys);
+            $this->assertContains('2026-08-31', $dateKeys);
+            $this->assertLessThan(1000, $queries);
+        } finally {
+            CarbonImmutable::setTestNow();
+        }
     }
 
     public function test_idempotent_requests_return_same_appointment(): void
