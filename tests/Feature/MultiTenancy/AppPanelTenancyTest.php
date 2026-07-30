@@ -9,14 +9,14 @@ use Tests\TestCase;
 
 class AppPanelTenancyTest extends TestCase
 {
-    public function test_super_admin_can_access_active_company_tenant(): void
+    public function test_super_admin_cannot_access_app_company_tenant(): void
     {
         $superAdmin = $this->createSuperAdmin();
         $company = $this->createCompany(['slug' => 'estudio-ana']);
 
         $this->actingAs($superAdmin)
             ->get('/app/empresa/'.$company->slug)
-            ->assertOk();
+            ->assertForbidden();
     }
 
     public function test_linked_admin_can_access_their_company(): void

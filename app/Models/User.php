@@ -55,18 +55,25 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         }
 
         if ($panel->getId() === 'admin') {
-            return $this->is_super_admin;
+            return $this->isPlatformAdmin();
         }
 
         if ($panel->getId() === 'app') {
             if ($this->is_super_admin) {
-                return true;
+                return false;
             }
 
             return $this->hasActiveCompanyMembership();
         }
 
         return false;
+    }
+
+    public function isPlatformAdmin(): bool
+    {
+        return $this->is_active
+            && $this->is_super_admin
+            && ! $this->hasActiveCompanyMembership();
     }
 
     /**
@@ -76,13 +83,6 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     {
         if ($panel->getId() !== 'app') {
             return collect();
-        }
-
-        if ($this->is_super_admin) {
-            return Company::query()
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get();
         }
 
         return $this->companies()
@@ -107,10 +107,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         }
 
         if ($this->is_super_admin) {
-            return Company::query()
-                ->whereKey($tenant->getKey())
-                ->where('is_active', true)
-                ->exists();
+            return false;
         }
 
         return $this->companies()

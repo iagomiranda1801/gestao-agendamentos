@@ -106,6 +106,24 @@ class AppLoginPageTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_super_admin_cannot_login_to_app_panel(): void
+    {
+        $this->createSuperAdmin([
+            'email' => 'super@app.test',
+            'password' => 'password',
+        ]);
+
+        Livewire::test(Login::class)
+            ->fillForm([
+                'email' => 'super@app.test',
+                'password' => 'password',
+            ])
+            ->call('authenticate')
+            ->assertHasErrors(['data.email']);
+
+        $this->assertGuest();
+    }
+
     public function test_inactive_user_cannot_login(): void
     {
         $company = $this->createCompany();

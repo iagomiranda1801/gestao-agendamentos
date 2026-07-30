@@ -3,7 +3,6 @@
 namespace Tests\Feature\MultiTenancy;
 
 use App\Enums\CompanyRole;
-use App\Models\Company;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Tests\TestCase;
@@ -69,7 +68,7 @@ class UserTenantMethodsTest extends TestCase
         $this->assertFalse($user->canAccessTenant($company));
     }
 
-    public function test_super_admin_gets_all_active_companies_as_tenants(): void
+    public function test_super_admin_does_not_get_app_tenants(): void
     {
         $superAdmin = $this->createSuperAdmin();
         $this->createCompany(['slug' => 'empresa-a', 'is_active' => true]);
@@ -80,7 +79,6 @@ class UserTenantMethodsTest extends TestCase
 
         $tenants = $superAdmin->getTenants(Filament::getCurrentPanel());
 
-        $this->assertCount(2, $tenants);
-        $this->assertTrue($tenants->every(fn (Company $company) => $company->is_active));
+        $this->assertCount(0, $tenants);
     }
 }

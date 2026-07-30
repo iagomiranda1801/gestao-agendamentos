@@ -49,6 +49,6 @@ class CompanyPolicy
 
     protected function isSuperAdmin(User $user): bool
     {
-        return $user->is_active && $user->is_super_admin;
+        return $user->isPlatformAdmin();
     }
 }
