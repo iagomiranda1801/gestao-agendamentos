@@ -79,4 +79,16 @@ class SchedulingSettingsTest extends TestCase
         $this->get(route('filament.app.pages.configuracoes-agenda', ['tenant' => $company]))
             ->assertForbidden();
     }
+
+    public function test_admin_can_render_settings_page(): void
+    {
+        $company = $this->createSchedulingCompany();
+        $admin = $this->createCompanyUser($company, [], CompanyRole::CompanyAdmin);
+
+        $this->authenticateForAppTenant($admin, $company);
+
+        $this->get(route('filament.app.pages.configuracoes-agenda', ['tenant' => $company]))
+            ->assertOk()
+            ->assertSee('Configurações da agenda');
+    }
 }

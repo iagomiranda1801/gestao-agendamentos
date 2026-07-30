@@ -67,6 +67,7 @@ class AppPanelProvider extends PanelProvider
                 NavigationGroup::make('Estoque')->collapsed(),
                 NavigationGroup::make('Financeiro')->collapsed(),
                 NavigationGroup::make('Caixa')->collapsed(),
+                NavigationGroup::make('Marketing')->collapsed(),
                 NavigationGroup::make('Relatórios')->collapsed(),
                 NavigationGroup::make('Configurações')->collapsed(),
             ])

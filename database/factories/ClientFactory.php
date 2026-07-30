@@ -28,6 +28,7 @@ class ClientFactory extends Factory
             'birth_date' => fake()->optional()->date(),
             'notes' => fake()->optional()->sentence(),
             'is_active' => true,
+            'whatsapp_marketing_opt_in' => false,
         ];
     }
 
@@ -49,6 +50,13 @@ class ClientFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'is_active' => false,
+        ]);
+    }
+
+    public function optedInForWhatsAppMarketing(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'whatsapp_marketing_opt_in' => true,
         ]);
     }
 }

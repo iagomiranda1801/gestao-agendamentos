@@ -57,6 +57,10 @@ class ClientForm
                         Toggle::make('is_active')
                             ->label('Cliente ativo')
                             ->default(true),
+                        Toggle::make('whatsapp_marketing_opt_in')
+                            ->label('Aceita campanhas no WhatsApp')
+                            ->helperText('Use somente quando o cliente autorizou receber mensagens promocionais.')
+                            ->default(false),
                     ]),
             ]);
     }

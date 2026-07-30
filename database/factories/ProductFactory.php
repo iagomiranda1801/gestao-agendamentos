@@ -32,7 +32,7 @@ class ProductFactory extends Factory
             'sale_price' => fake()->randomFloat(2, 1, 200),
             'minimum_stock' => fake()->randomFloat(4, 0, 50),
             'tracks_stock' => true,
-            'is_sellable' => true,
+            'is_sellable' => false,
             'notes' => fake()->optional()->sentence(),
             'is_active' => true,
         ];
@@ -77,6 +77,15 @@ class ProductFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'is_sellable' => false,
+        ]);
+    }
+
+    public function sellable(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'type' => ProductType::Sale,
+            'is_sellable' => true,
+            'sale_price' => fake()->randomFloat(2, 1, 200),
         ]);
     }
 }

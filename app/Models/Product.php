@@ -185,7 +185,7 @@ class Product extends Model
      */
     public function scopeSellable(Builder $query): Builder
     {
-        return $query->where('is_sellable', true);
+        return $query->where('type', ProductType::Sale->value);
     }
 
     /**
@@ -204,6 +204,15 @@ class Product extends Model
     public function scopeConsumable(Builder $query): Builder
     {
         return $query->where('type', ProductType::Consumable);
+    }
+
+    /**
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeSale(Builder $query): Builder
+    {
+        return $query->where('type', ProductType::Sale->value);
     }
 
     /**

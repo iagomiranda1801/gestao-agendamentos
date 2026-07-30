@@ -94,6 +94,7 @@ class EstudioAnaCatalogSeeder extends Seeder
                     'type' => $item['type'],
                     'reference_unit_cost' => $item['cost'],
                     'tracks_stock' => $item['type'] === ProductType::Consumable,
+                    'is_sellable' => false,
                     'is_active' => true,
                 ],
             );

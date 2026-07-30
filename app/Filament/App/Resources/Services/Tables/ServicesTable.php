@@ -45,6 +45,9 @@ class ServicesTable
                 IconColumn::make('is_online_booking_enabled')
                     ->label('Agendamento online')
                     ->boolean(),
+                IconColumn::make('is_sellable')
+                    ->label('PDV')
+                    ->boolean(),
                 IconColumn::make('is_active')
                     ->label('Status')
                     ->boolean()
@@ -68,6 +71,11 @@ class ServicesTable
                     ->label('Agendamento online')
                     ->trueLabel('Online habilitado')
                     ->falseLabel('Online desabilitado')
+                    ->placeholder('Todos'),
+                TernaryFilter::make('is_sellable')
+                    ->label('PDV')
+                    ->trueLabel('Disponíveis no PDV')
+                    ->falseLabel('Fora do PDV')
                     ->placeholder('Todos'),
             ])
             ->defaultSort('sort_order')

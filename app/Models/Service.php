@@ -23,6 +23,7 @@ use Illuminate\Support\Str;
     'color',
     'sort_order',
     'is_bookable',
+    'is_sellable',
     'is_online_booking_enabled',
     'notes',
     'is_active',
@@ -80,6 +81,7 @@ class Service extends Model
             'buffer_after_minutes' => 'integer',
             'sort_order' => 'integer',
             'is_bookable' => 'boolean',
+            'is_sellable' => 'boolean',
             'is_online_booking_enabled' => 'boolean',
             'is_active' => 'boolean',
         ];
@@ -126,6 +128,14 @@ class Service extends Model
     public function attendances(): HasMany
     {
         return $this->hasMany(Attendance::class);
+    }
+
+    /**
+     * @return HasMany<SaleItem, $this>
+     */
+    public function saleItems(): HasMany
+    {
+        return $this->hasMany(SaleItem::class);
     }
 
     public function getEstimatedMaterialCost(): string
@@ -192,6 +202,15 @@ class Service extends Model
     public function scopeBookable(Builder $query): Builder
     {
         return $query->where('is_bookable', true);
+    }
+
+    /**
+     * @param  Builder<Service>  $query
+     * @return Builder<Service>
+     */
+    public function scopeSellable(Builder $query): Builder
+    {
+        return $query->where('is_sellable', true);
     }
 
     /**

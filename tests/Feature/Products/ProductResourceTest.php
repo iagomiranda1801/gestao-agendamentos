@@ -3,6 +3,7 @@
 namespace Tests\Feature\Products;
 
 use App\Enums\CompanyRole;
+use App\Enums\ProductType;
 use App\Filament\App\Resources\Products\Pages\ListProducts;
 use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\MeasurementUnit;
@@ -72,6 +73,63 @@ class ProductResourceTest extends TestCase
         ]);
 
         $this->assertSame($company->id, $product->company_id);
+    }
+
+    public function test_consumable_product_is_not_sellable_by_default(): void
+    {
+        $company = $this->createCompany();
+        $unit = MeasurementUnit::query()->first();
+
+        $product = app(ProductService::class)->create($company, [
+            'name' => 'Creme de consumo interno',
+            'measurement_unit_id' => $unit->getKey(),
+            'type' => 'consumable',
+            'reference_unit_cost' => 10,
+            'minimum_stock' => 0,
+            'tracks_stock' => true,
+            'is_active' => true,
+        ]);
+
+        $this->assertFalse($product->is_sellable);
+    }
+
+    public function test_sale_product_type_requires_positive_sale_price(): void
+    {
+        $company = $this->createCompany();
+        $unit = MeasurementUnit::query()->first();
+
+        $this->expectException(ValidationException::class);
+
+        app(ProductService::class)->create($company, [
+            'name' => 'Produto para PDV sem preço',
+            'measurement_unit_id' => $unit->getKey(),
+            'type' => ProductType::Sale->value,
+            'reference_unit_cost' => 10,
+            'sale_price' => 0,
+            'minimum_stock' => 0,
+            'tracks_stock' => true,
+            'is_active' => true,
+        ]);
+    }
+
+    public function test_sale_product_type_marks_product_as_sellable(): void
+    {
+        $company = $this->createCompany();
+        $unit = MeasurementUnit::query()->first();
+
+        $product = app(ProductService::class)->create($company, [
+            'name' => 'Shampoo revenda',
+            'measurement_unit_id' => $unit->getKey(),
+            'type' => ProductType::Sale->value,
+            'reference_unit_cost' => 15,
+            'sale_price' => 35,
+            'minimum_stock' => 0,
+            'tracks_stock' => true,
+            'is_active' => true,
+        ]);
+
+        $this->assertTrue($product->is_sellable);
+        $this->assertSame(ProductType::Sale, $product->type);
     }
 
     public function test_manipulated_company_id_is_ignored_on_create(): void

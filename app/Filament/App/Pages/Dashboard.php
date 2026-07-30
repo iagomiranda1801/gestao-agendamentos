@@ -4,10 +4,10 @@ namespace App\Filament\App\Pages;
 
 use Filament\Facades\Filament;
 use Filament\Pages\Dashboard as BaseDashboard;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Text;
+use Filament\Schemas\Components\View as ViewComponent;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\FontWeight;
+use App\Models\Company;
+use App\Services\Dashboard\OperationalDashboardAggregator;
 
 class Dashboard extends BaseDashboard
 {
@@ -22,18 +22,17 @@ class Dashboard extends BaseDashboard
 
     public function content(Schema $schema): Schema
     {
-        $companyName = Filament::getTenant()?->name ?? 'Empresa';
-        $userName = auth()->user()?->name ?? 'Usuário';
+        /** @var Company|null $company */
+        $company = Filament::getTenant();
 
         return $schema
             ->components([
-                Section::make('Bem-vindo')
-                    ->schema([
-                        Text::make("Empresa: {$companyName}")
-                            ->weight(FontWeight::SemiBold),
-                        Text::make("Usuário: {$userName}"),
-                        Text::make('Sistema em configuração')
-                            ->color('gray'),
+                ViewComponent::make('filament.app.pages.dashboard')
+                    ->viewData([
+                        'dashboard' => $company
+                            ? app(OperationalDashboardAggregator::class)->aggregate($company)
+                            : [],
+                        'userName' => auth()->user()?->name ?? 'Usuário',
                     ]),
             ]);
     }

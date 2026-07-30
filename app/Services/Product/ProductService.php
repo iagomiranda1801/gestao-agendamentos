@@ -2,6 +2,7 @@
 
 namespace App\Services\Product;
 
+use App\Enums\ProductType;
 use App\Models\Company;
 use App\Models\MeasurementUnit;
 use App\Models\Product;
@@ -16,7 +17,10 @@ class ProductService
     public function create(Company $company, array $data): Product
     {
         return DB::transaction(function () use ($company, $data): Product {
-            $payload = $this->preparePayload($data);
+            $payload = $this->preparePayload($data) + [
+                'is_sellable' => false,
+                'sale_price' => 0,
+            ];
 
             $this->validateBusinessRules($company, $payload);
 
@@ -71,6 +75,10 @@ class ProductService
     {
         unset($data['company_id']);
 
+        if (isset($data['type'])) {
+            $data['is_sellable'] = $data['type'] === ProductType::Sale->value || $data['type'] === ProductType::Sale;
+        }
+
         return $data;
     }
 
@@ -84,6 +92,7 @@ class ProductService
         $this->assertBarcodeIsUniqueInCompany($company, $payload['barcode'] ?? null, $ignore);
         $this->assertNonNegativeDecimal($payload['reference_unit_cost'] ?? 0, 'reference_unit_cost', 'O custo unitário de referência não pode ser negativo.');
         $this->assertNonNegativeDecimal($payload['sale_price'] ?? 0, 'sale_price', 'O preço de venda não pode ser negativo.');
+        $this->assertSalePriceIsValidForSellableProduct($payload['type'] ?? null, $payload['sale_price'] ?? 0);
         $this->assertNonNegativeDecimal($payload['minimum_stock'] ?? 0, 'minimum_stock', 'O estoque mínimo não pode ser negativo.');
         $this->assertMeasurementUnitIsActive($payload['measurement_unit_id'] ?? null);
     }
@@ -160,6 +169,19 @@ class ProductService
     {
         if (bccomp((string) $value, '0', 6) < 0) {
             throw ValidationException::withMessages([$field => $message]);
+        }
+    }
+
+    protected function assertSalePriceIsValidForSellableProduct(mixed $type, mixed $salePrice): void
+    {
+        if ($type !== ProductType::Sale->value && $type !== ProductType::Sale) {
+            return;
+        }
+
+        if (bccomp((string) $salePrice, '0', 2) <= 0) {
+            throw ValidationException::withMessages([
+                'sale_price' => 'Informe um preço de venda maior que zero para produtos vendidos no PDV.',
+            ]);
         }
     }
 }

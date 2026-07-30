@@ -31,6 +31,7 @@ class ServiceFactory extends Factory
             'color' => fake()->optional()->hexColor(),
             'sort_order' => fake()->numberBetween(0, 100),
             'is_bookable' => true,
+            'is_sellable' => true,
             'is_online_booking_enabled' => true,
             'notes' => fake()->optional()->sentence(),
             'is_active' => true,
@@ -70,6 +71,20 @@ class ServiceFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'is_bookable' => false,
             'is_online_booking_enabled' => false,
+        ]);
+    }
+
+    public function sellable(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_sellable' => true,
+        ]);
+    }
+
+    public function notSellable(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_sellable' => false,
         ]);
     }
 

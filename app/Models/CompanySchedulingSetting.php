@@ -37,6 +37,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'booking_terms',
     'whatsapp_notifications_enabled',
     'whatsapp_instance',
+    'whatsapp_instance_token',
+    'whatsapp_instance_status',
+    'whatsapp_instance_qr_code',
+    'whatsapp_instance_connected_at',
     'whatsapp_sender_phone',
     'whatsapp_confirmation_template',
 ])]
@@ -70,6 +74,8 @@ class CompanySchedulingSetting extends Model
             'cancellation_minimum_advance_minutes' => 'integer',
             'reschedule_minimum_advance_minutes' => 'integer',
             'whatsapp_notifications_enabled' => 'boolean',
+            'whatsapp_instance_token' => 'encrypted',
+            'whatsapp_instance_connected_at' => 'datetime',
         ];
     }
 

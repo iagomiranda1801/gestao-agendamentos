@@ -4,17 +4,22 @@ namespace Tests\Feature\Stock;
 
 use App\Enums\StockDocumentStatus;
 use App\Enums\StockDocumentType;
+use App\Filament\App\Resources\Purchases\Pages\EditPurchase;
 use App\Models\InventoryBalance;
+use App\Models\Payable;
 use App\Models\StockMovement;
 use App\Services\Stock\StockDocumentPostingService;
 use App\Services\Stock\StockDocumentReversalService;
 use App\Services\Stock\StockDocumentService;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
+use Tests\Support\CreatesFinanceFixtures;
 use Tests\Support\CreatesStockFixtures;
 use Tests\TestCase;
 
 class PurchaseAndReversalTest extends TestCase
 {
+    use CreatesFinanceFixtures;
     use CreatesStockFixtures;
 
     public function test_draft_purchase_does_not_change_stock(): void
@@ -53,6 +58,70 @@ class PurchaseAndReversalTest extends TestCase
         $this->assertSame(StockDocumentStatus::Posted, $document->status);
         $this->assertSame(1, StockMovement::query()->where('stock_document_id', $document->getKey())->count());
         $this->assertSame('10.0000', (string) InventoryBalance::query()->where('product_id', $product->getKey())->value('quantity_on_hand'));
+    }
+
+    public function test_purchase_edit_page_can_post_draft_purchase(): void
+    {
+        $company = $this->createCompany();
+        $user = $this->createCompanyUser($company);
+        $product = $this->createTrackedProduct($company);
+
+        $document = app(StockDocumentService::class)->createDraft(
+            $company,
+            StockDocumentType::Purchase,
+            ['occurred_at' => now()],
+            [[
+                'product_id' => $product->getKey(),
+                'quantity' => '10',
+                'unit_cost' => '2.000000',
+            ]],
+            $user,
+        );
+
+        $this->authenticateForAppTenant($user, $company);
+
+        Livewire::test(EditPurchase::class, [
+            'record' => $document->getRouteKey(),
+        ])
+            ->assertActionVisible('post')
+            ->callAction('post')
+            ->assertHasNoActionErrors();
+
+        $this->assertSame(StockDocumentStatus::Posted, $document->fresh()->status);
+        $this->assertSame('10.0000', (string) InventoryBalance::query()->where('product_id', $product->getKey())->value('quantity_on_hand'));
+    }
+
+    public function test_purchase_edit_page_can_generate_payable_for_posted_purchase(): void
+    {
+        $company = $this->createCompany();
+        $user = $this->createCompanyUser($company);
+        $product = $this->createTrackedProduct($company);
+        $category = $this->createStockPurchaseCategory($company);
+
+        $document = $this->postPurchase($company, $user, [[
+            'product_id' => $product->getKey(),
+            'quantity' => '5',
+            'unit_cost' => '20.000000',
+        ]]);
+
+        $this->authenticateForAppTenant($user, $company);
+
+        Livewire::test(EditPurchase::class, [
+            'record' => $document->getRouteKey(),
+        ])
+            ->assertSuccessful()
+            ->assertActionVisible('generatePayable')
+            ->callAction('generatePayable', [
+                'expense_category_id' => $category->getKey(),
+                'issue_date' => now()->toDateString(),
+                'competence_date' => now()->toDateString(),
+                'installment_count' => 1,
+                'first_due_date' => now()->addDays(30)->toDateString(),
+                'installment_interval_days' => 30,
+            ])
+            ->assertHasNoActionErrors();
+
+        $this->assertSame(1, Payable::query()->where('stock_document_id', $document->getKey())->count());
     }
 
     public function test_reversal_creates_inverse_movements_and_marks_original_reversed(): void

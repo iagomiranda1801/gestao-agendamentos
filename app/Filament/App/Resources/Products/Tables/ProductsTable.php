@@ -72,9 +72,8 @@ class ProductsTable
                     ->label('Controla estoque')
                     ->boolean(),
                 IconColumn::make('is_sellable')
-                    ->label('Vendável')
-                    ->boolean()
-                    ->toggleable(),
+                    ->label('PDV')
+                    ->boolean(),
                 IconColumn::make('is_active')
                     ->label('Status')
                     ->boolean()
@@ -92,6 +91,11 @@ class ProductsTable
                     ->label('Status')
                     ->trueLabel('Ativos')
                     ->falseLabel('Inativos')
+                    ->placeholder('Todos'),
+                TernaryFilter::make('is_sellable')
+                    ->label('PDV')
+                    ->trueLabel('Produtos de venda')
+                    ->falseLabel('Somente consumo interno')
                     ->placeholder('Todos'),
             ])
             ->defaultSort('name')

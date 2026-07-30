@@ -7,12 +7,14 @@ use App\Enums\SaleItemType;
 use App\Enums\SaleOrigin;
 use App\Enums\SaleStatus;
 use App\Enums\StockDocumentType;
+use App\Enums\ProductType;
 use App\Models\Company;
 use App\Models\FinancialAccount;
 use App\Models\Product;
 use App\Models\Receivable;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\Service;
 use App\Models\StockDocument;
 use App\Models\User;
 use App\Services\Financial\CashSessionService;
@@ -117,7 +119,7 @@ class SaleService
 
     /**
      * @param  list<array<string, mixed>>  $items
-     * @return list<array{type: SaleItemType, product: Product, quantity: string, unit_price: string, discount_amount: string, line_total: string}>
+     * @return list<array{type: SaleItemType, product?: Product, service?: Service, name: string, quantity: string, unit_price: string, unit_cost: string, discount_amount: string, line_total: string, tracks_stock: bool}>
      */
     protected function validateItems(Company $company, array $items): array
     {
@@ -132,32 +134,41 @@ class SaleService
         foreach ($items as $index => $item) {
             $type = SaleItemType::tryFrom((string) ($item['item_type'] ?? SaleItemType::Product->value));
 
-            if ($type !== SaleItemType::Product) {
+            if (! in_array($type, [SaleItemType::Product, SaleItemType::Service, SaleItemType::Custom], true)) {
                 throw ValidationException::withMessages([
-                    "items.{$index}.item_type" => 'Neste momento o PDV finaliza apenas produtos.',
+                    "items.{$index}.item_type" => 'Tipo de item inválido para venda rápida.',
                 ]);
             }
 
-            $product = Product::query()
-                ->whereKey((int) ($item['product_id'] ?? 0))
-                ->where('company_id', $company->getKey())
-                ->first();
+            $product = null;
+            $service = null;
+            $name = trim((string) ($item['name'] ?? ''));
+            $unitCost = '0.000000';
+            $tracksStock = false;
 
-            if (! $product) {
-                throw ValidationException::withMessages([
-                    "items.{$index}.product_id" => 'Produto inválido para esta empresa.',
-                ]);
+            if ($type === SaleItemType::Product) {
+                $product = $this->resolveProductItem($company, $item, $index);
+                $name = $product->name;
+                $unitCost = $product->getCurrentUnitCost();
+                $tracksStock = (bool) $product->tracks_stock;
             }
 
-            if (! $product->is_active || ! $product->is_sellable) {
+            if ($type === SaleItemType::Service) {
+                $service = $this->resolveServiceItem($company, $item, $index);
+                $name = $service->name;
+                $unitCost = $service->getEstimatedMaterialCost();
+                $tracksStock = $service->consumptions->contains(fn ($consumption): bool => (bool) $consumption->product?->tracks_stock);
+            }
+
+            if ($type === SaleItemType::Custom && $name === '') {
                 throw ValidationException::withMessages([
-                    "items.{$index}.product_id" => 'O produto precisa estar ativo e disponível para venda.',
+                    "items.{$index}.name" => 'Informe a descrição do item avulso.',
                 ]);
             }
 
             $quantity = $this->normalizePositiveQuantity($item['quantity'] ?? '1', "items.{$index}.quantity");
             $unitPrice = $this->normalizeNonNegativeMoney(
-                $item['unit_price'] ?? $product->sale_price,
+                $item['unit_price'] ?? $product?->sale_price ?? $service?->price ?? '0.00',
                 "items.{$index}.unit_price",
             );
             $discountAmount = $this->normalizeNonNegativeMoney($item['discount_amount'] ?? '0', "items.{$index}.discount_amount");
@@ -173,10 +184,14 @@ class SaleService
             $validated[] = [
                 'type' => $type,
                 'product' => $product,
+                'service' => $service,
+                'name' => $name,
                 'quantity' => $quantity,
                 'unit_price' => $unitPrice,
+                'unit_cost' => $unitCost,
                 'discount_amount' => $discountAmount,
                 'line_total' => $lineTotal,
+                'tracks_stock' => $tracksStock,
             ];
         }
 
@@ -198,18 +213,14 @@ class SaleService
     }
 
     /**
-     * @param  list<array{product: Product, quantity: string}>  $items
+     * @param  list<array{type: SaleItemType, product?: Product, service?: Service, quantity: string}>  $items
      */
     protected function validateStockAvailability(array $items): void
     {
-        foreach ($items as $item) {
-            $product = $item['product'];
+        foreach ($this->buildStockItems($items) as $stockItem) {
+            $product = $stockItem['product'];
 
-            if (! $product->tracks_stock) {
-                continue;
-            }
-
-            if (bccomp($product->getCurrentStockQuantity(), $item['quantity'], 4) < 0) {
+            if (bccomp($product->getCurrentStockQuantity(), $stockItem['quantity'], 4) < 0) {
                 throw ValidationException::withMessages([
                     'items' => "Saldo insuficiente para o produto {$product->name}.",
                 ]);
@@ -254,23 +265,25 @@ class SaleService
     }
 
     /**
-     * @param  list<array{type: SaleItemType, product: Product, quantity: string, unit_price: string, discount_amount: string, line_total: string}>  $items
+     * @param  list<array{type: SaleItemType, product?: Product, service?: Service, name: string, quantity: string, unit_price: string, unit_cost: string, discount_amount: string, line_total: string, tracks_stock: bool}>  $items
      */
     protected function createItems(Company $company, Sale $sale, array $items): void
     {
         foreach ($items as $item) {
-            $product = $item['product'];
+            $product = $item['product'] ?? null;
+            $service = $item['service'] ?? null;
 
             $saleItem = new SaleItem([
                 'item_type' => $item['type'],
-                'product_id' => $product->getKey(),
-                'name_snapshot' => $product->name,
+                'product_id' => $product?->getKey(),
+                'service_id' => $service?->getKey(),
+                'name_snapshot' => $item['name'],
                 'quantity' => $item['quantity'],
                 'unit_price_snapshot' => $item['unit_price'],
-                'unit_cost_snapshot' => $product->getCurrentUnitCost(),
+                'unit_cost_snapshot' => $item['unit_cost'],
                 'discount_amount' => $item['discount_amount'],
                 'line_total' => $item['line_total'],
-                'tracks_stock_snapshot' => $product->tracks_stock,
+                'tracks_stock_snapshot' => $item['tracks_stock'],
             ]);
             $saleItem->company()->associate($company);
             $saleItem->sale()->associate($sale);
@@ -279,7 +292,7 @@ class SaleService
     }
 
     /**
-     * @param  list<array{product: Product, quantity: string}>  $items
+     * @param  list<array{type: SaleItemType, product?: Product, service?: Service, quantity: string}>  $items
      */
     protected function createAndPostStockDocument(
         Company $company,
@@ -288,21 +301,14 @@ class SaleService
         array $items,
         CarbonInterface $soldAt,
     ): ?StockDocument {
-        $stockItems = [];
-
-        foreach ($items as $item) {
-            $product = $item['product'];
-
-            if (! $product->tracks_stock) {
-                continue;
-            }
-
-            $stockItems[] = [
-                'product_id' => $product->getKey(),
+        $stockItems = collect($this->buildStockItems($items))
+            ->map(fn (array $item): array => [
+                'product_id' => $item['product']->getKey(),
                 'quantity' => $item['quantity'],
-                'notes' => "Venda #{$sale->getKey()}",
-            ];
-        }
+                'notes' => $item['notes'],
+            ])
+            ->values()
+            ->all();
 
         if ($stockItems === []) {
             return null;
@@ -315,13 +321,126 @@ class SaleService
                 'sale_id' => $sale->getKey(),
                 'reference_key' => "sale:{$sale->getKey()}:product-sale",
                 'occurred_at' => $soldAt,
-                'notes' => "Venda de produtos #{$sale->getKey()}",
+                'notes' => "Venda PDV #{$sale->getKey()}",
             ],
             $stockItems,
             $user,
         );
 
         return $this->stockDocumentPostingService->post($company, $document, $user);
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    protected function resolveProductItem(Company $company, array $item, int $index): Product
+    {
+        $product = Product::query()
+            ->whereKey((int) ($item['product_id'] ?? 0))
+            ->where('company_id', $company->getKey())
+            ->first();
+
+        if (! $product) {
+            throw ValidationException::withMessages([
+                "items.{$index}.product_id" => 'Produto inválido para esta empresa.',
+            ]);
+        }
+
+        if (! $product->is_active || $product->type !== ProductType::Sale) {
+            throw ValidationException::withMessages([
+                "items.{$index}.product_id" => 'O produto precisa estar ativo e com tipo Produto de venda.',
+            ]);
+        }
+
+        return $product;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    protected function resolveServiceItem(Company $company, array $item, int $index): Service
+    {
+        $service = Service::query()
+            ->with('consumptions.product')
+            ->whereKey((int) ($item['service_id'] ?? 0))
+            ->where('company_id', $company->getKey())
+            ->first();
+
+        if (! $service) {
+            throw ValidationException::withMessages([
+                "items.{$index}.service_id" => 'Serviço inválido para esta empresa.',
+            ]);
+        }
+
+        if (! $service->is_active || ! $service->is_sellable) {
+            throw ValidationException::withMessages([
+                "items.{$index}.service_id" => 'O serviço precisa estar ativo e disponível para venda.',
+            ]);
+        }
+
+        return $service;
+    }
+
+    /**
+     * @param  list<array{type: SaleItemType, product?: Product, service?: Service, quantity: string}>  $items
+     * @return list<array{product: Product, quantity: string, notes: string}>
+     */
+    protected function buildStockItems(array $items): array
+    {
+        $stockItems = [];
+
+        foreach ($items as $item) {
+            if ($item['type'] === SaleItemType::Product) {
+                $product = $item['product'] ?? null;
+
+                if ($product?->tracks_stock) {
+                    $this->addStockItem($stockItems, $product, $item['quantity'], 'Produto vendido');
+                }
+
+                continue;
+            }
+
+            if ($item['type'] !== SaleItemType::Service || ! isset($item['service'])) {
+                continue;
+            }
+
+            foreach ($item['service']->consumptions as $consumption) {
+                $product = $consumption->product;
+
+                if (! $product?->tracks_stock) {
+                    continue;
+                }
+
+                $quantity = DecimalMoney::round(bcmul((string) $consumption->quantity, $item['quantity'], 4), 4);
+                $this->addStockItem($stockItems, $product, $quantity, "Consumo do serviço {$item['service']->name}");
+            }
+        }
+
+        return array_values($stockItems);
+    }
+
+    /**
+     * @param  array<int, array{product: Product, quantity: string, notes: string}>  $stockItems
+     */
+    protected function addStockItem(array &$stockItems, Product $product, string $quantity, string $notes): void
+    {
+        $productId = $product->getKey();
+
+        if (! isset($stockItems[$productId])) {
+            $stockItems[$productId] = [
+                'product' => $product,
+                'quantity' => $quantity,
+                'notes' => $notes,
+            ];
+
+            return;
+        }
+
+        $stockItems[$productId]['quantity'] = DecimalMoney::round(
+            bcadd($stockItems[$productId]['quantity'], $quantity, 4),
+            4,
+        );
+        $stockItems[$productId]['notes'] = 'Venda PDV';
     }
 
     protected function attachCashSessionIfNeeded(Company $company, Sale $sale, PaymentData $payment): void

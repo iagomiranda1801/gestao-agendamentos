@@ -40,7 +40,7 @@ class StockDocumentPolicy
 
     public function update(User $user, StockDocument $document): bool
     {
-        return $this->view($user, $document) && $document->isDraft();
+        return $this->view($user, $document);
     }
 
     public function delete(User $user, StockDocument $document): bool

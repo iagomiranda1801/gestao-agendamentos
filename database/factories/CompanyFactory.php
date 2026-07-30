@@ -29,7 +29,7 @@ class CompanyFactory extends Factory
             'logo_path' => null,
             'timezone' => 'America/Sao_Paulo',
             'is_active' => true,
-            'enabled_modules' => ['scheduling', 'stock', 'finance', 'sales'],
+            'enabled_modules' => ['scheduling', 'stock', 'finance', 'sales', 'marketing'],
             'trial_ends_at' => null,
             'subscription_status' => 'active',
         ];

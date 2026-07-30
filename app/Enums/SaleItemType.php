@@ -7,6 +7,7 @@ enum SaleItemType: string
     case Product = 'product';
     case Service = 'service';
     case Attendance = 'attendance';
+    case Custom = 'custom';
 
     public function label(): string
     {
@@ -14,6 +15,7 @@ enum SaleItemType: string
             self::Product => 'Produto',
             self::Service => 'Serviço',
             self::Attendance => 'Atendimento',
+            self::Custom => 'Avulso',
         };
     }
 

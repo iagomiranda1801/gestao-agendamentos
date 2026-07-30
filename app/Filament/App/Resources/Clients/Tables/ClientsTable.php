@@ -44,6 +44,14 @@ class ClientsTable
                     ->falseIcon('heroicon-o-x-circle')
                     ->trueColor('success')
                     ->falseColor('danger'),
+                IconColumn::make('whatsapp_marketing_opt_in')
+                    ->label('Marketing WhatsApp')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('gray')
+                    ->toggleable(),
                 TextColumn::make('created_at')
                     ->label('Data de cadastro')
                     ->dateTime('d/m/Y H:i')
@@ -55,6 +63,11 @@ class ClientsTable
                     ->label('Status')
                     ->trueLabel('Ativos')
                     ->falseLabel('Inativos')
+                    ->placeholder('Todos'),
+                TernaryFilter::make('whatsapp_marketing_opt_in')
+                    ->label('Marketing WhatsApp')
+                    ->trueLabel('Com aceite')
+                    ->falseLabel('Sem aceite')
                     ->placeholder('Todos'),
             ])
             ->defaultSort('name')

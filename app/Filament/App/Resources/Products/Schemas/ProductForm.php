@@ -9,6 +9,8 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 
 class ProductForm
@@ -33,6 +35,12 @@ class ProductForm
                             ->label('Tipo')
                             ->options(ProductType::options())
                             ->required()
+                            ->live()
+                            ->afterStateUpdated(function (?string $state, Set $set): void {
+                                if ($state !== ProductType::Sale->value) {
+                                    $set('sale_price', '0.00');
+                                }
+                            })
                             ->native(false),
                         Select::make('measurement_unit_id')
                             ->label('Unidade de medida')
@@ -70,7 +78,8 @@ class ProductForm
                             ->step(0.01)
                             ->minValue(0)
                             ->default(0)
-                            ->required(),
+                            ->required(fn (Get $get): bool => $get('type') === ProductType::Sale->value)
+                            ->visible(fn (Get $get): bool => $get('type') === ProductType::Sale->value),
                         TextInput::make('minimum_stock')
                             ->label('Estoque mínimo')
                             ->numeric()
@@ -80,9 +89,6 @@ class ProductForm
                             ->required(),
                         Toggle::make('tracks_stock')
                             ->label('Controlar estoque')
-                            ->default(true),
-                        Toggle::make('is_sellable')
-                            ->label('Disponível para venda')
                             ->default(true),
                         Toggle::make('is_active')
                             ->label('Produto ativo')

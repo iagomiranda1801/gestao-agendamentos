@@ -12,6 +12,7 @@ use App\Models\Client;
 use App\Models\Company;
 use App\Models\FinancialAccount;
 use App\Models\Product;
+use App\Models\Service;
 use App\Policies\SalePolicy;
 use App\Services\Sales\SaleService;
 use BackedEnum;
@@ -91,7 +92,7 @@ class PointOfSalePage extends Page
                 notes: $payment['notes'] ?? null,
             ))
             ->values()
-            ->all();
+                ->all();
 
         $sale = app(SaleService::class)->complete($company, auth()->user(), [
             'client_id' => $state['client_id'] ?? null,
@@ -101,8 +102,10 @@ class PointOfSalePage extends Page
             'notes' => $state['notes'] ?? null,
             'items' => collect($state['items'] ?? [])
                 ->map(fn (array $item): array => [
-                    'item_type' => SaleItemType::Product->value,
+                    'item_type' => $item['item_type'] ?? SaleItemType::Product->value,
                     'product_id' => $item['product_id'] ?? null,
+                    'service_id' => $item['service_id'] ?? null,
+                    'name' => $item['name'] ?? null,
                     'quantity' => $item['quantity'] ?? '1',
                     'unit_price' => $item['unit_price'] ?? '0.00',
                     'discount_amount' => $item['discount_amount'] ?? '0.00',
@@ -159,13 +162,27 @@ class PointOfSalePage extends Page
                 Section::make('Itens')
                     ->schema([
                         Repeater::make('items')
-                            ->label('Produtos')
+                            ->label('Itens')
                             ->schema([
+                                Select::make('item_type')
+                                    ->label('Tipo')
+                                    ->options(self::itemTypeOptions())
+                                    ->default(SaleItemType::Product->value)
+                                    ->required()
+                                    ->live()
+                                    ->afterStateUpdated(function (Set $set): void {
+                                        $set('product_id', null);
+                                        $set('service_id', null);
+                                        $set('name', null);
+                                        $set('unit_price', '0.00');
+                                    })
+                                    ->native(false),
                                 Select::make('product_id')
                                     ->label('Produto')
                                     ->options(fn (): array => self::productOptions())
                                     ->searchable()
-                                    ->required()
+                                    ->required(fn (Get $get): bool => $get('item_type') === SaleItemType::Product->value)
+                                    ->visible(fn (Get $get): bool => $get('item_type') === SaleItemType::Product->value)
                                     ->live()
                                     ->afterStateUpdated(function (?int $state, Set $set): void {
                                         if ($state === null) {
@@ -181,6 +198,32 @@ class PointOfSalePage extends Page
                                         }
                                     })
                                     ->native(false),
+                                Select::make('service_id')
+                                    ->label('Serviço')
+                                    ->options(fn (): array => self::serviceOptions())
+                                    ->searchable()
+                                    ->required(fn (Get $get): bool => $get('item_type') === SaleItemType::Service->value)
+                                    ->visible(fn (Get $get): bool => $get('item_type') === SaleItemType::Service->value)
+                                    ->live()
+                                    ->afterStateUpdated(function (?int $state, Set $set): void {
+                                        if ($state === null) {
+                                            return;
+                                        }
+
+                                        $service = Service::query()
+                                            ->where('company_id', Filament::getTenant()?->getKey())
+                                            ->find($state);
+
+                                        if ($service !== null) {
+                                            $set('unit_price', (string) $service->price);
+                                        }
+                                    })
+                                    ->native(false),
+                                TextInput::make('name')
+                                    ->label('Descrição')
+                                    ->required(fn (Get $get): bool => $get('item_type') === SaleItemType::Custom->value)
+                                    ->visible(fn (Get $get): bool => $get('item_type') === SaleItemType::Custom->value)
+                                    ->maxLength(255),
                                 TextInput::make('quantity')
                                     ->label('Qtd.')
                                     ->numeric()
@@ -215,9 +258,9 @@ class PointOfSalePage extends Page
                                         self::lineTotal($get('quantity'), $get('unit_price'), $get('discount_amount')),
                                     )),
                             ])
-                            ->columns(5)
+                            ->columns(6)
                             ->defaultItems(1)
-                            ->addActionLabel('Adicionar produto')
+                            ->addActionLabel('Adicionar item')
                             ->columnSpanFull(),
                         TextInput::make('items_total')
                             ->label('Subtotal dos itens')
@@ -324,6 +367,18 @@ class PointOfSalePage extends Page
     }
 
     /**
+     * @return array<string, string>
+     */
+    protected static function itemTypeOptions(): array
+    {
+        return [
+            SaleItemType::Product->value => SaleItemType::Product->label(),
+            SaleItemType::Service->value => SaleItemType::Service->label(),
+            SaleItemType::Custom->value => SaleItemType::Custom->label(),
+        ];
+    }
+
+    /**
      * @return array<int, string>
      */
     protected static function productOptions(): array
@@ -343,6 +398,31 @@ class PointOfSalePage extends Page
                     $product->name,
                     number_format((float) $product->sale_price, 2, ',', '.'),
                     $product->tracks_stock ? $product->getCurrentStockQuantity() : 'sem controle',
+                ),
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected static function serviceOptions(): array
+    {
+        /** @var Company $company */
+        $company = Filament::getTenant();
+
+        return Service::query()
+            ->where('company_id', $company->getKey())
+            ->active()
+            ->sellable()
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (Service $service): array => [
+                $service->getKey() => sprintf(
+                    '%s · R$ %s',
+                    $service->name,
+                    number_format((float) $service->price, 2, ',', '.'),
                 ),
             ])
             ->all();
@@ -377,6 +457,7 @@ class PointOfSalePage extends Page
             'sold_at' => now(),
             'discount_amount' => '0.00',
             'items' => [[
+                'item_type' => SaleItemType::Product->value,
                 'quantity' => '1',
                 'unit_price' => '0.00',
                 'discount_amount' => '0.00',

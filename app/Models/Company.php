@@ -236,6 +236,30 @@ class Company extends Model
     }
 
     /**
+     * @return HasMany<WhatsAppCampaign, $this>
+     */
+    public function whatsappCampaigns(): HasMany
+    {
+        return $this->hasMany(WhatsAppCampaign::class);
+    }
+
+    /**
+     * @return HasMany<CompanyWhatsAppInstance, $this>
+     */
+    public function whatsappInstances(): HasMany
+    {
+        return $this->hasMany(CompanyWhatsAppInstance::class);
+    }
+
+    /**
+     * @return HasMany<WhatsAppContact, $this>
+     */
+    public function whatsappContacts(): HasMany
+    {
+        return $this->hasMany(WhatsAppContact::class);
+    }
+
+    /**
      * @return HasMany<ExpenseCategory, $this>
      */
     public function expenseCategories(): HasMany

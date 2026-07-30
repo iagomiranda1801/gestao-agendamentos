@@ -83,6 +83,9 @@ class ServiceForm
                             ->label('Disponível para agendamento')
                             ->default(true)
                             ->live(),
+                        Toggle::make('is_sellable')
+                            ->label('Disponível para venda no PDV')
+                            ->default(true),
                         Toggle::make('is_online_booking_enabled')
                             ->label('Disponível no agendamento online')
                             ->default(true)

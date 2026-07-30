@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'birth_date',
     'notes',
     'is_active',
+    'whatsapp_marketing_opt_in',
 ])]
 class Client extends Model
 {
@@ -48,6 +49,7 @@ class Client extends Model
         return [
             'birth_date' => 'date',
             'is_active' => 'boolean',
+            'whatsapp_marketing_opt_in' => 'boolean',
         ];
     }
 
@@ -76,6 +78,14 @@ class Client extends Model
     }
 
     /**
+     * @return HasMany<WhatsAppCampaignRecipient, $this>
+     */
+    public function whatsappCampaignRecipients(): HasMany
+    {
+        return $this->hasMany(WhatsAppCampaignRecipient::class);
+    }
+
+    /**
      * @param  Builder<Client>  $query
      * @return Builder<Client>
      */
@@ -91,5 +101,14 @@ class Client extends Model
     public function scopeInactive(Builder $query): Builder
     {
         return $query->where('is_active', false);
+    }
+
+    /**
+     * @param  Builder<Client>  $query
+     * @return Builder<Client>
+     */
+    public function scopeWhatsappMarketingOptedIn(Builder $query): Builder
+    {
+        return $query->where('whatsapp_marketing_opt_in', true);
     }
 }

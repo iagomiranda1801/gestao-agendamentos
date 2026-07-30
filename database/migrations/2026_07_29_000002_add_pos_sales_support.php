@@ -62,7 +62,7 @@ return new class extends Migration
 
         if (! Schema::hasColumn('products', 'is_sellable')) {
             Schema::table('products', function (Blueprint $table): void {
-                $table->boolean('is_sellable')->default(true)->after('tracks_stock');
+                $table->boolean('is_sellable')->default(false)->after('tracks_stock');
             });
         }
 

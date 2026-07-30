@@ -20,14 +20,16 @@ use Filament\Resources\Pages\EditRecord;
 
 class EditPurchase extends EditRecord
 {
-    use EditsStockDocument;
+    use EditsStockDocument {
+        getHeaderActions as getStockDocumentHeaderActions;
+    }
 
     protected static string $resource = PurchaseResource::class;
 
     protected function getHeaderActions(): array
     {
         return [
-            ...parent::getHeaderActions(),
+            ...$this->getStockDocumentHeaderActions(),
             Action::make('generatePayable')
                 ->label('Gerar conta a pagar')
                 ->icon('heroicon-o-credit-card')

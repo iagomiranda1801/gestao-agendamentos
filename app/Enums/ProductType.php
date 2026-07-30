@@ -4,14 +4,16 @@ namespace App\Enums;
 
 enum ProductType: string
 {
+    case Sale = 'sale';
     case Consumable = 'consumable';
     case Asset = 'asset';
 
     public function label(): string
     {
         return match ($this) {
+            self::Sale => 'Produto de venda',
             self::Consumable => 'Material de consumo',
-            self::Asset => 'Investimento/ativo',
+            self::Asset => 'Ativo/material operacional',
         };
     }
 

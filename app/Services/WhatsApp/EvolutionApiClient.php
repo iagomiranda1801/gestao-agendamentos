@@ -15,13 +15,6 @@ class EvolutionApiClient
 
     public function sendText(string $instance, string $phoneDigits, string $message): void
     {
-        $baseUrl = rtrim((string) config('services.evolution.url'), '/');
-        $apiKey = (string) config('services.evolution.key');
-
-        if ($baseUrl === '' || $apiKey === '') {
-            throw new RuntimeException('Evolution API não configurada (EVOLUTION_API_URL / EVOLUTION_API_KEY).');
-        }
-
         $instance = $this->resolveInstance($instance);
 
         if ($instance === '') {
@@ -30,13 +23,10 @@ class EvolutionApiClient
 
         $number = $this->toWhatsAppNumber($phoneDigits);
 
-        $response = Http::withHeaders([
-            'apikey' => $apiKey,
-            'Content-Type' => 'application/json',
-        ])
+        $response = $this->http()
             ->acceptJson()
             ->timeout(20)
-            ->post("{$baseUrl}/message/sendText/{$instance}", [
+            ->post($this->url("/message/sendText/{$instance}"), [
                 'number' => $number,
                 'text' => $message,
             ]);
@@ -44,6 +34,149 @@ class EvolutionApiClient
         if ($response->failed()) {
             throw new RequestException($response);
         }
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function fetchInstances(): array
+    {
+        $response = $this->http()
+            ->acceptJson()
+            ->timeout(20)
+            ->get($this->url('/instance/fetchInstances'));
+
+        if ($response->failed()) {
+            throw new RequestException($response);
+        }
+
+        $payload = $response->json() ?? [];
+
+        if (isset($payload['instances']) && is_array($payload['instances'])) {
+            return array_values(array_filter($payload['instances'], 'is_array'));
+        }
+
+        return is_array($payload) ? array_values(array_filter($payload, 'is_array')) : [];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function findContacts(string $instance, int $take = 200, int $skip = 0): array
+    {
+        $instance = $this->resolveInstance($instance);
+
+        if ($instance === '') {
+            throw new RuntimeException('Instância Evolution não configurada.');
+        }
+
+        $response = $this->http()
+            ->acceptJson()
+            ->timeout(30)
+            ->post($this->url("/chat/findContacts/{$instance}"), [
+                'where' => new \stdClass(),
+                'take' => $take,
+                'skip' => $skip,
+                'orderBy' => new \stdClass(),
+            ]);
+
+        if ($response->failed()) {
+            throw new RequestException($response);
+        }
+
+        $payload = $response->json() ?? [];
+
+        if (isset($payload['contacts']) && is_array($payload['contacts'])) {
+            return array_values(array_filter($payload['contacts'], 'is_array'));
+        }
+
+        return is_array($payload) ? array_values(array_filter($payload, 'is_array')) : [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function createInstance(string $instanceName, ?string $token = null, bool $qrcode = true): array
+    {
+        $payload = [
+            'instanceName' => $instanceName,
+            'qrcode' => $qrcode,
+            'integration' => 'WHATSAPP-BAILEYS',
+        ];
+
+        if (filled($token)) {
+            $payload['token'] = $token;
+        }
+
+        $response = $this->http()
+            ->acceptJson()
+            ->timeout(30)
+            ->post($this->url('/instance/create'), $payload);
+
+        if ($response->failed()) {
+            throw new RequestException($response);
+        }
+
+        return $response->json() ?? [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function connectInstance(string $instanceName): array
+    {
+        $response = $this->http()
+            ->acceptJson()
+            ->timeout(30)
+            ->get($this->url("/instance/connect/{$instanceName}"));
+
+        if ($response->failed()) {
+            throw new RequestException($response);
+        }
+
+        return $response->json() ?? [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function connectionState(string $instanceName): array
+    {
+        $response = $this->http()
+            ->acceptJson()
+            ->timeout(20)
+            ->get($this->url("/instance/connectionState/{$instanceName}"));
+
+        if ($response->failed()) {
+            throw new RequestException($response);
+        }
+
+        return $response->json() ?? [];
+    }
+
+    protected function url(string $path): string
+    {
+        $baseUrl = rtrim((string) config('services.evolution.url'), '/');
+
+        if ($baseUrl === '') {
+            throw new RuntimeException('Evolution API não configurada (EVOLUTION_API_URL).');
+        }
+
+        return $baseUrl.'/'.ltrim($path, '/');
+    }
+
+    protected function http(): \Illuminate\Http\Client\PendingRequest
+    {
+        $apiKey = (string) config('services.evolution.key');
+
+        if ($apiKey === '') {
+            throw new RuntimeException('Evolution API não configurada (EVOLUTION_API_KEY).');
+        }
+
+        return Http::withHeaders([
+            'apikey' => $apiKey,
+            'Content-Type' => 'application/json',
+        ]);
     }
 
     protected function toWhatsAppNumber(string $phoneDigits): string
