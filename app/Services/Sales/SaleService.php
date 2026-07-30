@@ -167,8 +167,19 @@ class SaleService
             }
 
             $quantity = $this->normalizePositiveQuantity($item['quantity'] ?? '1', "items.{$index}.quantity");
+            $unitPriceInput = $item['unit_price'] ?? null;
+            $catalogUnitPrice = $product?->sale_price ?? $service?->price;
+
+            if (
+                $type !== SaleItemType::Custom
+                && filled($catalogUnitPrice)
+                && (blank($unitPriceInput) || bccomp((string) $unitPriceInput, '0', 4) === 0)
+            ) {
+                $unitPriceInput = $catalogUnitPrice;
+            }
+
             $unitPrice = $this->normalizeNonNegativeMoney(
-                $item['unit_price'] ?? $product?->sale_price ?? $service?->price ?? '0.00',
+                $unitPriceInput ?? '0.00',
                 "items.{$index}.unit_price",
             );
             $discountAmount = $this->normalizeNonNegativeMoney($item['discount_amount'] ?? '0', "items.{$index}.discount_amount");

@@ -46,6 +46,7 @@ class SaleServiceTest extends TestCase
             'items' => [[
                 'product_id' => $product->getKey(),
                 'quantity' => '2.0000',
+                'unit_price' => '0.00',
             ]],
             'payments' => [
                 new PaymentData('50.00', '0.00', PaymentMethod::Pix, now(), $account->getKey()),

@@ -29,9 +29,10 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Forms\Components\Placeholder;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use UnitEnum;
@@ -249,12 +250,9 @@ class PointOfSalePage extends Page
                                     ->minValue(0)
                                     ->default('0.00')
                                     ->live(onBlur: true),
-                                TextInput::make('line_total')
+                                Placeholder::make('line_total')
                                     ->label('Total')
-                                    ->prefix('R$')
-                                    ->disabled()
-                                    ->dehydrated(false)
-                                    ->formatStateUsing(fn ($state, Get $get): string => self::formatMoney(
+                                    ->content(fn (Get $get): string => 'R$ '.self::formatMoney(
                                         self::lineTotal($get('quantity'), $get('unit_price'), $get('discount_amount')),
                                     )),
                             ])
@@ -262,18 +260,12 @@ class PointOfSalePage extends Page
                             ->defaultItems(1)
                             ->addActionLabel('Adicionar item')
                             ->columnSpanFull(),
-                        TextInput::make('items_total')
+                        Placeholder::make('items_total')
                             ->label('Subtotal dos itens')
-                            ->prefix('R$')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->formatStateUsing(fn ($state, Get $get): string => self::formatMoney(self::itemsTotal($get('items') ?? []))),
-                        TextInput::make('sale_total')
+                            ->content(fn (Get $get): string => 'R$ '.self::formatMoney(self::itemsTotal($get('items') ?? []))),
+                        Placeholder::make('sale_total')
                             ->label('Total da venda')
-                            ->prefix('R$')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->formatStateUsing(fn ($state, Get $get): string => self::formatMoney(
+                            ->content(fn (Get $get): string => 'R$ '.self::formatMoney(
                                 max(0, self::itemsTotal($get('items') ?? []) - (float) ($get('discount_amount') ?? 0)),
                             )),
                     ])
