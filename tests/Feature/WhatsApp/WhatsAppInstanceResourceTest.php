@@ -13,7 +13,7 @@ use Tests\TestCase;
 
 class WhatsAppInstanceResourceTest extends TestCase
 {
-    public function test_instance_resource_requires_marketing_module(): void
+    public function test_instance_resource_requires_whatsapp_module(): void
     {
         $company = $this->createCompany([
             'enabled_modules' => [CompanyModule::Scheduling->value],
@@ -26,7 +26,7 @@ class WhatsAppInstanceResourceTest extends TestCase
         $this->assertFalse(WhatsAppInstanceResource::canViewAny());
 
         $company->update([
-            'enabled_modules' => [CompanyModule::Scheduling->value, CompanyModule::Marketing->value],
+            'enabled_modules' => [CompanyModule::Scheduling->value, CompanyModule::WhatsApp->value],
         ]);
 
         $this->assertTrue(WhatsAppInstanceResource::canViewAny());
@@ -48,6 +48,19 @@ class WhatsAppInstanceResourceTest extends TestCase
         $this->get(WhatsAppInstanceResource::getUrl('create'))
             ->assertOk()
             ->assertSee('Criar Conexão WhatsApp');
+    }
+
+    public function test_legacy_marketing_module_keeps_whatsapp_connection_available(): void
+    {
+        $company = $this->createCompany([
+            'enabled_modules' => [CompanyModule::Marketing->value],
+        ]);
+        $admin = $this->createCompanyUser($company, [], CompanyRole::CompanyAdmin);
+
+        $this->authenticateForAppTenant($admin, $company);
+        Filament::setCurrentPanel('app');
+
+        $this->assertTrue(WhatsAppInstanceResource::canViewAny());
     }
 
     public function test_default_instance_syncs_legacy_scheduling_settings(): void

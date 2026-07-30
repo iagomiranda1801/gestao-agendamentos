@@ -12,8 +12,17 @@ enum ProductType: string
     {
         return match ($this) {
             self::Sale => 'Produto de venda',
-            self::Consumable => 'Material de consumo',
-            self::Asset => 'Ativo/material operacional',
+            self::Consumable => 'Produto de consumo',
+            self::Asset => 'Material operacional',
+        };
+    }
+
+    public function description(): string
+    {
+        return match ($this) {
+            self::Sale => 'Aparece no PDV e pode ser vendido diretamente ao cliente.',
+            self::Consumable => 'Usado internamente em serviços e não aparece no PDV.',
+            self::Asset => 'Equipamento ou material permanente da empresa.',
         };
     }
 

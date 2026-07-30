@@ -148,6 +148,15 @@ body.signup-body {
     gap: 0.75rem;
 }
 
+.signup-section-title {
+    font-size: 1rem;
+    margin: 1.5rem 0 0.35rem;
+}
+
+.signup-profile-field {
+    margin-top: 1.25rem;
+}
+
 .signup-module {
     border: 1px solid var(--signup-border);
     border-radius: 0.75rem;

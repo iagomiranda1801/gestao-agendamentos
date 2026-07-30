@@ -34,6 +34,7 @@ class ProductForm
                         Select::make('type')
                             ->label('Tipo')
                             ->options(ProductType::options())
+                            ->helperText(fn (?string $state): string => ProductType::tryFrom((string) $state)?->description() ?? '')
                             ->required()
                             ->live()
                             ->afterStateUpdated(function (?string $state, Set $set): void {

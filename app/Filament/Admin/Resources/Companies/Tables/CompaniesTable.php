@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Resources\Companies\Tables;
 
 use App\Enums\CompanyModule;
+use App\Enums\CompanyProfile;
 use App\Enums\SubscriptionStatus;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -27,6 +28,10 @@ class CompaniesTable
                     ->label('Slug')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('business_profile')
+                    ->label('Perfil')
+                    ->formatStateUsing(fn (?CompanyProfile $state): string => $state?->label() ?? 'Personalizado')
+                    ->badge(),
                 TextColumn::make('enabled_modules')
                     ->label('Módulos')
                     ->badge()

@@ -54,8 +54,21 @@
     @endif
 
     @if ($step === 'modules')
-        <h1 class="signup-title">Escolha os módulos</h1>
-        <p class="signup-subtitle">Ative só o que precisa agora. Você pode ajustar depois com nossa equipe.</p>
+        <h1 class="signup-title">Como você trabalha?</h1>
+        <p class="signup-subtitle">Escolha um perfil para receber uma configuração inicial adequada ao seu negócio.</p>
+
+        <div class="signup-field signup-profile-field">
+            <label for="businessProfile">Perfil do negócio</label>
+            <select id="businessProfile" wire:model.live="businessProfile">
+                @foreach ($this->profileOptions() as $value => $label)
+                    <option value="{{ $value }}">{{ $label }}</option>
+                @endforeach
+            </select>
+            <small>{{ $this->profileDescription() }}</small>
+        </div>
+
+        <h2 class="signup-section-title">Recursos ativados</h2>
+        <p class="signup-subtitle">Confira a sugestão e ajuste o que a empresa realmente precisa.</p>
 
         <div class="signup-modules">
             @foreach ($this->moduleOptions() as $value => $label)
@@ -120,7 +133,10 @@
             <dt>Empresa</dt>
             <dd>{{ $companyName }} ({{ $companySlug }})</dd>
 
-            <dt>Módulos</dt>
+            <dt>Perfil</dt>
+            <dd>{{ $this->profileOptions()[$businessProfile] ?? 'Personalizado' }}</dd>
+
+            <dt>Recursos</dt>
             <dd>
                 {{ collect($selectedModules)->map(fn ($value) => $this->moduleOptions()[$value] ?? $value)->join(', ') }}
             </dd>

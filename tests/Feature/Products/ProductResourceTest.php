@@ -47,6 +47,33 @@ class ProductResourceTest extends TestCase
         Livewire::test(ListProducts::class)->assertSuccessful();
     }
 
+    public function test_stock_product_tabs_separate_sale_and_consumption_products(): void
+    {
+        $company = $this->createCompany();
+        $admin = $this->createCompanyUser($company);
+        $sale = Product::factory()->forCompany($company)->create([
+            'name' => 'Shampoo para revenda',
+            'type' => ProductType::Sale,
+            'is_sellable' => true,
+            'sale_price' => 25,
+        ]);
+        $consumable = Product::factory()->forCompany($company)->create([
+            'name' => 'Creme de uso interno',
+            'type' => ProductType::Consumable,
+            'is_sellable' => false,
+        ]);
+
+        $this->authenticateForAppTenant($admin, $company);
+
+        Livewire::test(ListProducts::class)
+            ->set('activeTab', 'sale')
+            ->assertCanSeeTableRecords([$sale])
+            ->assertCanNotSeeTableRecords([$consumable])
+            ->set('activeTab', 'consumable')
+            ->assertCanSeeTableRecords([$consumable])
+            ->assertCanNotSeeTableRecords([$sale]);
+    }
+
     public function test_employee_cannot_access_product_resource(): void
     {
         $company = $this->createCompany(['slug' => 'estudio-ana']);

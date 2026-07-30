@@ -35,7 +35,7 @@ class WhatsAppInstanceResource extends Resource
 
     protected static ?string $navigationLabel = 'WhatsApp';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Configurações';
+    protected static string|UnitEnum|null $navigationGroup = 'WhatsApp';
 
     protected static ?int $navigationSort = 2;
 
@@ -69,6 +69,6 @@ class WhatsAppInstanceResource extends Resource
 
     protected static function requiredCompanyModule(): CompanyModule
     {
-        return CompanyModule::Marketing;
+        return CompanyModule::WhatsApp;
     }
 }

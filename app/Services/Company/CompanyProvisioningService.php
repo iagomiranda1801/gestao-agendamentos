@@ -3,6 +3,7 @@
 namespace App\Services\Company;
 
 use App\Enums\CompanyModule;
+use App\Enums\CompanyProfile;
 use App\Enums\CompanyRole;
 use App\Enums\SubscriptionStatus;
 use App\Enums\Weekday;
@@ -30,6 +31,7 @@ class CompanyProvisioningService
      *     email?: string|null,
      *     phone?: string|null,
      *     timezone?: string,
+     *     business_profile?: CompanyProfile|string,
      *     enabled_modules?: list<CompanyModule|string>,
      *     subscription_status?: SubscriptionStatus,
      *     trial_ends_at?: \DateTimeInterface|null,
@@ -42,7 +44,10 @@ class CompanyProvisioningService
     public function provision(array $data): array
     {
         return DB::transaction(function () use ($data): array {
-            $modules = collect($data['enabled_modules'] ?? CompanyModule::trialDefaults())
+            $profile = $data['business_profile'] ?? CompanyProfile::Custom;
+            $profile = $profile instanceof CompanyProfile ? $profile : CompanyProfile::tryFrom((string) $profile) ?? CompanyProfile::Custom;
+
+            $modules = collect($data['enabled_modules'] ?? $profile->defaultModules())
                 ->map(fn (mixed $module) => $module instanceof CompanyModule ? $module : CompanyModule::tryFrom((string) $module))
                 ->filter()
                 ->unique()
@@ -75,6 +80,7 @@ class CompanyProvisioningService
 
             $company = Company::query()->create([
                 'name' => $data['name'],
+                'business_profile' => $profile->value,
                 'slug' => $slug,
                 'email' => $data['email'] ?? null,
                 'phone' => $data['phone'] ?? null,

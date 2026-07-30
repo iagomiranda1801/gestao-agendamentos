@@ -8,6 +8,7 @@ enum CompanyModule: string
     case Stock = 'stock';
     case Finance = 'finance';
     case Sales = 'sales';
+    case WhatsApp = 'whatsapp';
     case Marketing = 'marketing';
 
     public function label(): string
@@ -17,6 +18,7 @@ enum CompanyModule: string
             self::Stock => 'Estoque',
             self::Finance => 'Financeiro',
             self::Sales => 'Vendas/PDV',
+            self::WhatsApp => 'WhatsApp operacional',
             self::Marketing => 'Marketing',
         };
     }
@@ -28,6 +30,7 @@ enum CompanyModule: string
             self::Stock => 'Produtos, fornecedores, compras, ajustes e movimentações de estoque.',
             self::Finance => 'Contas a pagar/receber, caixa, transferências, relatórios e configurações financeiras.',
             self::Sales => 'Venda rápida, PDV, carrinho de produtos e checkout.',
+            self::WhatsApp => 'Conexão do WhatsApp e mensagens operacionais de agendamento.',
             self::Marketing => 'Campanhas, listas e comunicação promocional com clientes.',
         };
     }

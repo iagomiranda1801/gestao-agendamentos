@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Resources\Companies\Schemas;
 
 use App\Enums\CompanyModule;
+use App\Enums\CompanyProfile;
 use App\Enums\SubscriptionStatus;
 use App\Models\Company;
 use Filament\Forms\Components\CheckboxList;
@@ -10,6 +11,8 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
@@ -34,6 +37,19 @@ class CompanyForm
                                 }
 
                                 $set('slug', Str::slug($state ?? ''));
+                            }),
+                        Select::make('business_profile')
+                            ->label('Perfil do negócio')
+                            ->options(CompanyProfile::options())
+                            ->default(CompanyProfile::Custom->value)
+                            ->helperText(fn (Get $get): string => CompanyProfile::tryFrom((string) ($get('business_profile') ?? 'custom'))?->description() ?? '')
+                            ->live()
+                            ->afterStateUpdated(function (?string $state, Set $set): void {
+                                $profile = CompanyProfile::tryFrom((string) $state);
+
+                                if ($profile !== null) {
+                                    $set('enabled_modules', collect($profile->defaultModules())->map(fn (CompanyModule $module) => $module->value)->all());
+                                }
                             }),
                         TextInput::make('slug')
                             ->label('Slug')
@@ -70,7 +86,7 @@ class CompanyForm
                 Section::make('Módulos')
                     ->schema([
                         CheckboxList::make('enabled_modules')
-                            ->label('Módulos habilitados')
+                            ->label('Recursos ativados')
                             ->options(CompanyModule::options())
                             ->descriptions(collect(CompanyModule::cases())
                                 ->mapWithKeys(fn (CompanyModule $module) => [$module->value => $module->description()])
@@ -78,6 +94,7 @@ class CompanyForm
                             ->columns(1)
                             ->required()
                             ->default([CompanyModule::Scheduling->value])
+                            ->helperText('O perfil preenche uma sugestão. Você pode ajustar os recursos antes de salvar.')
                             ->bulkToggleable(),
                     ]),
                 Section::make('Assinatura')

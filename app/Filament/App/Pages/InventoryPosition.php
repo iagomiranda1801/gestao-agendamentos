@@ -131,7 +131,7 @@ class InventoryPosition extends Page implements HasTable
                     ->falseLabel('Inativos')
                     ->placeholder('Todos'),
                 Filter::make('consumable')
-                    ->label('Material de consumo')
+                    ->label('Produtos de consumo')
                     ->toggle()
                     ->query(fn (Builder $query): Builder => $query->consumable()),
                 Filter::make('asset')

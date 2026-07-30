@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\CompanyRole;
+use App\Enums\CompanyProfile;
 use App\Enums\SubscriptionStatus;
 use Database\Factories\CompanyFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -15,6 +16,7 @@ use Illuminate\Support\Str;
 
 #[Fillable([
     'name',
+    'business_profile',
     'slug',
     'document',
     'phone',
@@ -67,6 +69,7 @@ class Company extends Model
         return [
             'is_active' => 'boolean',
             'enabled_modules' => 'array',
+            'business_profile' => CompanyProfile::class,
             'trial_ends_at' => 'datetime',
             'subscription_status' => SubscriptionStatus::class,
         ];

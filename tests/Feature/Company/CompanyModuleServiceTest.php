@@ -38,6 +38,16 @@ class CompanyModuleServiceTest extends TestCase
         app(CompanyModuleService::class)->syncModules($company, []);
     }
 
+    public function test_marketing_automatically_includes_operational_whatsapp(): void
+    {
+        $company = $this->createCompany();
+
+        app(CompanyModuleService::class)->syncModules($company, [CompanyModule::Marketing]);
+
+        $this->assertTrue(app(CompanyModuleService::class)->hasModule($company->refresh(), CompanyModule::WhatsApp));
+        $this->assertTrue(app(CompanyModuleService::class)->hasModule($company, CompanyModule::Marketing));
+    }
+
     public function test_trial_access_is_allowed_before_expiration(): void
     {
         $company = Company::factory()->create([

@@ -32,7 +32,14 @@ class CompanyModuleService
 
     public function hasModule(Company $company, CompanyModule $module): bool
     {
-        return in_array($module, $this->enabledModules($company), true);
+        $enabled = $this->enabledModules($company);
+
+        // Companies created before WhatsApp became independent used Marketing for the connection.
+        if ($module === CompanyModule::WhatsApp && in_array(CompanyModule::Marketing, $enabled, true)) {
+            return true;
+        }
+
+        return in_array($module, $enabled, true);
     }
 
     /**
@@ -49,6 +56,7 @@ class CompanyModuleService
                 return CompanyModule::tryFrom((string) $module);
             })
             ->filter()
+            ->when(fn ($modules) => $modules->contains(CompanyModule::Marketing), fn ($modules) => $modules->push(CompanyModule::WhatsApp))
             ->unique()
             ->values();
 

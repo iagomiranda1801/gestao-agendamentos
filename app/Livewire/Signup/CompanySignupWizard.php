@@ -3,6 +3,7 @@
 namespace App\Livewire\Signup;
 
 use App\Enums\CompanyModule;
+use App\Enums\CompanyProfile;
 use App\Filament\App\Pages\Dashboard;
 use App\Services\Company\CompanyProvisioningService;
 use Filament\Facades\Filament;
@@ -35,6 +36,8 @@ class CompanySignupWizard extends Component
 
     public string $timezone = 'America/Sao_Paulo';
 
+    public string $businessProfile = CompanyProfile::Professional->value;
+
     /** @var list<string> */
     public array $selectedModules = [];
 
@@ -48,7 +51,7 @@ class CompanySignupWizard extends Component
 
     public function mount(): void
     {
-        $this->selectedModules = [CompanyModule::Scheduling->value];
+        $this->selectedModules = $this->profileModules($this->businessProfile);
     }
 
     public function updatedCompanyName(string $value): void
@@ -86,6 +89,11 @@ class CompanySignupWizard extends Component
         $this->step = self::STEP_ADMIN;
     }
 
+    public function updatedBusinessProfile(string $value): void
+    {
+        $this->selectedModules = $this->profileModules($value);
+    }
+
     public function goToReviewStep(): void
     {
         $this->validate([
@@ -111,6 +119,7 @@ class CompanySignupWizard extends Component
             'email' => $this->companyEmail,
             'phone' => $this->companyPhone,
             'timezone' => $this->timezone,
+            'business_profile' => $this->businessProfile,
             'enabled_modules' => $this->selectedModules,
             'admin_name' => $this->adminName,
             'admin_email' => $this->adminEmail,
@@ -141,6 +150,25 @@ class CompanySignupWizard extends Component
         return collect(CompanyModule::cases())
             ->mapWithKeys(fn (CompanyModule $module) => [$module->value => $module->description()])
             ->all();
+    }
+
+    /** @return list<string> */
+    public function profileModules(string $profile): array
+    {
+        $selected = CompanyProfile::tryFrom($profile) ?? CompanyProfile::Custom;
+
+        return collect($selected->defaultModules())->map(fn (CompanyModule $module) => $module->value)->all();
+    }
+
+    /** @return array<string, string> */
+    public function profileOptions(): array
+    {
+        return CompanyProfile::options();
+    }
+
+    public function profileDescription(): string
+    {
+        return (CompanyProfile::tryFrom($this->businessProfile) ?? CompanyProfile::Custom)->description();
     }
 
     public function render()
