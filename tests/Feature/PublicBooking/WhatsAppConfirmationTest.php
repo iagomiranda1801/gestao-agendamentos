@@ -4,6 +4,7 @@ namespace Tests\Feature\PublicBooking;
 
 use App\Events\OnlineAppointmentCreated;
 use App\Jobs\NotifyStaffOfOnlineBookingJob;
+use App\Jobs\SendAppointmentCreatedEmailJob;
 use App\Jobs\SendWhatsAppAppointmentConfirmationJob;
 use App\Jobs\SendWhatsAppStaffBookingAlertJob;
 use App\Listeners\SendOnlineBookingWhatsAppNotification;
@@ -245,6 +246,7 @@ class WhatsAppConfirmationTest extends TestCase
 
         Queue::assertPushed(SendWhatsAppAppointmentConfirmationJob::class);
         Queue::assertPushed(SendWhatsAppStaffBookingAlertJob::class);
+        Queue::assertPushed(SendAppointmentCreatedEmailJob::class);
         Queue::assertPushed(NotifyStaffOfOnlineBookingJob::class);
     }
 

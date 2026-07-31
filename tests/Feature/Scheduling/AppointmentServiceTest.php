@@ -5,11 +5,14 @@ namespace Tests\Feature\Scheduling;
 use App\Enums\AppointmentHistoryType;
 use App\Enums\AppointmentOrigin;
 use App\Enums\AppointmentStatus;
+use App\Jobs\SendAppointmentChangeEmailJob;
+use App\Jobs\SendAppointmentChangeWhatsAppJob;
 use App\Models\InventoryBalance;
 use App\Models\Professional;
 use App\Models\StockMovement;
 use App\Services\Scheduling\AppointmentService;
 use App\Support\CompanyDateTime;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Tests\Concerns\CreatesSchedulingFixtures;
 use Tests\TestCase;
@@ -211,6 +214,8 @@ class AppointmentServiceTest extends TestCase
 
     public function test_reschedule_keeps_duration(): void
     {
+        Queue::fake();
+
         $setup = $this->createBookableSetup();
 
         $appointment = app(AppointmentService::class)->createInternalAppointment(
@@ -236,6 +241,8 @@ class AppointmentServiceTest extends TestCase
             'appointment_id' => $appointment->getKey(),
             'type' => AppointmentHistoryType::Rescheduled->value,
         ]);
+        Queue::assertPushed(SendAppointmentChangeWhatsAppJob::class);
+        Queue::assertPushed(SendAppointmentChangeEmailJob::class);
     }
 
     public function test_appointment_does_not_move_stock_or_financial(): void

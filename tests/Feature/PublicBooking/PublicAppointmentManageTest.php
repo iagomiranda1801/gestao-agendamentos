@@ -4,10 +4,13 @@ namespace Tests\Feature\PublicBooking;
 
 use App\Enums\AppointmentHistoryType;
 use App\Enums\AppointmentStatus;
+use App\Jobs\SendAppointmentChangeEmailJob;
+use App\Jobs\SendAppointmentChangeWhatsAppJob;
 use App\Livewire\PublicBooking\ManageAppointment;
 use App\Services\PublicBooking\OnlineBookingService;
 use App\Services\PublicBooking\PublicAppointmentService;
 use App\Support\CompanyDateTime;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Tests\Concerns\CreatesPublicBookingFixtures;
@@ -66,6 +69,8 @@ class PublicAppointmentManageTest extends TestCase
 
     public function test_public_cancel_updates_appointment_status(): void
     {
+        Queue::fake();
+
         $context = $this->createOnlineAppointment();
 
         $appointment = app(PublicAppointmentService::class)->cancelPublic(
@@ -80,6 +85,8 @@ class PublicAppointmentManageTest extends TestCase
             'appointment_id' => $appointment->getKey(),
             'type' => AppointmentHistoryType::Cancelled->value,
         ]);
+        Queue::assertPushed(SendAppointmentChangeWhatsAppJob::class);
+        Queue::assertPushed(SendAppointmentChangeEmailJob::class);
     }
 
     public function test_public_cancel_via_livewire(): void
@@ -100,6 +107,8 @@ class PublicAppointmentManageTest extends TestCase
 
     public function test_public_reschedule_updates_start_time(): void
     {
+        Queue::fake();
+
         $context = $this->createOnlineAppointment();
         $newStart = $context['localStart']->addHours(2);
 
@@ -117,6 +126,8 @@ class PublicAppointmentManageTest extends TestCase
             'appointment_id' => $appointment->getKey(),
             'type' => AppointmentHistoryType::Rescheduled->value,
         ]);
+        Queue::assertPushed(SendAppointmentChangeWhatsAppJob::class);
+        Queue::assertPushed(SendAppointmentChangeEmailJob::class);
     }
 
     public function test_public_reschedule_via_livewire(): void

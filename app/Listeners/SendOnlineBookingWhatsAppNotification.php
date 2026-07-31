@@ -4,6 +4,7 @@ namespace App\Listeners;
 
 use App\Events\OnlineAppointmentCreated;
 use App\Jobs\NotifyStaffOfOnlineBookingJob;
+use App\Jobs\SendAppointmentCreatedEmailJob;
 use App\Jobs\SendWhatsAppAppointmentConfirmationJob;
 use App\Jobs\SendWhatsAppStaffBookingAlertJob;
 
@@ -19,6 +20,11 @@ class SendOnlineBookingWhatsAppNotification
         );
 
         SendWhatsAppStaffBookingAlertJob::dispatch(
+            $appointmentId,
+            $event->manageUrl,
+        );
+
+        SendAppointmentCreatedEmailJob::dispatch(
             $appointmentId,
             $event->manageUrl,
         );

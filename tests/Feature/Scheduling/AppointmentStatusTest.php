@@ -3,10 +3,13 @@
 namespace Tests\Feature\Scheduling;
 
 use App\Enums\AppointmentStatus;
+use App\Jobs\SendAppointmentChangeEmailJob;
+use App\Jobs\SendAppointmentChangeWhatsAppJob;
 use App\Models\Appointment;
 use App\Models\AppointmentHistory;
 use App\Services\Scheduling\AppointmentService;
 use App\Services\Scheduling\AppointmentStatusService;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Tests\Concerns\CreatesSchedulingFixtures;
 use Tests\TestCase;
@@ -97,6 +100,8 @@ class AppointmentStatusTest extends TestCase
 
     public function test_cancel_records_user_and_timestamp(): void
     {
+        Queue::fake();
+
         $setup = $this->createBookableSetup();
 
         $appointment = app(AppointmentService::class)->createInternalAppointment(
@@ -118,6 +123,8 @@ class AppointmentStatusTest extends TestCase
         $this->assertSame(AppointmentStatus::Cancelled, $cancelled->status);
         $this->assertSame($setup['admin']->getKey(), $cancelled->cancelled_by);
         $this->assertNotNull($cancelled->cancelled_at);
+        Queue::assertPushed(SendAppointmentChangeWhatsAppJob::class);
+        Queue::assertPushed(SendAppointmentChangeEmailJob::class);
     }
 
     public function test_no_show_only_after_scheduled_time(): void

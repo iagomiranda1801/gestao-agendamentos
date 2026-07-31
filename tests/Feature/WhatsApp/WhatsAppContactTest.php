@@ -3,7 +3,9 @@
 namespace Tests\Feature\WhatsApp;
 
 use App\Models\Client;
+use App\Models\WhatsAppContact;
 use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
+use App\Services\WhatsApp\WhatsAppContactCleanupService;
 use App\Services\WhatsApp\WhatsAppContactService;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -99,5 +101,77 @@ class WhatsAppContactTest extends TestCase
             'whatsapp_marketing_opt_in' => false,
         ]);
         $this->assertNotNull($contact->refresh()->imported_as_client_at);
+    }
+
+    public function test_cleanup_deletes_only_contacts_matching_filters(): void
+    {
+        $company = $this->createCompany();
+        $otherCompany = $this->createCompany();
+        $instance = app(CompanyWhatsAppInstanceService::class)->create($company, [
+            'name' => 'Principal',
+            'instance_name' => 'principal',
+        ]);
+        $otherInstance = app(CompanyWhatsAppInstanceService::class)->create($company, [
+            'name' => 'Secundária',
+            'instance_name' => 'secundaria',
+        ]);
+        $foreignInstance = app(CompanyWhatsAppInstanceService::class)->create($otherCompany, [
+            'name' => 'Outra',
+            'instance_name' => 'outra',
+        ]);
+        $client = Client::factory()->forCompany($company)->create();
+
+        $deleteMe = WhatsAppContact::query()->create([
+            'company_id' => $company->getKey(),
+            'company_whatsapp_instance_id' => $instance->getKey(),
+            'external_id' => 'delete-me',
+            'name' => 'Contato antigo',
+            'phone' => '34999990001',
+            'phone_normalized' => '34999990001',
+            'last_synced_at' => now()->subDays(10),
+            'imported_as_client_at' => null,
+        ]);
+        $imported = WhatsAppContact::query()->create([
+            'company_id' => $company->getKey(),
+            'company_whatsapp_instance_id' => $instance->getKey(),
+            'client_id' => $client->getKey(),
+            'external_id' => 'imported',
+            'name' => 'Contato importado',
+            'phone' => '34999990002',
+            'phone_normalized' => '34999990002',
+            'last_synced_at' => now()->subDays(10),
+            'imported_as_client_at' => now(),
+        ]);
+        $otherInstanceContact = WhatsAppContact::query()->create([
+            'company_id' => $company->getKey(),
+            'company_whatsapp_instance_id' => $otherInstance->getKey(),
+            'external_id' => 'other-instance',
+            'name' => 'Outra instância',
+            'phone' => '34999990003',
+            'phone_normalized' => '34999990003',
+            'last_synced_at' => now()->subDays(10),
+        ]);
+        $foreignContact = WhatsAppContact::query()->create([
+            'company_id' => $otherCompany->getKey(),
+            'company_whatsapp_instance_id' => $foreignInstance->getKey(),
+            'external_id' => 'foreign',
+            'name' => 'Outra empresa',
+            'phone' => '34999990004',
+            'phone_normalized' => '34999990004',
+            'last_synced_at' => now()->subDays(10),
+        ]);
+
+        $deleted = app(WhatsAppContactCleanupService::class)->deleteByFilters($company, [
+            'instance_id' => $instance->getKey(),
+            'import_status' => 'not_imported',
+            'synced_before' => now()->subDay()->toDateString(),
+        ]);
+
+        $this->assertSame(1, $deleted);
+        $this->assertDatabaseMissing('whatsapp_contacts', ['id' => $deleteMe->getKey()]);
+        $this->assertDatabaseHas('whatsapp_contacts', ['id' => $imported->getKey()]);
+        $this->assertDatabaseHas('whatsapp_contacts', ['id' => $otherInstanceContact->getKey()]);
+        $this->assertDatabaseHas('whatsapp_contacts', ['id' => $foreignContact->getKey()]);
+        $this->assertDatabaseHas('clients', ['id' => $client->getKey()]);
     }
 }

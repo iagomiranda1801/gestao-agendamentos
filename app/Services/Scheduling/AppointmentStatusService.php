@@ -4,6 +4,7 @@ namespace App\Services\Scheduling;
 
 use App\Enums\AppointmentHistoryType;
 use App\Enums\AppointmentStatus;
+use App\Events\AppointmentCancelled;
 use App\Models\Appointment;
 use App\Models\AppointmentHistory;
 use App\Models\Company;
@@ -86,6 +87,9 @@ class AppointmentStatusService
             $appointment->save();
 
             $this->recordHistory($company, $user, $appointment, AppointmentHistoryType::Cancelled, $oldStatus);
+
+            $oldStart = CarbonImmutable::parse($appointment->start_at);
+            DB::afterCommit(fn () => event(new AppointmentCancelled($appointment->refresh(), $oldStart, 'internal')));
 
             return $appointment->refresh();
         });

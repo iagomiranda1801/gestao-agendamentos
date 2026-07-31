@@ -2,7 +2,11 @@
 
 namespace App\Providers;
 
+use App\Events\AppointmentCancelled;
+use App\Events\AppointmentRescheduled;
 use App\Events\OnlineAppointmentCreated;
+use App\Listeners\SendAppointmentCancelledNotifications;
+use App\Listeners\SendAppointmentRescheduledNotifications;
 use App\Listeners\SendOnlineBookingWhatsAppNotification;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Event;
@@ -26,6 +30,16 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(
             OnlineAppointmentCreated::class,
             SendOnlineBookingWhatsAppNotification::class,
+        );
+
+        Event::listen(
+            AppointmentCancelled::class,
+            SendAppointmentCancelledNotifications::class,
+        );
+
+        Event::listen(
+            AppointmentRescheduled::class,
+            SendAppointmentRescheduledNotifications::class,
         );
 
         Filament::serving(function (): void {

@@ -4,14 +4,19 @@ namespace App\Filament\App\Resources\WhatsAppContacts\Tables;
 
 use App\Models\Client;
 use App\Models\Company;
+use App\Models\CompanyWhatsAppInstance;
 use App\Models\WhatsAppContact;
 use App\Services\WhatsApp\WhatsAppContactService;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Builder;
@@ -52,6 +57,23 @@ class WhatsAppContactsTable
             ])
             ->defaultSort('name')
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->whereRaw('LENGTH(phone_normalized) >= 10'))
+            ->filters([
+                SelectFilter::make('company_whatsapp_instance_id')
+                    ->label('Instância')
+                    ->options(fn (): array => CompanyWhatsAppInstance::query()
+                        ->where('company_id', Filament::getTenant()?->getKey())
+                        ->orderBy('name')
+                        ->pluck('name', 'id')
+                        ->all()),
+                TernaryFilter::make('imported_as_client_at')
+                    ->label('Importado como cliente')
+                    ->nullable()
+                    ->queries(
+                        true: fn (Builder $query): Builder => $query->whereNotNull('imported_as_client_at'),
+                        false: fn (Builder $query): Builder => $query->whereNull('imported_as_client_at'),
+                        blank: fn (Builder $query): Builder => $query,
+                    ),
+            ])
             ->recordActions([
                 Action::make('import')
                     ->label('Importar como cliente')
@@ -74,6 +96,10 @@ class WhatsAppContactsTable
                             ->title($result['created'] > 0 ? 'Cliente criado' : 'Contato vinculado')
                             ->send();
                     }),
+                DeleteAction::make()
+                    ->label('Excluir contato')
+                    ->modalHeading('Excluir contato WhatsApp')
+                    ->modalDescription('Isso remove apenas o contato sincronizado do WhatsApp. O cliente vinculado, se existir, será mantido. Você pode sincronizar novamente depois.'),
             ])
             ->bulkActions([
                 BulkAction::make('importSelected')
@@ -94,6 +120,10 @@ class WhatsAppContactsTable
                             ->body("{$result['created']} cliente(s) criado(s) e {$result['linked']} contato(s) vinculado(s).")
                             ->send();
                     }),
+                DeleteBulkAction::make()
+                    ->label('Excluir selecionados')
+                    ->modalHeading('Excluir contatos selecionados')
+                    ->modalDescription('Isso remove apenas os contatos sincronizados do WhatsApp. Clientes vinculados serão mantidos. Você pode sincronizar novamente depois.'),
             ])
             ->searchable();
     }

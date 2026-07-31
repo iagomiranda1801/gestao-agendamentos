@@ -5,8 +5,8 @@ namespace App\Services\PublicBooking;
 use App\Enums\AppointmentHistoryType;
 use App\Enums\AppointmentOrigin;
 use App\Enums\AppointmentStatus;
-use App\Events\OnlineAppointmentCancelled;
-use App\Events\OnlineAppointmentRescheduled;
+use App\Events\AppointmentCancelled;
+use App\Events\AppointmentRescheduled;
 use App\Models\Appointment;
 use App\Models\Company;
 use App\Models\CompanySchedulingSetting;
@@ -75,7 +75,11 @@ class PublicAppointmentService
                 ['source' => 'public'],
             );
 
-            DB::afterCommit(fn () => event(new OnlineAppointmentCancelled($appointment)));
+            DB::afterCommit(fn () => event(new AppointmentCancelled(
+                $appointment->refresh(),
+                CarbonImmutable::parse($appointment->start_at),
+                'public',
+            )));
 
             return $appointment->refresh();
         });
@@ -151,7 +155,12 @@ class PublicAppointmentService
                 $this->tokenService->refreshExpiration($activeToken);
             }
 
-            DB::afterCommit(fn () => event(new OnlineAppointmentRescheduled($appointment)));
+            DB::afterCommit(fn () => event(new AppointmentRescheduled(
+                $appointment->refresh(),
+                $oldStart,
+                $oldEnd,
+                'public',
+            )));
 
             return $appointment->refresh();
         });

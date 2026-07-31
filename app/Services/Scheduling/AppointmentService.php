@@ -5,6 +5,7 @@ namespace App\Services\Scheduling;
 use App\Enums\AppointmentHistoryType;
 use App\Enums\AppointmentOrigin;
 use App\Enums\AppointmentStatus;
+use App\Events\AppointmentRescheduled;
 use App\Enums\CompanyRole;
 use App\Models\Appointment;
 use App\Models\AppointmentHistory;
@@ -109,6 +110,7 @@ class AppointmentService
 
             $oldStart = CarbonImmutable::parse($appointment->start_at);
             $oldEnd = CarbonImmutable::parse($appointment->end_at);
+            $oldProfessionalId = (int) $appointment->professional_id;
 
             $client = isset($data['client_id'])
                 ? Client::query()->findOrFail($data['client_id'])
@@ -166,6 +168,19 @@ class AppointmentService
                 'old_end_at' => $oldEnd,
                 'new_end_at' => $appointment->end_at,
             ]);
+
+            $scheduleChanged = ! $oldStart->equalTo(CarbonImmutable::parse($appointment->start_at))
+                || ! $oldEnd->equalTo(CarbonImmutable::parse($appointment->end_at))
+                || $oldProfessionalId !== (int) $appointment->professional_id;
+
+            if ($scheduleChanged) {
+                DB::afterCommit(fn () => event(new AppointmentRescheduled(
+                    $appointment->refresh(),
+                    $oldStart,
+                    $oldEnd,
+                    'internal',
+                )));
+            }
 
             return $appointment->refresh();
         });
@@ -226,6 +241,13 @@ class AppointmentService
                 'old_end_at' => $oldEnd,
                 'new_end_at' => $appointment->end_at,
             ]);
+
+            DB::afterCommit(fn () => event(new AppointmentRescheduled(
+                $appointment->refresh(),
+                $oldStart,
+                $oldEnd,
+                'internal',
+            )));
 
             return $appointment->refresh();
         });
