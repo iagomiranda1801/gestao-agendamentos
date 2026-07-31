@@ -7,6 +7,7 @@ use App\Filament\App\Concerns\RequiresCompanyModuleResource;
 use App\Filament\App\Resources\WhatsAppCampaigns\Pages\CreateWhatsAppCampaign;
 use App\Filament\App\Resources\WhatsAppCampaigns\Pages\EditWhatsAppCampaign;
 use App\Filament\App\Resources\WhatsAppCampaigns\Pages\ListWhatsAppCampaigns;
+use App\Filament\App\Resources\WhatsAppCampaigns\RelationManagers\RecipientsRelationManager;
 use App\Filament\App\Resources\WhatsAppCampaigns\Schemas\WhatsAppCampaignForm;
 use App\Filament\App\Resources\WhatsAppCampaigns\Tables\WhatsAppCampaignsTable;
 use App\Models\WhatsAppCampaign;
@@ -53,7 +54,9 @@ class WhatsAppCampaignResource extends Resource
 
     public static function getRelations(): array
     {
-        return [];
+        return [
+            RecipientsRelationManager::class,
+        ];
     }
 
     public static function getPages(): array
