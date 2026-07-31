@@ -81,6 +81,7 @@ class AppointmentChangeNotificationTest extends TestCase
         Mail::fake();
 
         $setup = $this->createBookableSetup();
+        $setup['company']->update(['email' => 'empresa@example.test']);
         $setup['client']->update(['email' => 'cliente@example.test']);
         $setup['admin']->update(['email' => 'admin@example.test']);
 
@@ -102,6 +103,11 @@ class AppointmentChangeNotificationTest extends TestCase
             app(AppointmentNotificationRecipientService::class),
         );
 
+        Mail::assertSent(
+            AppointmentChangeMail::class,
+            fn (AppointmentChangeMail $mail): bool => $mail->fromEmail === 'empresa@example.test'
+                && $mail->fromName === $setup['company']->name,
+        );
         Mail::assertSent(AppointmentChangeMail::class, 2);
     }
 
@@ -110,6 +116,7 @@ class AppointmentChangeNotificationTest extends TestCase
         Mail::fake();
 
         $setup = $this->createBookableSetup();
+        $setup['company']->update(['email' => 'empresa@example.test']);
         $setup['client']->update(['email' => 'cliente@example.test']);
         $setup['admin']->update(['email' => 'admin@example.test']);
 
@@ -130,6 +137,11 @@ class AppointmentChangeNotificationTest extends TestCase
             app(AppointmentNotificationRecipientService::class),
         );
 
+        Mail::assertSent(
+            AppointmentChangeMail::class,
+            fn (AppointmentChangeMail $mail): bool => $mail->fromEmail === 'empresa@example.test'
+                && $mail->fromName === $setup['company']->name,
+        );
         Mail::assertSent(AppointmentChangeMail::class, 2);
     }
 }
