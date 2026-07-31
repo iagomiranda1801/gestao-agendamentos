@@ -46,6 +46,8 @@ class RecipientsRelationManager extends RelationManager
                         WhatsAppCampaignRecipientStatus::Queued => 'warning',
                         WhatsAppCampaignRecipientStatus::Accepted => 'info',
                         WhatsAppCampaignRecipientStatus::Sent => 'success',
+                        WhatsAppCampaignRecipientStatus::Delivered => 'success',
+                        WhatsAppCampaignRecipientStatus::Read => 'success',
                         WhatsAppCampaignRecipientStatus::Failed => 'danger',
                         WhatsAppCampaignRecipientStatus::Skipped => 'gray',
                     }),

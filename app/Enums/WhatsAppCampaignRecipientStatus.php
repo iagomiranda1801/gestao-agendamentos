@@ -8,6 +8,8 @@ enum WhatsAppCampaignRecipientStatus: string
     case Queued = 'queued';
     case Accepted = 'accepted';
     case Sent = 'sent';
+    case Delivered = 'delivered';
+    case Read = 'read';
     case Failed = 'failed';
     case Skipped = 'skipped';
 
@@ -18,6 +20,8 @@ enum WhatsAppCampaignRecipientStatus: string
             self::Queued => 'Na fila',
             self::Accepted => 'Pendente na Evolution',
             self::Sent => 'Enviado',
+            self::Delivered => 'Entregue',
+            self::Read => 'Lido',
             self::Failed => 'Falhou',
             self::Skipped => 'Ignorado',
         };

@@ -39,6 +39,7 @@ return [
         'url' => env('EVOLUTION_API_URL'),
         'key' => env('EVOLUTION_API_KEY'),
         'instance' => env('EVOLUTION_INSTANCE'),
+        'webhook_token' => env('EVOLUTION_WEBHOOK_TOKEN'),
     ],
 
 ];
