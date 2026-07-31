@@ -3,10 +3,12 @@
 namespace App\Filament\App\Resources\WhatsAppCampaigns\Tables;
 
 use App\Enums\WhatsAppCampaignStatus;
+use App\Filament\App\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Models\Company;
 use App\Models\WhatsAppCampaign;
 use App\Services\WhatsApp\Campaigns\WhatsAppCampaignService;
 use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
@@ -127,6 +129,49 @@ class WhatsAppCampaignsTable
                             ->title('Campanha cancelada')
                             ->send();
                     }),
+                Action::make('duplicateForResend')
+                    ->label('Copiar para editar')
+                    ->icon('heroicon-o-document-duplicate')
+                    ->color('gray')
+                    ->requiresConfirmation()
+                    ->modalHeading('Criar cópia da campanha')
+                    ->modalDescription('Uma nova campanha em rascunho será criada com a mesma mensagem e público, para você editar e enviar novamente.')
+                    ->action(function (WhatsAppCampaign $record) {
+                        /** @var Company $company */
+                        $company = Filament::getTenant();
+
+                        $copy = app(WhatsAppCampaignService::class)->duplicateForResend($company, $record, auth()->user());
+
+                        Notification::make()
+                            ->success()
+                            ->title('Cópia criada para edição')
+                            ->send();
+
+                        return redirect(WhatsAppCampaignResource::getUrl('edit', ['record' => $copy]));
+                    }),
+                Action::make('resend')
+                    ->label('Reenviar agora')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Reenviar campanha')
+                    ->modalDescription('Será criada uma nova cópia da campanha e ela será colocada na fila de envio imediatamente.')
+                    ->visible(fn (WhatsAppCampaign $record): bool => $record->status !== WhatsAppCampaignStatus::Draft)
+                    ->action(function (WhatsAppCampaign $record): void {
+                        /** @var Company $company */
+                        $company = Filament::getTenant();
+
+                        app(WhatsAppCampaignService::class)->resend($company, $record, auth()->user());
+
+                        Notification::make()
+                            ->success()
+                            ->title('Campanha reenviada em uma nova cópia')
+                            ->send();
+                    }),
+                DeleteAction::make()
+                    ->label('Excluir')
+                    ->icon('heroicon-o-trash')
+                    ->requiresConfirmation(),
             ])
             ->searchable();
     }

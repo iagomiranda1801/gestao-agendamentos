@@ -253,6 +253,57 @@ class WhatsAppCampaignTest extends TestCase
         $this->assertSame(WhatsAppCampaignStatus::Completed, $campaign->status);
     }
 
+    public function test_completed_campaign_can_be_copied_to_edit_again(): void
+    {
+        $company = $this->createCompany();
+        $user = $this->createCompanyUser($company);
+
+        $campaign = app(WhatsAppCampaignService::class)->create($company, $user, [
+            'name' => 'Campanha original',
+            'audience_type' => WhatsAppCampaignAudience::SelectedClients->value,
+            'selected_client_ids' => [10, 20],
+            'message_template' => 'Mensagem original',
+            'send_interval_seconds' => 30,
+        ]);
+        $campaign->forceFill(['status' => WhatsAppCampaignStatus::Completed])->save();
+
+        $copy = app(WhatsAppCampaignService::class)->duplicateForResend($company, $campaign, $user);
+
+        $this->assertSame('Campanha original - reenvio', $copy->name);
+        $this->assertSame(WhatsAppCampaignStatus::Draft, $copy->status);
+        $this->assertSame(WhatsAppCampaignAudience::SelectedClients, $copy->audience_type);
+        $this->assertSame([10, 20], $copy->selected_client_ids);
+        $this->assertSame('Mensagem original', $copy->message_template);
+        $this->assertSame(0, $copy->total_recipients);
+    }
+
+    public function test_completed_campaign_can_be_resent_as_new_campaign(): void
+    {
+        Queue::fake();
+
+        $company = $this->createCompany();
+        $user = $this->createCompanyUser($company);
+        $client = Client::factory()
+            ->forCompany($company)
+            ->create(['phone' => '(11) 99999-0001']);
+
+        $campaign = app(WhatsAppCampaignService::class)->create($company, $user, [
+            'name' => 'Campanha original',
+            'audience_type' => WhatsAppCampaignAudience::SelectedClients->value,
+            'selected_client_ids' => [$client->getKey()],
+            'message_template' => 'Mensagem original',
+            'send_interval_seconds' => 10,
+        ]);
+        $campaign->forceFill(['status' => WhatsAppCampaignStatus::Completed])->save();
+
+        $resent = app(WhatsAppCampaignService::class)->resend($company, $campaign, $user);
+
+        $this->assertNotSame($campaign->getKey(), $resent->getKey());
+        $this->assertSame(WhatsAppCampaignStatus::Sending, $resent->status);
+        $this->assertSame(1, $resent->total_recipients);
+        Queue::assertPushed(SendWhatsAppCampaignRecipientJob::class);
+    }
+
     public function test_evolution_client_can_create_and_check_instance(): void
     {
         config([

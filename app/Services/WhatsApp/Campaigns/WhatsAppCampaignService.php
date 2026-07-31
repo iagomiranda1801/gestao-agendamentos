@@ -159,6 +159,40 @@ class WhatsAppCampaignService
         return $campaign->refresh();
     }
 
+    public function duplicateForResend(Company $company, WhatsAppCampaign $campaign, User $user): WhatsAppCampaign
+    {
+        $this->ensureBelongsToCompany($company, $campaign);
+
+        return DB::transaction(function () use ($company, $campaign, $user): WhatsAppCampaign {
+            $copy = new WhatsAppCampaign([
+                'name' => $campaign->name.' - reenvio',
+                'audience_type' => $campaign->audience_type->value,
+                'selected_client_ids' => $campaign->selected_client_ids,
+                'message_template' => $campaign->message_template,
+                'send_interval_seconds' => $campaign->send_interval_seconds,
+                'status' => WhatsAppCampaignStatus::Draft->value,
+                'total_recipients' => 0,
+                'sent_count' => 0,
+                'accepted_count' => 0,
+                'failed_count' => 0,
+                'skipped_count' => 0,
+            ]);
+            $copy->company()->associate($company);
+            $copy->creator()->associate($user);
+            $copy->save();
+
+            return $copy->refresh();
+        });
+    }
+
+    public function resend(Company $company, WhatsAppCampaign $campaign, User $user): WhatsAppCampaign
+    {
+        $copy = $this->duplicateForResend($company, $campaign, $user);
+        $this->prepareRecipients($company, $copy);
+
+        return $this->startSending($company, $copy->refresh());
+    }
+
     public function refreshCounters(WhatsAppCampaign $campaign): void
     {
         $counts = $campaign->recipients()
