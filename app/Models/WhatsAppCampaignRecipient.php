@@ -15,6 +15,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'status',
     'attempts',
     'error_message',
+    'provider_message_id',
+    'provider_status',
+    'provider_response',
     'queued_at',
     'attempted_at',
     'sent_at',
@@ -39,6 +42,7 @@ class WhatsAppCampaignRecipient extends Model
         return [
             'status' => WhatsAppCampaignRecipientStatus::class,
             'attempts' => 'integer',
+            'provider_response' => 'array',
             'queued_at' => 'datetime',
             'attempted_at' => 'datetime',
             'sent_at' => 'datetime',

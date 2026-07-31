@@ -40,6 +40,9 @@ class WhatsAppCampaignsTable
                 TextColumn::make('sent_count')
                     ->label('Enviadas')
                     ->sortable(),
+                TextColumn::make('accepted_count')
+                    ->label('Pendentes Evolution')
+                    ->sortable(),
                 TextColumn::make('failed_count')
                     ->label('Falhas')
                     ->sortable(),

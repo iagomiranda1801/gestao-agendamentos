@@ -13,7 +13,10 @@ class EvolutionApiClient
         return trim((string) ($companyInstance ?: config('services.evolution.instance')));
     }
 
-    public function sendText(string $instance, string $phoneDigits, string $message): void
+    /**
+     * @return array<string, mixed>
+     */
+    public function sendText(string $instance, string $phoneDigits, string $message): array
     {
         $instance = $this->resolveInstance($instance);
 
@@ -34,6 +37,8 @@ class EvolutionApiClient
         if ($response->failed()) {
             throw new RequestException($response);
         }
+
+        return $response->json() ?? [];
     }
 
     /**

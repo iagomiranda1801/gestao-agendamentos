@@ -41,7 +41,7 @@ class AppPanelProvider extends PanelProvider
                 $tenant = filament()->getTenant();
 
                 if ($tenant instanceof Company && filled($tenant->logo_path)) {
-                    return $tenant->logo_path;
+                    return $tenant->logoUrl();
                 }
 
                 if ($tenant === null) {

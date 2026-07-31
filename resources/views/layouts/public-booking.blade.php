@@ -29,9 +29,9 @@
             <header class="booking-header">
                 @if (isset($company))
                     <div class="booking-brand">
-                        @if ($company->logo_path)
+                        @if ($company->logoUrl())
                             <img
-                                src="{{ e($company->logo_path) }}"
+                                src="{{ e($company->logoUrl()) }}"
                                 alt="{{ e($company->name) }}"
                                 class="booking-brand__logo"
                             >

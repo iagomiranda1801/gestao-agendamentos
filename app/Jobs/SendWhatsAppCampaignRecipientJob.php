@@ -11,6 +11,7 @@ use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Arr;
 use Throwable;
 
 class SendWhatsAppCampaignRecipientJob implements ShouldQueue
@@ -62,11 +63,15 @@ class SendWhatsAppCampaignRecipientJob implements ShouldQueue
                 'error_message' => null,
             ])->save();
 
-            $client->sendText($instance, $recipient->phone, $recipient->message_snapshot);
+            $response = $client->sendText($instance, $recipient->phone, $recipient->message_snapshot);
+            $providerStatus = $this->providerStatus($response);
 
             $recipient->forceFill([
-                'status' => WhatsAppCampaignRecipientStatus::Sent,
-                'sent_at' => now(),
+                'status' => $this->recipientStatusFromProvider($providerStatus),
+                'sent_at' => $this->providerConfirmsSend($providerStatus) ? now() : null,
+                'provider_message_id' => $this->providerMessageId($response),
+                'provider_status' => $providerStatus,
+                'provider_response' => $response,
             ])->save();
         } catch (Throwable $exception) {
             $recipient->forceFill([
@@ -78,5 +83,52 @@ class SendWhatsAppCampaignRecipientJob implements ShouldQueue
         }
 
         $campaigns->refreshCounters($campaign);
+    }
+
+    protected function recipientStatusFromProvider(?string $providerStatus): WhatsAppCampaignRecipientStatus
+    {
+        if (! $this->providerConfirmsSend($providerStatus)) {
+            return WhatsAppCampaignRecipientStatus::Accepted;
+        }
+
+        return WhatsAppCampaignRecipientStatus::Sent;
+    }
+
+    protected function providerConfirmsSend(?string $providerStatus): bool
+    {
+        if ($providerStatus === null || $providerStatus === '') {
+            return true;
+        }
+
+        return in_array(strtoupper($providerStatus), [
+            'SENT',
+            'DELIVERED',
+            'READ',
+            'SERVER_ACK',
+        ], true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $response
+     */
+    protected function providerStatus(array $response): ?string
+    {
+        $status = Arr::get($response, 'status')
+            ?: Arr::get($response, 'message.status')
+            ?: Arr::get($response, 'key.status');
+
+        return filled($status) ? (string) $status : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $response
+     */
+    protected function providerMessageId(array $response): ?string
+    {
+        $id = Arr::get($response, 'key.id')
+            ?: Arr::get($response, 'messageId')
+            ?: Arr::get($response, 'id');
+
+        return filled($id) ? (string) $id : null;
     }
 }

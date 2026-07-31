@@ -6,6 +6,7 @@ enum WhatsAppCampaignRecipientStatus: string
 {
     case Pending = 'pending';
     case Queued = 'queued';
+    case Accepted = 'accepted';
     case Sent = 'sent';
     case Failed = 'failed';
     case Skipped = 'skipped';
@@ -15,6 +16,7 @@ enum WhatsAppCampaignRecipientStatus: string
         return match ($this) {
             self::Pending => 'Pendente',
             self::Queued => 'Na fila',
+            self::Accepted => 'Pendente na Evolution',
             self::Sent => 'Enviado',
             self::Failed => 'Falhou',
             self::Skipped => 'Ignorado',

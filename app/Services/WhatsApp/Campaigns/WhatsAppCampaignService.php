@@ -84,6 +84,7 @@ class WhatsAppCampaignService
             $campaign->forceFill([
                 'total_recipients' => $count,
                 'sent_count' => 0,
+                'accepted_count' => 0,
                 'failed_count' => 0,
                 'skipped_count' => 0,
             ])->save();
@@ -172,6 +173,7 @@ class WhatsAppCampaignService
         $campaign->forceFill([
             'total_recipients' => (int) $counts->sum(),
             'sent_count' => (int) ($counts[WhatsAppCampaignRecipientStatus::Sent->value] ?? 0),
+            'accepted_count' => (int) ($counts[WhatsAppCampaignRecipientStatus::Accepted->value] ?? 0),
             'failed_count' => (int) ($counts[WhatsAppCampaignRecipientStatus::Failed->value] ?? 0),
             'skipped_count' => (int) ($counts[WhatsAppCampaignRecipientStatus::Skipped->value] ?? 0),
             'status' => $campaign->status === WhatsAppCampaignStatus::Sending && ! $remaining

@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 #[Fillable([
@@ -92,6 +93,25 @@ class Company extends Model
             ->wherePivot('role', CompanyRole::CompanyAdmin->value)
             ->wherePivot('is_active', true)
             ->exists();
+    }
+
+    public function logoUrl(): ?string
+    {
+        if (blank($this->logo_path)) {
+            return null;
+        }
+
+        foreach (['http://', 'https://', '/'] as $prefix) {
+            if (str_starts_with((string) $this->logo_path, $prefix)) {
+                return (string) $this->logo_path;
+            }
+        }
+
+        if (str_starts_with((string) $this->logo_path, 'storage/')) {
+            return asset((string) $this->logo_path);
+        }
+
+        return Storage::disk('public')->url((string) $this->logo_path);
     }
 
     public function activeAdminsCount(): int

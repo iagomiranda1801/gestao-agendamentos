@@ -199,6 +199,60 @@ class WhatsAppCampaignTest extends TestCase
             && $request['number'] === '5511999990001');
     }
 
+    public function test_campaign_job_marks_pending_provider_response_as_accepted_not_sent(): void
+    {
+        config([
+            'services.evolution.url' => 'https://evolution.test',
+            'services.evolution.key' => 'secret',
+        ]);
+
+        Http::fake([
+            'https://evolution.test/message/sendText/loja-1' => Http::response([
+                'key' => ['id' => 'provider-message-id'],
+                'status' => 'PENDING',
+            ], 201),
+        ]);
+
+        $company = $this->createCompany();
+        $user = $this->createCompanyUser($company);
+        CompanySchedulingSetting::factory()->for($company)->create([
+            'whatsapp_instance' => 'loja-1',
+        ]);
+        Client::factory()
+            ->forCompany($company)
+            ->optedInForWhatsAppMarketing()
+            ->create(['phone' => '(11) 99999-0001']);
+
+        $campaign = app(WhatsAppCampaignService::class)->create($company, $user, [
+            'name' => 'Campanha',
+            'audience_type' => WhatsAppCampaignAudience::OptedInActiveClients->value,
+            'message_template' => 'Mensagem',
+            'send_interval_seconds' => 10,
+        ]);
+        app(WhatsAppCampaignService::class)->prepareRecipients($company, $campaign);
+        $recipient = $campaign->recipients()->firstOrFail();
+        $recipient->forceFill(['status' => WhatsAppCampaignRecipientStatus::Queued])->save();
+        $campaign->forceFill(['status' => WhatsAppCampaignStatus::Sending])->save();
+
+        (new SendWhatsAppCampaignRecipientJob($recipient->getKey()))->handle(
+            app(EvolutionApiClient::class),
+            app(\App\Services\Scheduling\CompanySchedulingSettingService::class),
+            app(\App\Services\WhatsApp\CompanyWhatsAppInstanceService::class),
+            app(WhatsAppCampaignService::class),
+        );
+
+        $recipient->refresh();
+        $campaign->refresh();
+
+        $this->assertSame(WhatsAppCampaignRecipientStatus::Accepted, $recipient->status);
+        $this->assertNull($recipient->sent_at);
+        $this->assertSame('PENDING', $recipient->provider_status);
+        $this->assertSame('provider-message-id', $recipient->provider_message_id);
+        $this->assertSame(0, $campaign->sent_count);
+        $this->assertSame(1, $campaign->accepted_count);
+        $this->assertSame(WhatsAppCampaignStatus::Completed, $campaign->status);
+    }
+
     public function test_evolution_client_can_create_and_check_instance(): void
     {
         config([
