@@ -11,14 +11,27 @@ use Throwable;
 
 class EvolutionWebhookController extends Controller
 {
-    public function __invoke(Request $request, EvolutionWebhookService $webhooks): JsonResponse
+    public function __invoke(Request $request, EvolutionWebhookService $webhooks, ?string $instance = null): JsonResponse
     {
         if (! $this->tokenIsValid($request)) {
             return response()->json(['message' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
         }
 
         try {
-            $event = $webhooks->handle($request->all());
+            $payload = $request->all();
+            $payloadInstance = data_get($payload, 'instance');
+
+            if (filled($instance) && filled($payloadInstance) && (string) $instance !== (string) $payloadInstance) {
+                return response()->json([
+                    'message' => 'A instância do webhook não corresponde à instância informada pela Evolution.',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            if (filled($instance) && blank($payloadInstance)) {
+                data_set($payload, 'instance', $instance);
+            }
+
+            $event = $webhooks->handle($payload);
 
             return response()->json([
                 'ok' => true,

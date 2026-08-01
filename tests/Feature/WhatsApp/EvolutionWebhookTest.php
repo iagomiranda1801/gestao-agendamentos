@@ -78,4 +78,32 @@ class EvolutionWebhookTest extends TestCase
             'provider_status' => 'DELIVERED',
         ]);
     }
+
+    public function test_webhook_can_receive_instance_in_url(): void
+    {
+        config(['services.evolution.webhook_token' => 'secret-token']);
+
+        $this->postJson('/webhooks/evolution/whatsapp-principal?token=secret-token', [
+            'event' => 'SEND_MESSAGE',
+            'data' => [
+                'key' => ['id' => 'url-instance-message'],
+                'status' => 'PENDING',
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('evolution_webhook_events', [
+            'instance' => 'whatsapp-principal',
+            'message_id' => 'url-instance-message',
+        ]);
+    }
+
+    public function test_webhook_rejects_different_url_and_payload_instances(): void
+    {
+        config(['services.evolution.webhook_token' => 'secret-token']);
+
+        $this->postJson('/webhooks/evolution/whatsapp-principal?token=secret-token', [
+            'event' => 'SEND_MESSAGE',
+            'instance' => 'another-instance',
+        ])->assertUnprocessable();
+    }
 }

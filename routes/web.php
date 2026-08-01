@@ -14,5 +14,5 @@ Route::get('/cadastro', CompanySignupWizard::class)
 
 Route::get('/agendar/{company:slug}', BookingWizard::class)->name('public.booking.show');
 Route::get('/agendamento/{token}', ManageAppointment::class)->name('public.appointment.manage');
-Route::post('/webhooks/evolution', EvolutionWebhookController::class)
+Route::post('/webhooks/evolution/{instance?}', EvolutionWebhookController::class)
     ->name('webhooks.evolution');
