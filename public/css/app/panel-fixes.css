@@ -15,3 +15,682 @@
 .fi-no .fi-no-notification .fi-no-notification-title {
     display: block;
 }
+
+.fi-app-login-signup {
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+    text-align: center;
+}
+
+.fi-app-login-signup__text {
+    margin: 0 0 0.5rem;
+    font-size: 0.875rem;
+    color: rgb(100 116 139);
+}
+
+.dark .fi-app-login-signup__text {
+    color: rgb(148 163 184);
+}
+
+.fi-app-login-signup__link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: rgb(217 119 6);
+    text-decoration: none;
+}
+
+.fi-app-login-signup__link:hover {
+    color: rgb(180 83 9);
+    text-decoration: underline;
+}
+
+.dark .fi-app-login-signup__link {
+    color: rgb(251 191 36);
+}
+
+.dark .fi-app-login-signup__link:hover {
+    color: rgb(253 224 71);
+}
+
+.fi-logo {
+    width: auto;
+    max-width: 100%;
+    border-radius: 0.5rem;
+    object-fit: contain;
+}
+
+.fi-header {
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.fi-header-actions-ctn {
+    max-width: 100%;
+}
+
+.fi-header-actions-ctn > .fi-ac {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 0.5rem;
+}
+
+.fi-header-actions-ctn .fi-btn,
+.fi-header-actions-ctn .fi-icon-btn {
+    min-height: 2.25rem;
+}
+
+.fi-header-actions-ctn .fi-btn {
+    padding-inline: 0.75rem;
+    font-size: 0.8125rem;
+}
+
+/* Dashboard operacional */
+
+.agendaqui-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.agendaqui-dashboard__header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.agendaqui-dashboard__date {
+    margin: 0;
+    font-size: 0.875rem;
+    color: rgb(100 116 139);
+}
+
+.agendaqui-dashboard__title {
+    margin: 0;
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 650;
+    letter-spacing: 0;
+    color: rgb(15 23 42);
+}
+
+.agendaqui-dashboard__cards {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.agendaqui-dashboard-card,
+.agendaqui-dashboard-panel {
+    border: 1px solid rgb(226 232 240);
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+}
+
+.agendaqui-dashboard-card {
+    display: block;
+    padding: 1rem;
+    text-decoration: none;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.agendaqui-dashboard-card:hover {
+    border-color: rgb(245 158 11 / 0.55);
+    box-shadow: 0 8px 20px rgb(15 23 42 / 0.08);
+    transform: translateY(-1px);
+}
+
+.agendaqui-dashboard-card__top,
+.agendaqui-dashboard-list__row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.agendaqui-dashboard-card__label,
+.agendaqui-dashboard-card__description,
+.agendaqui-dashboard-list__description,
+.agendaqui-dashboard-list__meta,
+.agendaqui-dashboard-empty {
+    color: rgb(100 116 139);
+}
+
+.agendaqui-dashboard-card__label {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.agendaqui-dashboard-card__value {
+    margin: 0.5rem 0 0;
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    color: rgb(15 23 42);
+}
+
+.agendaqui-dashboard-card__description {
+    margin: 0.75rem 0 0;
+    font-size: 0.875rem;
+}
+
+.agendaqui-dashboard-chip,
+.agendaqui-dashboard-counter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.agendaqui-dashboard-chip {
+    padding: 0.25rem 0.5rem;
+}
+
+.agendaqui-dashboard-counter {
+    min-width: 2.5rem;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.875rem;
+}
+
+.agendaqui-dashboard-tone--primary {
+    border-color: rgb(253 230 138);
+    background: rgb(255 251 235);
+    color: rgb(180 83 9);
+}
+
+.agendaqui-dashboard-tone--success {
+    border-color: rgb(167 243 208);
+    background: rgb(236 253 245);
+    color: rgb(4 120 87);
+}
+
+.agendaqui-dashboard-tone--warning {
+    border-color: rgb(254 240 138);
+    background: rgb(254 252 232);
+    color: rgb(161 98 7);
+}
+
+.agendaqui-dashboard-tone--danger {
+    border-color: rgb(254 205 211);
+    background: rgb(255 241 242);
+    color: rgb(190 18 60);
+}
+
+.agendaqui-dashboard__main-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+}
+
+.agendaqui-dashboard-panel {
+    overflow: hidden;
+}
+
+.agendaqui-dashboard-panel__header {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid rgb(241 245 249);
+}
+
+.agendaqui-dashboard-panel__title {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 650;
+    color: rgb(15 23 42);
+}
+
+.agendaqui-dashboard-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.agendaqui-dashboard-list__item {
+    padding: 0.875rem 1rem;
+    border-top: 1px solid rgb(241 245 249);
+}
+
+.agendaqui-dashboard-list__item:first-child {
+    border-top: 0;
+}
+
+.agendaqui-dashboard-list__item--link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    text-decoration: none;
+}
+
+.agendaqui-dashboard-list__item--link:hover {
+    background: rgb(248 250 252);
+}
+
+.agendaqui-dashboard-list__title {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 650;
+    color: rgb(15 23 42);
+}
+
+.agendaqui-dashboard-list__description {
+    margin: 0.25rem 0 0;
+    font-size: 0.875rem;
+}
+
+.agendaqui-dashboard-list__description--strong {
+    color: rgb(71 85 105);
+}
+
+.agendaqui-dashboard-list__meta {
+    margin: 0;
+    font-size: 0.75rem;
+}
+
+.agendaqui-dashboard-list__amount {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.agendaqui-dashboard-list__amount p {
+    margin: 0;
+    font-weight: 700;
+    color: rgb(15 23 42);
+}
+
+.agendaqui-dashboard-list__amount span {
+    font-size: 0.75rem;
+    color: rgb(100 116 139);
+}
+
+.agendaqui-dashboard-empty {
+    padding: 2rem 1rem;
+    font-size: 0.875rem;
+}
+
+.dark .agendaqui-dashboard__title,
+.dark .agendaqui-dashboard-card__value,
+.dark .agendaqui-dashboard-panel__title,
+.dark .agendaqui-dashboard-list__title,
+.dark .agendaqui-dashboard-list__amount p {
+    color: rgb(248 250 252);
+}
+
+.dark .agendaqui-dashboard-card,
+.dark .agendaqui-dashboard-panel {
+    border-color: rgb(51 65 85);
+    background: rgb(15 23 42);
+}
+
+.dark .agendaqui-dashboard-panel__header,
+.dark .agendaqui-dashboard-list__item {
+    border-color: rgb(30 41 59);
+}
+
+.dark .agendaqui-dashboard-card__label,
+.dark .agendaqui-dashboard-card__description,
+.dark .agendaqui-dashboard-list__description,
+.dark .agendaqui-dashboard-list__meta,
+.dark .agendaqui-dashboard-empty,
+.dark .agendaqui-dashboard__date {
+    color: rgb(148 163 184);
+}
+
+.dark .agendaqui-dashboard-list__item--link:hover {
+    background: rgb(30 41 59);
+}
+
+/* Dashboard administrativa */
+
+.admin-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.admin-dashboard__header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.admin-dashboard__eyebrow,
+.admin-dashboard__subtitle,
+.admin-dashboard-card__description,
+.admin-dashboard-alert small,
+.admin-dashboard-company small,
+.admin-dashboard-failure small,
+.admin-dashboard-failure p,
+.admin-dashboard-empty,
+.admin-dashboard-metrics dt {
+    color: rgb(100 116 139);
+}
+
+.admin-dashboard__eyebrow {
+    margin: 0 0 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.admin-dashboard__title {
+    margin: 0;
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    color: rgb(15 23 42);
+}
+
+.admin-dashboard__subtitle {
+    margin: 0;
+    max-width: 34rem;
+    font-size: 0.875rem;
+    text-align: right;
+}
+
+.admin-dashboard__cards {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.admin-dashboard-card,
+.admin-dashboard-panel {
+    border: 1px solid rgb(226 232 240);
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+}
+
+.admin-dashboard-card {
+    display: flex;
+    min-height: 6.25rem;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 0.875rem;
+    text-decoration: none;
+}
+
+.admin-dashboard-card__label {
+    font-size: 0.8125rem;
+    font-weight: 650;
+    color: rgb(51 65 85);
+}
+
+.admin-dashboard-card__value {
+    font-size: 1.75rem;
+    line-height: 2rem;
+    font-weight: 750;
+    letter-spacing: 0;
+    color: rgb(15 23 42);
+}
+
+.admin-dashboard-card__description {
+    font-size: 0.75rem;
+}
+
+.admin-dashboard__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+}
+
+.admin-dashboard-panel {
+    overflow: hidden;
+}
+
+.admin-dashboard-panel__header {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid rgb(241 245 249);
+}
+
+.admin-dashboard-panel__title {
+    margin: 0;
+    font-size: 0.9375rem;
+    line-height: 1.35rem;
+    font-weight: 700;
+    color: rgb(15 23 42);
+}
+
+.admin-dashboard-alerts,
+.admin-dashboard-failures,
+.admin-dashboard-table {
+    display: flex;
+    flex-direction: column;
+}
+
+.admin-dashboard-alert,
+.admin-dashboard-company,
+.admin-dashboard-failure {
+    border-top: 1px solid rgb(241 245 249);
+}
+
+.admin-dashboard-alert:first-child,
+.admin-dashboard-company:first-child,
+.admin-dashboard-failure:first-child {
+    border-top: 0;
+}
+
+.admin-dashboard-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    text-decoration: none;
+}
+
+.admin-dashboard-alert strong {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    background: rgb(248 250 252);
+    color: rgb(15 23 42);
+}
+
+.admin-dashboard-alert span,
+.admin-dashboard-company span {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.admin-dashboard-alert b,
+.admin-dashboard-company b {
+    color: rgb(15 23 42);
+}
+
+.admin-dashboard-alert small,
+.admin-dashboard-company small {
+    font-size: 0.75rem;
+}
+
+.admin-dashboard-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    margin: 0;
+}
+
+.admin-dashboard-metrics div {
+    padding: 0.875rem 1rem;
+    border-top: 1px solid rgb(241 245 249);
+}
+
+.admin-dashboard-metrics dt {
+    font-size: 0.75rem;
+    font-weight: 650;
+}
+
+.admin-dashboard-metrics dd {
+    margin: 0.25rem 0 0;
+    font-size: 1.375rem;
+    line-height: 1.75rem;
+    font-weight: 750;
+    color: rgb(15 23 42);
+}
+
+.admin-dashboard-company {
+    display: grid;
+    grid-template-columns: minmax(12rem, 2fr) repeat(5, minmax(5rem, 1fr));
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    color: rgb(51 65 85);
+    font-size: 0.8125rem;
+    text-decoration: none;
+}
+
+.admin-dashboard-company:hover,
+.admin-dashboard-alert:hover {
+    background: rgb(248 250 252);
+}
+
+.admin-dashboard-failure {
+    padding: 0.875rem 1rem;
+}
+
+.admin-dashboard-failure b {
+    color: rgb(15 23 42);
+}
+
+.admin-dashboard-failure p {
+    margin: 0.375rem 0 0;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+}
+
+.admin-dashboard-empty {
+    margin: 0;
+    padding: 1rem;
+    font-size: 0.875rem;
+}
+
+.admin-dashboard-tone--primary {
+    border-color: rgb(191 219 254);
+}
+
+.admin-dashboard-tone--success {
+    border-color: rgb(187 247 208);
+}
+
+.admin-dashboard-tone--warning {
+    border-color: rgb(254 240 138);
+}
+
+.admin-dashboard-tone--danger {
+    border-color: rgb(254 205 211);
+}
+
+.dark .admin-dashboard__title,
+.dark .admin-dashboard-card__value,
+.dark .admin-dashboard-card__label,
+.dark .admin-dashboard-panel__title,
+.dark .admin-dashboard-alert b,
+.dark .admin-dashboard-company b,
+.dark .admin-dashboard-failure b,
+.dark .admin-dashboard-metrics dd {
+    color: rgb(248 250 252);
+}
+
+.dark .admin-dashboard-card,
+.dark .admin-dashboard-panel {
+    border-color: rgb(51 65 85);
+    background: rgb(15 23 42);
+}
+
+.dark .admin-dashboard-panel__header,
+.dark .admin-dashboard-alert,
+.dark .admin-dashboard-company,
+.dark .admin-dashboard-failure,
+.dark .admin-dashboard-metrics div {
+    border-color: rgb(30 41 59);
+}
+
+.dark .admin-dashboard__eyebrow,
+.dark .admin-dashboard__subtitle,
+.dark .admin-dashboard-card__description,
+.dark .admin-dashboard-alert small,
+.dark .admin-dashboard-company,
+.dark .admin-dashboard-company small,
+.dark .admin-dashboard-failure small,
+.dark .admin-dashboard-failure p,
+.dark .admin-dashboard-empty,
+.dark .admin-dashboard-metrics dt {
+    color: rgb(148 163 184);
+}
+
+.dark .admin-dashboard-alert strong,
+.dark .admin-dashboard-company:hover,
+.dark .admin-dashboard-alert:hover {
+    background: rgb(30 41 59);
+}
+
+@media (max-width: 767px) {
+    .admin-dashboard__header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .admin-dashboard__subtitle {
+        text-align: left;
+    }
+
+    .admin-dashboard-company {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (min-width: 768px) {
+    .admin-dashboard__cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1280px) {
+    .admin-dashboard__cards {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .admin-dashboard__grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .admin-dashboard-panel--wide {
+        grid-column: span 2 / span 2;
+    }
+}
+
+@media (min-width: 768px) {
+    .agendaqui-dashboard__cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1280px) {
+    .agendaqui-dashboard__cards {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .agendaqui-dashboard__main-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .agendaqui-dashboard-panel--wide {
+        grid-column: span 2 / span 2;
+    }
+}

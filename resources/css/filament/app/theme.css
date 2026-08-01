@@ -4,6 +4,174 @@
 @source '../../../../resources/views/filament/app/**/*';
 @source '../../../../resources/views/components/agendaqui/**/*';
 
+/* App shell: light blue workspace with clear white work surfaces */
+
+.fi-panel-app {
+    --sidebar-width: 16rem;
+    --collapsed-sidebar-width: 4.25rem;
+}
+
+.fi-panel-app .fi-sidebar,
+.fi-panel-app .fi-sidebar nav {
+    border-inline-end: 1px solid #e5e7eb;
+    background: #f8fafc;
+}
+
+.fi-panel-app .fi-main-ctn,
+.fi-panel-app .fi-main {
+    background: #f6f9fc;
+}
+
+.fi-panel-app .fi-topbar {
+    border-bottom-color: #123b78;
+    background: #061b49;
+    color: #fff;
+}
+
+.fi-panel-app .fi-topbar .fi-icon-btn,
+.fi-panel-app .fi-topbar .fi-btn,
+.fi-panel-app .fi-topbar a {
+    color: rgb(255 255 255 / 0.9);
+}
+
+.fi-panel-app .fi-topbar .fi-logo,
+.fi-panel-app .fi-sidebar-header .fi-logo {
+    color: #fff !important;
+    font-weight: 800;
+}
+
+.fi-panel-app .fi-topbar .fi-icon-btn:hover,
+.fi-panel-app .fi-topbar .fi-btn:hover,
+.fi-panel-app .fi-topbar a:hover {
+    background: rgb(255 255 255 / 0.12);
+    color: #fff;
+}
+
+.fi-panel-app .fi-sidebar-group-items > .fi-sidebar-item:not(.fi-active) > .fi-sidebar-item-btn:hover {
+    background: #eff6ff;
+    color: #334155;
+}
+
+.fi-panel-app .fi-sidebar-group-items > .fi-sidebar-item.fi-active > .fi-sidebar-item-btn {
+    position: relative;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+    background: #dbeafe;
+    color: #2563eb;
+    font-weight: 600;
+}
+
+.fi-panel-app .fi-sidebar-group-items > .fi-sidebar-item.fi-active > .fi-sidebar-item-btn::before {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: 3px;
+    border-radius: 0 4px 4px 0;
+    background: #2563eb;
+    content: '';
+}
+
+.fi-panel-app .fi-sidebar-nav-groups {
+    gap: 0.5rem;
+}
+
+.fi-panel-app .fi-sidebar-group {
+    margin-block: 0.25rem;
+}
+
+.fi-panel-app .fi-sidebar-group + .fi-sidebar-group {
+    margin-top: 0.85rem;
+}
+
+.fi-panel-app .fi-sidebar-group-btn {
+    min-height: 2rem;
+    padding-block: 0.35rem;
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.fi-panel-app .fi-sidebar-item-btn {
+    min-height: 2.625rem;
+    margin-block: 0.1rem;
+    padding-block: 0.5625rem;
+    padding-inline: 0.8125rem;
+    border-radius: 0.625rem;
+    color: #334155;
+    transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.fi-panel-app .fi-sidebar-item-btn:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+}
+
+.fi-panel-app .fi-sidebar-sub-group-items {
+    margin-inline-start: 0.75rem;
+    padding-inline-start: 0.5rem;
+}
+
+.fi-panel-app .fi-sidebar-item-icon {
+    color: #64748b;
+    flex-shrink: 0;
+}
+
+.fi-panel-app .fi-sidebar-item-label {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fi-panel-app .fi-sidebar-group-items > .fi-sidebar-item.fi-active > .fi-sidebar-item-btn .fi-sidebar-item-icon {
+    color: #2563eb;
+}
+
+.dark .fi-panel-app .fi-sidebar,
+.dark .fi-panel-app .fi-sidebar nav {
+    border-inline-end-color: #1e3a66;
+    background: #0b234f;
+}
+
+.dark .fi-panel-app .fi-main-ctn,
+.dark .fi-panel-app .fi-main {
+    background: #081a38;
+}
+
+.dark .fi-panel-app .fi-sidebar-group-btn,
+.dark .fi-panel-app .fi-sidebar-item-btn {
+    color: #dbeafe;
+}
+
+.dark .fi-panel-app .fi-sidebar-item-icon {
+    color: #94a3b8;
+}
+
+.dark .fi-panel-app .fi-sidebar-group-items > .fi-sidebar-item:not(.fi-active) > .fi-sidebar-item-btn:hover {
+    background: #123b78;
+    color: #dbeafe;
+}
+
+.dark .fi-panel-app .fi-sidebar-group-items > .fi-sidebar-item.fi-active > .fi-sidebar-item-btn {
+    background: #123b78;
+    color: #bfdbfe;
+}
+
+.dark .fi-panel-app .fi-sidebar-group-items > .fi-sidebar-item.fi-active > .fi-sidebar-item-btn::before {
+    background: #60a5fa;
+}
+
+.dark .fi-panel-app .fi-sidebar-group-items > .fi-sidebar-item.fi-active > .fi-sidebar-item-btn .fi-sidebar-item-icon {
+    color: #bfdbfe;
+}
+
+.dark .fi-panel-app .fi-topbar {
+    background: #04132f;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Agendaqui auth — structure                                                 */
 /* -------------------------------------------------------------------------- */

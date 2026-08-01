@@ -14,6 +14,7 @@ use App\Filament\App\Pages\InventoryPosition;
 use App\Filament\App\Pages\PointOfSalePage;
 use App\Filament\App\Resources\Appointments\AppointmentResource;
 use App\Filament\App\Resources\Attendances\AttendanceResource;
+use App\Filament\App\Resources\Clients\ClientResource;
 use App\Filament\App\Resources\Payables\PayableResource;
 use App\Filament\App\Resources\Purchases\PurchaseResource;
 use App\Filament\App\Resources\Receivables\ReceivableResource;
@@ -57,11 +58,45 @@ class OperationalDashboardAggregator
             'company' => $company,
             'dateLabel' => $localToday->translatedFormat('d/m/Y'),
             'modules' => $modules,
+            'quickActions' => $this->quickActions($modules),
             'cards' => $this->cards($company, $modules, $todayStart, $todayEnd, $todayDate, $nextWeekDate),
             'alerts' => $this->alerts($company, $modules, $todayStart, $todayEnd, $todayDate, $nextWeekDate),
             'agenda' => $this->todayAgenda($company, $modules, $todayStart, $todayEnd),
             'sales' => $this->latestSales($company, $modules),
         ];
+    }
+
+    /**
+     * @param  list<string>  $modules
+     * @return list<array{label: string, description: string, url: string}>
+     */
+    protected function quickActions(array $modules): array
+    {
+        $actions = [
+            [
+                'label' => 'Novo cliente',
+                'description' => 'Cadastre uma pessoa',
+                'url' => ClientResource::getUrl('create'),
+            ],
+        ];
+
+        if ($this->has($modules, CompanyModule::Scheduling)) {
+            array_unshift($actions, [
+                'label' => 'Novo agendamento',
+                'description' => 'Reserve um horário',
+                'url' => AppointmentResource::getUrl('create'),
+            ]);
+        }
+
+        if ($this->has($modules, CompanyModule::Sales)) {
+            $actions[] = [
+                'label' => 'Nova venda',
+                'description' => 'Abra o atendimento no PDV',
+                'url' => PointOfSalePage::getUrl(),
+            ];
+        }
+
+        return $actions;
     }
 
     /**

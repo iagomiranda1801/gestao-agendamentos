@@ -2,12 +2,13 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Admin\Pages\Dashboard;
+use App\Filament\Admin\Pages\Auth\Login;
 use App\Support\Branding;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Assets\Css;
@@ -29,14 +30,15 @@ class AdminPanelProvider extends PanelProvider
         return $panel
             ->id('admin')
             ->path('admin')
-            ->login()
+            ->login(Login::class)
+            ->viteTheme('resources/css/filament/admin/theme.css')
             ->maxContentWidth(Width::Full)
             ->brandName('IM Soluções Digitais')
-            ->brandLogo(Branding::logoUrl())
+            ->brandLogo(asset('images/agendaqui-login-logo.png'))
             ->brandLogoHeight(Branding::logoHeight())
             ->favicon(Branding::faviconUrl())
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Blue,
             ])
             ->assets([
                 Css::make('panel-fixes', resource_path('css/filament-panel-fixes.css')),

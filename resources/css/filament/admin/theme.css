@@ -1,0 +1,250 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament/Admin/**/*';
+@source '../../../../resources/views/filament/admin/**/*';
+
+/* Admin identity */
+
+.fi-sidebar {
+    border-inline-end-color: rgb(226 232 240);
+    background: #eff6ff;
+}
+
+.fi-sidebar nav {
+    background: #eff6ff;
+}
+
+.fi-panel-admin .fi-main-ctn,
+.fi-panel-admin .fi-main {
+    background: #eff6ff;
+}
+
+.fi-panel-admin .fi-topbar {
+    border-bottom-color: #123b78;
+    background: #061b49;
+    color: #fff;
+}
+
+.fi-panel-admin .fi-topbar .fi-icon-btn,
+.fi-panel-admin .fi-topbar .fi-btn,
+.fi-panel-admin .fi-topbar a {
+    color: rgb(255 255 255 / 0.9);
+}
+
+.fi-panel-admin .fi-topbar .fi-icon-btn:hover,
+.fi-panel-admin .fi-topbar .fi-btn:hover,
+.fi-panel-admin .fi-topbar a:hover {
+    background: rgb(255 255 255 / 0.12);
+    color: #fff;
+}
+
+.fi-panel-admin .fi-btn-color-primary {
+    background: #126bff;
+    color: #fff;
+}
+
+.fi-panel-admin .fi-btn-color-primary:hover {
+    background: #0757f8;
+}
+
+.fi-sidebar-nav-item:not(.fi-active) > a:hover {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.fi-sidebar-nav-item.fi-active > a {
+    box-shadow: inset 3px 0 0 rgb(18 107 255);
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.dark .fi-sidebar,
+.dark .fi-sidebar nav {
+    background: #0b234f;
+}
+
+.dark .fi-panel-admin .fi-main-ctn,
+.dark .fi-panel-admin .fi-main {
+    background: #081a38;
+}
+
+.dark .fi-panel-admin .fi-topbar {
+    background: #04132f;
+}
+
+.dark .fi-sidebar-nav-item:not(.fi-active) > a:hover,
+.dark .fi-sidebar-nav-item.fi-active > a {
+    background: #123b78;
+    color: #bfdbfe;
+}
+
+.admin-dashboard-card:hover {
+    border-color: rgb(18 107 255 / 0.45);
+}
+
+/* Admin authentication */
+
+.admin-auth-root {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(30rem, 0.95fr);
+    min-height: 100dvh;
+    background: #f6f9fc;
+    color: #0f172a;
+}
+
+.admin-auth-brand {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    overflow: hidden;
+    padding: clamp(2rem, 6vw, 6rem);
+    background: #061b49;
+}
+
+.admin-auth-brand::after {
+    position: absolute;
+    inset: auto -8rem -10rem auto;
+    width: 28rem;
+    height: 28rem;
+    border: 1px solid rgb(25 211 243 / 0.3);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3rem rgb(25 211 243 / 0.06), 0 0 0 7rem rgb(18 107 255 / 0.06);
+    content: '';
+}
+
+.admin-auth-brand__content {
+    position: relative;
+    z-index: 1;
+    width: min(32rem, 100%);
+}
+
+.admin-auth-brand__logo {
+    display: block;
+    width: min(19rem, 80%);
+    height: auto;
+    margin-bottom: 3.5rem;
+    object-fit: contain;
+    object-position: left center;
+    filter: drop-shadow(0 10px 28px rgb(0 0 0 / 0.2));
+}
+
+.admin-auth-brand__eyebrow,
+.admin-auth-form-header__eyebrow {
+    margin: 0 0 0.625rem;
+    color: #19d3f3;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.admin-auth-brand__title {
+    max-width: 28rem;
+    margin: 0;
+    color: #fff;
+    font-size: clamp(2rem, 4vw, 3.5rem);
+    line-height: 1.08;
+    letter-spacing: 0;
+}
+
+.admin-auth-brand__text {
+    max-width: 27rem;
+    margin: 1.25rem 0 0;
+    color: rgb(226 232 240 / 0.82);
+    font-size: 1rem;
+    line-height: 1.6;
+}
+
+.admin-auth-form-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    padding: 2rem clamp(1.25rem, 5vw, 5rem);
+    background: #fff;
+}
+
+.admin-auth-form-wrap {
+    width: min(100%, 26rem);
+}
+
+.admin-auth-mobile-brand {
+    display: none;
+}
+
+.admin-auth-form-header__title {
+    margin: 0;
+    color: #0f172a;
+    font-size: 1.75rem;
+    line-height: 1.2;
+    letter-spacing: 0;
+}
+
+.admin-auth-form-header__text {
+    margin: 0.625rem 0 0;
+    color: #64748b;
+    font-size: 0.9375rem;
+}
+
+.admin-auth-form {
+    margin-top: 2rem;
+}
+
+.admin-auth-form .fi-fo-field-wrp-label {
+    color: #334155;
+    font-weight: 650;
+}
+
+.admin-auth-form .fi-input-wrp {
+    border-color: #dbe4f0;
+    border-radius: 0.625rem;
+    background: #f8fafc;
+}
+
+.admin-auth-form .fi-input-wrp:focus-within {
+    border-color: #126bff;
+    box-shadow: 0 0 0 3px rgb(18 107 255 / 0.14);
+    background: #fff;
+}
+
+.admin-auth-form .fi-btn-color-primary {
+    min-height: 2.75rem;
+    border-radius: 0.625rem;
+    box-shadow: 0 8px 16px rgb(18 107 255 / 0.2);
+    font-weight: 700;
+}
+
+.admin-auth-form-footer {
+    margin: 2.5rem 0 0;
+    color: #94a3b8;
+    font-size: 0.75rem;
+    text-align: center;
+}
+
+@media (max-width: 767px) {
+    .admin-auth-root {
+        display: block;
+        min-height: 100dvh;
+    }
+
+    .admin-auth-brand {
+        display: none;
+    }
+
+    .admin-auth-form-panel {
+        min-height: 100dvh;
+        padding: 2rem 1.25rem;
+    }
+
+    .admin-auth-mobile-brand {
+        display: block;
+        margin-bottom: 3rem;
+        text-align: center;
+    }
+
+    .admin-auth-mobile-brand__logo {
+        display: inline-block;
+        width: min(13rem, 75%);
+        height: auto;
+    }
+}

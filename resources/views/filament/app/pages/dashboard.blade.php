@@ -30,6 +30,12 @@
             color: rgb(100 116 139);
         }
 
+        .agendaqui-dashboard__subtitle {
+            margin: 0.25rem 0 0;
+            color: rgb(71 85 105);
+            font-size: 0.875rem;
+        }
+
         .agendaqui-dashboard__title {
             margin: 0;
             font-size: 1.5rem;
@@ -61,9 +67,65 @@
         }
 
         .agendaqui-dashboard-card:hover {
-            border-color: rgb(245 158 11 / 0.55);
+            border-color: rgb(18 107 255 / 0.45);
             box-shadow: 0 8px 20px rgb(15 23 42 / 0.08);
             transform: translateY(-1px);
+        }
+
+        .agendaqui-dashboard-actions {
+            display: grid;
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            gap: 0.75rem;
+        }
+
+        .agendaqui-dashboard-action {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            min-width: 0;
+            padding: 0.875rem 1rem;
+            border: 1px solid rgb(191 219 254);
+            border-radius: 0.5rem;
+            background: rgb(239 246 255);
+            color: rgb(15 23 42);
+            text-decoration: none;
+            transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+        }
+
+        .agendaqui-dashboard-action:hover {
+            border-color: rgb(18 107 255 / 0.55);
+            background: rgb(219 234 254);
+            transform: translateY(-1px);
+        }
+
+        .agendaqui-dashboard-action__icon {
+            display: inline-flex;
+            flex: 0 0 auto;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 0.375rem;
+            background: #126bff;
+            color: #fff;
+            font-size: 1.25rem;
+            line-height: 1;
+        }
+
+        .agendaqui-dashboard-action strong,
+        .agendaqui-dashboard-action small {
+            display: block;
+        }
+
+        .agendaqui-dashboard-action strong {
+            font-size: 0.875rem;
+            font-weight: 700;
+        }
+
+        .agendaqui-dashboard-action small {
+            margin-top: 0.125rem;
+            color: rgb(71 85 105);
+            font-size: 0.75rem;
         }
 
         .agendaqui-dashboard-card__top,
@@ -125,9 +187,9 @@
         }
 
         .agendaqui-dashboard-tone--primary {
-            border-color: rgb(253 230 138);
-            background: rgb(255 251 235);
-            color: rgb(180 83 9);
+            border-color: rgb(191 219 254);
+            background: rgb(239 246 255);
+            color: rgb(29 78 216);
         }
 
         .agendaqui-dashboard-tone--success {
@@ -240,6 +302,10 @@
         }
 
         @media (min-width: 768px) {
+            .agendaqui-dashboard-actions {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
             .agendaqui-dashboard__cards {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
@@ -265,7 +331,22 @@
     <div class="agendaqui-dashboard__header">
         <p class="agendaqui-dashboard__date">Hoje, {{ $dashboard['dateLabel'] ?? now()->format('d/m/Y') }}</p>
         <h2 class="agendaqui-dashboard__title">Olá, {{ $userName }}.</h2>
+        <p class="agendaqui-dashboard__subtitle">Aqui está o resumo da operação de hoje.</p>
     </div>
+
+    @if (filled($dashboard['quickActions'] ?? []))
+        <section class="agendaqui-dashboard-actions" aria-label="Ações rápidas">
+            @foreach ($dashboard['quickActions'] as $action)
+                <a href="{{ $action['url'] }}" class="agendaqui-dashboard-action">
+                    <span class="agendaqui-dashboard-action__icon" aria-hidden="true">+</span>
+                    <span>
+                        <strong>{{ $action['label'] }}</strong>
+                        <small>{{ $action['description'] }}</small>
+                    </span>
+                </a>
+            @endforeach
+        </section>
+    @endif
 
     <div class="agendaqui-dashboard__cards">
         @foreach ($cards as $card)

@@ -63,19 +63,6 @@
     object-fit: contain;
 }
 
-/*
- * O nome da empresa já aparece como marca no topo do painel.
- * No seletor de empresa, mantemos só o avatar/logo e a seta para reduzir a altura visual do menu.
- */
-.fi-sidebar .fi-tenant-menu-trigger-text {
-    display: none;
-}
-
-.fi-sidebar .fi-tenant-menu-trigger {
-    justify-content: space-between;
-    min-height: 3rem;
-}
-
 .fi-header {
     align-items: flex-start;
     gap: 1rem;
@@ -361,6 +348,331 @@
 
 .dark .agendaqui-dashboard-list__item--link:hover {
     background: rgb(30 41 59);
+}
+
+/* Dashboard administrativa */
+
+.admin-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.admin-dashboard__header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.admin-dashboard__eyebrow,
+.admin-dashboard__subtitle,
+.admin-dashboard-card__description,
+.admin-dashboard-alert small,
+.admin-dashboard-company small,
+.admin-dashboard-failure small,
+.admin-dashboard-failure p,
+.admin-dashboard-empty,
+.admin-dashboard-metrics dt {
+    color: rgb(100 116 139);
+}
+
+.admin-dashboard__eyebrow {
+    margin: 0 0 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.admin-dashboard__title {
+    margin: 0;
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    color: rgb(15 23 42);
+}
+
+.admin-dashboard__subtitle {
+    margin: 0;
+    max-width: 34rem;
+    font-size: 0.875rem;
+    text-align: right;
+}
+
+.admin-dashboard__cards {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.admin-dashboard-card,
+.admin-dashboard-panel {
+    border: 1px solid rgb(226 232 240);
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+}
+
+.admin-dashboard-card {
+    display: flex;
+    min-height: 6.25rem;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 0.875rem;
+    text-decoration: none;
+}
+
+.admin-dashboard-card__label {
+    font-size: 0.8125rem;
+    font-weight: 650;
+    color: rgb(51 65 85);
+}
+
+.admin-dashboard-card__value {
+    font-size: 1.75rem;
+    line-height: 2rem;
+    font-weight: 750;
+    letter-spacing: 0;
+    color: rgb(15 23 42);
+}
+
+.admin-dashboard-card__description {
+    font-size: 0.75rem;
+}
+
+.admin-dashboard__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+}
+
+.admin-dashboard-panel {
+    overflow: hidden;
+}
+
+.admin-dashboard-panel__header {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid rgb(241 245 249);
+}
+
+.admin-dashboard-panel__title {
+    margin: 0;
+    font-size: 0.9375rem;
+    line-height: 1.35rem;
+    font-weight: 700;
+    color: rgb(15 23 42);
+}
+
+.admin-dashboard-alerts,
+.admin-dashboard-failures,
+.admin-dashboard-table {
+    display: flex;
+    flex-direction: column;
+}
+
+.admin-dashboard-alert,
+.admin-dashboard-company,
+.admin-dashboard-failure {
+    border-top: 1px solid rgb(241 245 249);
+}
+
+.admin-dashboard-alert:first-child,
+.admin-dashboard-company:first-child,
+.admin-dashboard-failure:first-child {
+    border-top: 0;
+}
+
+.admin-dashboard-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    text-decoration: none;
+}
+
+.admin-dashboard-alert strong {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    background: rgb(248 250 252);
+    color: rgb(15 23 42);
+}
+
+.admin-dashboard-alert span,
+.admin-dashboard-company span {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.admin-dashboard-alert b,
+.admin-dashboard-company b {
+    color: rgb(15 23 42);
+}
+
+.admin-dashboard-alert small,
+.admin-dashboard-company small {
+    font-size: 0.75rem;
+}
+
+.admin-dashboard-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    margin: 0;
+}
+
+.admin-dashboard-metrics div {
+    padding: 0.875rem 1rem;
+    border-top: 1px solid rgb(241 245 249);
+}
+
+.admin-dashboard-metrics dt {
+    font-size: 0.75rem;
+    font-weight: 650;
+}
+
+.admin-dashboard-metrics dd {
+    margin: 0.25rem 0 0;
+    font-size: 1.375rem;
+    line-height: 1.75rem;
+    font-weight: 750;
+    color: rgb(15 23 42);
+}
+
+.admin-dashboard-company {
+    display: grid;
+    grid-template-columns: minmax(12rem, 2fr) repeat(5, minmax(5rem, 1fr));
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    color: rgb(51 65 85);
+    font-size: 0.8125rem;
+    text-decoration: none;
+}
+
+.admin-dashboard-company:hover,
+.admin-dashboard-alert:hover {
+    background: rgb(248 250 252);
+}
+
+.admin-dashboard-failure {
+    padding: 0.875rem 1rem;
+}
+
+.admin-dashboard-failure b {
+    color: rgb(15 23 42);
+}
+
+.admin-dashboard-failure p {
+    margin: 0.375rem 0 0;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+}
+
+.admin-dashboard-empty {
+    margin: 0;
+    padding: 1rem;
+    font-size: 0.875rem;
+}
+
+.admin-dashboard-tone--primary {
+    border-color: rgb(191 219 254);
+}
+
+.admin-dashboard-tone--success {
+    border-color: rgb(187 247 208);
+}
+
+.admin-dashboard-tone--warning {
+    border-color: rgb(254 240 138);
+}
+
+.admin-dashboard-tone--danger {
+    border-color: rgb(254 205 211);
+}
+
+.dark .admin-dashboard__title,
+.dark .admin-dashboard-card__value,
+.dark .admin-dashboard-card__label,
+.dark .admin-dashboard-panel__title,
+.dark .admin-dashboard-alert b,
+.dark .admin-dashboard-company b,
+.dark .admin-dashboard-failure b,
+.dark .admin-dashboard-metrics dd {
+    color: rgb(248 250 252);
+}
+
+.dark .admin-dashboard-card,
+.dark .admin-dashboard-panel {
+    border-color: rgb(51 65 85);
+    background: rgb(15 23 42);
+}
+
+.dark .admin-dashboard-panel__header,
+.dark .admin-dashboard-alert,
+.dark .admin-dashboard-company,
+.dark .admin-dashboard-failure,
+.dark .admin-dashboard-metrics div {
+    border-color: rgb(30 41 59);
+}
+
+.dark .admin-dashboard__eyebrow,
+.dark .admin-dashboard__subtitle,
+.dark .admin-dashboard-card__description,
+.dark .admin-dashboard-alert small,
+.dark .admin-dashboard-company,
+.dark .admin-dashboard-company small,
+.dark .admin-dashboard-failure small,
+.dark .admin-dashboard-failure p,
+.dark .admin-dashboard-empty,
+.dark .admin-dashboard-metrics dt {
+    color: rgb(148 163 184);
+}
+
+.dark .admin-dashboard-alert strong,
+.dark .admin-dashboard-company:hover,
+.dark .admin-dashboard-alert:hover {
+    background: rgb(30 41 59);
+}
+
+@media (max-width: 767px) {
+    .admin-dashboard__header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .admin-dashboard__subtitle {
+        text-align: left;
+    }
+
+    .admin-dashboard-company {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (min-width: 768px) {
+    .admin-dashboard__cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1280px) {
+    .admin-dashboard__cards {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .admin-dashboard__grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .admin-dashboard-panel--wide {
+        grid-column: span 2 / span 2;
+    }
 }
 
 @media (min-width: 768px) {

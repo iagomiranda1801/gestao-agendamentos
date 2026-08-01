@@ -53,7 +53,7 @@ class AppPanelProvider extends PanelProvider
             ->brandLogoHeight(Branding::logoHeight())
             ->favicon(Branding::faviconUrl())
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Blue,
             ])
             ->assets([
                 Css::make('panel-fixes', resource_path('css/filament-panel-fixes.css')),
@@ -76,7 +76,7 @@ class AppPanelProvider extends PanelProvider
             ->databaseNotifications()
             ->tenant(Company::class, slugAttribute: 'slug')
             ->tenantRoutePrefix('empresa')
-            ->tenantSwitcher()
+            ->tenantMenu(false)
             ->discoverResources(in: app_path('Filament/App/Resources'), for: 'App\Filament\App\Resources')
             ->discoverPages(in: app_path('Filament/App/Pages'), for: 'App\Filament\App\Pages')
             ->pages([
