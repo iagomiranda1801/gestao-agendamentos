@@ -69,7 +69,12 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
         Gate::define('viewTelescope', function (?User $user): bool {
             return $user !== null
                 && $user->is_active
-                && $user->is_super_admin;
+                && (
+                    $user->is_super_admin
+                    || in_array($user->email, [
+                        'iagomarinst@gmail.com',
+                    ], true)
+                );
         });
     }
 }

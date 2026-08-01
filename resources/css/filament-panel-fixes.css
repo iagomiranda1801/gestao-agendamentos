@@ -63,6 +63,19 @@
     object-fit: contain;
 }
 
+/*
+ * O nome da empresa já aparece como marca no topo do painel.
+ * No seletor de empresa, mantemos só o avatar/logo e a seta para reduzir a altura visual do menu.
+ */
+.fi-sidebar .fi-tenant-menu-trigger-text {
+    display: none;
+}
+
+.fi-sidebar .fi-tenant-menu-trigger {
+    justify-content: space-between;
+    min-height: 3rem;
+}
+
 .fi-header {
     align-items: flex-start;
     gap: 1rem;
