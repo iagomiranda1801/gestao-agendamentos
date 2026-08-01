@@ -6,6 +6,7 @@ use App\Enums\AppointmentHistoryType;
 use App\Enums\AppointmentOrigin;
 use App\Enums\AppointmentStatus;
 use App\Events\AppointmentRescheduled;
+use App\Events\AppointmentCreated;
 use App\Enums\CompanyRole;
 use App\Models\Appointment;
 use App\Models\AppointmentHistory;
@@ -89,6 +90,8 @@ class AppointmentService
                 'new_start_at' => $appointment->start_at,
                 'new_end_at' => $appointment->end_at,
             ]);
+
+            DB::afterCommit(fn () => event(new AppointmentCreated($appointment->refresh())));
 
             return $appointment->refresh();
         });

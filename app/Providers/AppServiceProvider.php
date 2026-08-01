@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Events\AppointmentCancelled;
 use App\Events\AppointmentRescheduled;
 use App\Events\OnlineAppointmentCreated;
+use App\Events\AppointmentCreated;
 use App\Listeners\SendAppointmentCancelledNotifications;
 use App\Listeners\SendAppointmentRescheduledNotifications;
 use App\Listeners\SendOnlineBookingWhatsAppNotification;
@@ -29,6 +30,11 @@ class AppServiceProvider extends ServiceProvider
     {
         Event::listen(
             OnlineAppointmentCreated::class,
+            SendOnlineBookingWhatsAppNotification::class,
+        );
+
+        Event::listen(
+            AppointmentCreated::class,
             SendOnlineBookingWhatsAppNotification::class,
         );
 

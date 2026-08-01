@@ -7,6 +7,8 @@ use App\Enums\AppointmentOrigin;
 use App\Enums\AppointmentStatus;
 use App\Jobs\SendAppointmentChangeEmailJob;
 use App\Jobs\SendAppointmentChangeWhatsAppJob;
+use App\Jobs\SendAppointmentCreatedEmailJob;
+use App\Jobs\SendWhatsAppAppointmentConfirmationJob;
 use App\Models\InventoryBalance;
 use App\Models\Professional;
 use App\Models\StockMovement;
@@ -36,6 +38,24 @@ class AppointmentServiceTest extends TestCase
 
         $this->assertSame(AppointmentStatus::Confirmed, $appointment->status);
         $this->assertSame(AppointmentOrigin::Internal, $appointment->origin);
+    }
+
+    public function test_internal_appointment_queues_whatsapp_and_email_notifications(): void
+    {
+        Queue::fake();
+        $setup = $this->createBookableSetup();
+
+        app(AppointmentService::class)->createInternalAppointment(
+            $setup['company'],
+            $setup['admin'],
+            $setup['client'],
+            $setup['professional'],
+            $setup['service'],
+            $setup['localStart'],
+        );
+
+        Queue::assertPushed(SendWhatsAppAppointmentConfirmationJob::class);
+        Queue::assertPushed(SendAppointmentCreatedEmailJob::class);
     }
 
     public function test_end_at_is_calculated_by_backend(): void

@@ -103,7 +103,7 @@ class AppointmentChangeNotificationTest extends TestCase
             app(AppointmentNotificationRecipientService::class),
         );
 
-        Mail::assertSent(AppointmentChangeMail::class, 2);
+        Mail::assertSent(AppointmentChangeMail::class, 6);
     }
 
     public function test_created_email_job_notifies_client_and_staff(): void
@@ -132,6 +132,6 @@ class AppointmentChangeNotificationTest extends TestCase
             app(AppointmentNotificationRecipientService::class),
         );
 
-        Mail::assertSent(AppointmentChangeMail::class, 2);
+        Mail::assertSent(AppointmentChangeMail::class, 6);
     }
 }

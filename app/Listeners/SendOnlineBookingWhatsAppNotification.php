@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Events\OnlineAppointmentCreated;
+use App\Events\AppointmentCreated;
 use App\Jobs\NotifyStaffOfOnlineBookingJob;
 use App\Jobs\SendAppointmentCreatedEmailJob;
 use App\Jobs\SendWhatsAppAppointmentConfirmationJob;
@@ -10,7 +11,7 @@ use App\Jobs\SendWhatsAppStaffBookingAlertJob;
 
 class SendOnlineBookingWhatsAppNotification
 {
-    public function handle(OnlineAppointmentCreated $event): void
+    public function handle(OnlineAppointmentCreated|AppointmentCreated $event): void
     {
         $appointmentId = $event->appointment->getKey();
 
