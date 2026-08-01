@@ -18,6 +18,11 @@ class SendAppointmentChangeEmailJob implements ShouldQueue
 {
     use Queueable;
 
+    /** Keep a stalled SMTP connection from occupying a worker indefinitely. */
+    public int $timeout = 55;
+
+    public int $tries = 3;
+
     public function __construct(
         public int $appointmentId,
         public string $changeType,
