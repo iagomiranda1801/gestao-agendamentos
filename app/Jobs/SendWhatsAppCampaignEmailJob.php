@@ -48,6 +48,8 @@ class SendWhatsAppCampaignEmailJob implements ShouldQueue
                 'email' => $recipient->email_snapshot,
                 'error' => $exception->getMessage(),
             ]);
+
+            throw $exception;
         }
     }
 }

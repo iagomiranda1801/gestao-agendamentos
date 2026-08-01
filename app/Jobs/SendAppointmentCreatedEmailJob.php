@@ -16,6 +16,10 @@ class SendAppointmentCreatedEmailJob implements ShouldQueue
 {
     use Queueable;
 
+    public int $timeout = 55;
+
+    public int $tries = 3;
+
     public function __construct(
         public int $appointmentId,
         public ?string $manageUrl = null,
@@ -69,6 +73,8 @@ class SendAppointmentCreatedEmailJob implements ShouldQueue
                 'recipient' => $to,
                 'error' => $exception->getMessage(),
             ]);
+
+            throw $exception;
         }
     }
 }

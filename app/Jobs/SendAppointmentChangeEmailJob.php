@@ -110,6 +110,8 @@ class SendAppointmentChangeEmailJob implements ShouldQueue
                 'recipient' => $to,
                 'error' => $exception->getMessage(),
             ]);
+
+            throw $exception;
         }
     }
 }
