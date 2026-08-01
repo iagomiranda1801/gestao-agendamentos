@@ -106,4 +106,33 @@ class EvolutionWebhookTest extends TestCase
             'instance' => 'another-instance',
         ])->assertUnprocessable();
     }
+
+    public function test_webhook_updates_recipient_when_evolution_sends_array_update_with_numeric_status(): void
+    {
+        config(['services.evolution.webhook_token' => 'secret-token']);
+
+        $company = $this->createCompany();
+        $user = $this->createCompanyUser($company);
+        CompanySchedulingSetting::factory()->for($company)->create(['whatsapp_instance' => 'loja-1']);
+        Client::factory()->forCompany($company)->optedInForWhatsAppMarketing()->create();
+        $campaign = app(WhatsAppCampaignService::class)->create($company, $user, [
+            'name' => 'Campanha',
+            'audience_type' => WhatsAppCampaignAudience::OptedInActiveClients->value,
+            'message_template' => 'Mensagem',
+        ]);
+        app(WhatsAppCampaignService::class)->prepareRecipients($company, $campaign);
+        $recipient = $campaign->recipients()->firstOrFail();
+        $recipient->forceFill(['status' => WhatsAppCampaignRecipientStatus::Accepted, 'provider_message_id' => 'array-message'])->save();
+
+        $this->postJson('/webhooks/evolution/loja-1?token=secret-token', [
+            'event' => 'messages.update',
+            'instance' => 'loja-1',
+            'data' => [[
+                'key' => ['id' => 'array-message'],
+                'update' => ['status' => 3],
+            ]],
+        ])->assertOk()->assertJson(['processed' => true]);
+
+        $this->assertSame(WhatsAppCampaignRecipientStatus::Delivered, $recipient->refresh()->status);
+    }
 }

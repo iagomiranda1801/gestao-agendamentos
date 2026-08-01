@@ -50,7 +50,7 @@ class EvolutionWebhookService
         }
 
         $recipient = WhatsAppCampaignRecipient::query()
-            ->where('provider_message_id', $event->message_id)
+            ->whereIn('provider_message_id', $this->messageIds($payload))
             ->first();
 
         if ($recipient === null) {
@@ -85,6 +85,11 @@ class EvolutionWebhookService
         $status = strtoupper((string) $providerStatus);
 
         return match ($status) {
+            '0' => WhatsAppCampaignRecipientStatus::Failed,
+            '1', 'PENDING' => WhatsAppCampaignRecipientStatus::Accepted,
+            '2' => WhatsAppCampaignRecipientStatus::Sent,
+            '3' => WhatsAppCampaignRecipientStatus::Delivered,
+            '4', '5' => WhatsAppCampaignRecipientStatus::Read,
             'READ', 'PLAYED' => WhatsAppCampaignRecipientStatus::Read,
             'DELIVERED', 'DELIVERY_ACK' => WhatsAppCampaignRecipientStatus::Delivered,
             'SENT', 'SERVER_ACK', 'SEND', 'SUCCESS' => WhatsAppCampaignRecipientStatus::Sent,
@@ -98,23 +103,22 @@ class EvolutionWebhookService
      */
     protected function messageId(array $payload): ?string
     {
-        foreach ([
+        return $this->firstString($payload, [
             'data.key.id',
+            'data.0.key.id',
             'data.id',
+            'data.0.id',
             'data.messageId',
+            'data.0.messageId',
             'data.keyId',
+            'data.0.keyId',
+            'data.update.0.key.id',
+            'data.0.update.0.key.id',
+            'data.messages.0.key.id',
             'key.id',
             'messageId',
             'id',
-        ] as $key) {
-            $value = Arr::get($payload, $key);
-
-            if (filled($value)) {
-                return (string) $value;
-            }
-        }
-
-        return null;
+        ]);
     }
 
     /**
@@ -122,21 +126,17 @@ class EvolutionWebhookService
      */
     protected function providerStatus(array $payload): ?string
     {
-        foreach ([
+        return $this->firstString($payload, [
             'data.status',
             'data.update.status',
+            'data.0.status',
+            'data.0.update.status',
+            'data.update.0.status',
+            'data.0.update.0.status',
             'data.message.status',
             'data.key.status',
             'status',
-        ] as $key) {
-            $value = Arr::get($payload, $key);
-
-            if (filled($value)) {
-                return (string) $value;
-            }
-        }
-
-        return null;
+        ]);
     }
 
     /**
@@ -144,14 +144,49 @@ class EvolutionWebhookService
      */
     protected function remoteJid(array $payload): ?string
     {
-        foreach ([
+        return $this->firstString($payload, [
             'data.key.remoteJid',
+            'data.0.key.remoteJid',
             'data.remoteJid',
+            'data.0.remoteJid',
             'sender',
-        ] as $key) {
+        ]);
+    }
+
+    /**
+     * Evolution can send an update as an array, while the send response is a
+     * single object. Keep all known message-id shapes available for matching.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return list<string>
+     */
+    protected function messageIds(array $payload): array
+    {
+        $keys = [
+            'data.key.id', 'data.0.key.id', 'data.id', 'data.0.id',
+            'data.messageId', 'data.0.messageId', 'data.keyId', 'data.0.keyId',
+            'data.update.0.key.id', 'data.0.update.0.key.id',
+            'data.messages.0.key.id', 'key.id', 'messageId', 'id',
+        ];
+
+        return collect($keys)
+            ->map(fn (string $key): mixed => Arr::get($payload, $key))
+            ->filter(fn (mixed $value): bool => filled($value) && is_scalar($value))
+            ->map(fn (mixed $value): string => (string) $value)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  list<string>  $keys
+     */
+    protected function firstString(array $payload, array $keys): ?string
+    {
+        foreach ($keys as $key) {
             $value = Arr::get($payload, $key);
 
-            if (filled($value)) {
+            if (filled($value) && is_scalar($value)) {
                 return (string) $value;
             }
         }

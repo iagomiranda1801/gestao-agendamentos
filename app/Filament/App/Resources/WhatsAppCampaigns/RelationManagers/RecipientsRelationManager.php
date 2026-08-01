@@ -28,6 +28,7 @@ class RecipientsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->poll('10s')
             ->columns([
                 TextColumn::make('name_snapshot')
                     ->label('Nome')
