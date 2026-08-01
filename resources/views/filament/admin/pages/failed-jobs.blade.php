@@ -29,7 +29,7 @@
                         <tr>
                             <td><strong>{{ $job['displayName'] }}</strong><small>{{ $job['connection'] }}</small></td>
                             <td>{{ $job['queue'] }}</td>
-                            <td>{{ IlluminateSupportCarbon::parse($job['failedAt'])->format('d/m/Y H:i:s') }}</td>
+                            <td>{{ \Illuminate\Support\Carbon::parse($job['failedAt'])->format('d/m/Y H:i:s') }}</td>
                             <td><code>{{ $job['exception'] }}</code></td>
                             <td class="admin-operations-table__actions">
                                 <button type="button" wire:click="retryJob(@js($job['id']))" class="admin-operations-button admin-operations-button--primary">Tentar novamente</button>
