@@ -8,6 +8,7 @@ use App\Enums\WhatsAppCampaignRecipientStatus;
 use App\Enums\WhatsAppCampaignStatus;
 use App\Filament\App\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Jobs\SendWhatsAppCampaignRecipientJob;
+use App\Jobs\SendWhatsAppCampaignEmailJob;
 use App\Models\Client;
 use App\Models\CompanySchedulingSetting;
 use App\Models\WhatsAppCampaign;
@@ -173,7 +174,7 @@ class WhatsAppCampaignTest extends TestCase
         Client::factory()
             ->forCompany($company)
             ->optedInForWhatsAppMarketing()
-            ->create(['phone' => '(11) 99999-0001']);
+            ->create(['phone' => '(11) 99999-0001', 'email' => 'cliente@example.com']);
 
         $campaign = app(WhatsAppCampaignService::class)->create($company, $user, [
             'name' => 'Campanha',
@@ -186,6 +187,8 @@ class WhatsAppCampaignTest extends TestCase
         $recipient->forceFill(['status' => WhatsAppCampaignRecipientStatus::Queued])->save();
         $campaign->forceFill(['status' => WhatsAppCampaignStatus::Sending])->save();
 
+        Queue::fake();
+
         (new SendWhatsAppCampaignRecipientJob($recipient->getKey()))->handle(
             app(EvolutionApiClient::class),
             app(\App\Services\Scheduling\CompanySchedulingSettingService::class),
@@ -197,6 +200,7 @@ class WhatsAppCampaignTest extends TestCase
         $this->assertSame(WhatsAppCampaignStatus::Completed, $campaign->refresh()->status);
         Http::assertSent(fn ($request): bool => $request->url() === 'https://evolution.test/message/sendText/loja-1'
             && $request['number'] === '5511999990001');
+        Queue::assertPushed(SendWhatsAppCampaignEmailJob::class, 1);
     }
 
     public function test_campaign_job_marks_pending_provider_response_as_accepted_not_sent(): void

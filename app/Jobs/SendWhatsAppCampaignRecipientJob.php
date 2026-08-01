@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Enums\WhatsAppCampaignRecipientStatus;
 use App\Enums\WhatsAppCampaignStatus;
+use App\Jobs\SendWhatsAppCampaignEmailJob;
 use App\Models\WhatsAppCampaignRecipient;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\Campaigns\WhatsAppCampaignService;
@@ -73,6 +74,10 @@ class SendWhatsAppCampaignRecipientJob implements ShouldQueue
                 'provider_status' => $providerStatus,
                 'provider_response' => $response,
             ])->save();
+
+            if (filled($recipient->email_snapshot)) {
+                SendWhatsAppCampaignEmailJob::dispatch($recipient->getKey());
+            }
         } catch (Throwable $exception) {
             $recipient->forceFill([
                 'status' => WhatsAppCampaignRecipientStatus::Failed,

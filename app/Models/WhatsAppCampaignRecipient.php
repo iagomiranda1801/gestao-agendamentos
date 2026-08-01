@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'phone',
+    'email_snapshot',
     'name_snapshot',
     'message_snapshot',
     'status',

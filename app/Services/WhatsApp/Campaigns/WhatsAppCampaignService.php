@@ -69,6 +69,7 @@ class WhatsAppCampaignService
 
                         $recipient = new WhatsAppCampaignRecipient([
                             'phone' => $phone,
+                            'email_snapshot' => filled($client->email) ? $client->email : null,
                             'name_snapshot' => $client->name,
                             'message_snapshot' => $this->renderMessage($campaign, $client),
                             'status' => WhatsAppCampaignRecipientStatus::Pending,
