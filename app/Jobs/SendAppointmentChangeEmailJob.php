@@ -97,14 +97,7 @@ class SendAppointmentChangeEmailJob implements ShouldQueue
     protected function sendMail(string $to, string $subject, string $body, Appointment $appointment): void
     {
         try {
-            $company = $appointment->company;
-
-            Mail::to($to)->send(new AppointmentChangeMail(
-                $subject,
-                $body,
-                $company?->email,
-                $company?->name,
-            ));
+            Mail::to($to)->send(new AppointmentChangeMail($subject, $body));
         } catch (Throwable $exception) {
             Log::warning('Appointment email change notification failed.', [
                 'appointment_id' => $appointment->getKey(),

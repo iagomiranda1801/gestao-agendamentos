@@ -103,11 +103,6 @@ class AppointmentChangeNotificationTest extends TestCase
             app(AppointmentNotificationRecipientService::class),
         );
 
-        Mail::assertSent(
-            AppointmentChangeMail::class,
-            fn (AppointmentChangeMail $mail): bool => $mail->fromEmail === 'empresa@example.test'
-                && $mail->fromName === $setup['company']->name,
-        );
         Mail::assertSent(AppointmentChangeMail::class, 2);
     }
 
@@ -137,11 +132,6 @@ class AppointmentChangeNotificationTest extends TestCase
             app(AppointmentNotificationRecipientService::class),
         );
 
-        Mail::assertSent(
-            AppointmentChangeMail::class,
-            fn (AppointmentChangeMail $mail): bool => $mail->fromEmail === 'empresa@example.test'
-                && $mail->fromName === $setup['company']->name,
-        );
         Mail::assertSent(AppointmentChangeMail::class, 2);
     }
 }
