@@ -59,7 +59,7 @@ class AdminDashboardAggregator
             $this->card('Usuários ativos', (string) User::query()->where('is_active', true)->count(), 'Contas habilitadas', 'primary', $this->usersUrl()),
             $this->card('Agenda hoje', (string) (clone $appointmentsToday)->count(), 'Agendamentos no dia', 'primary', $this->companiesUrl()),
             $this->card('Cancelados hoje', (string) (clone $appointmentsToday)->where('status', AppointmentStatus::Cancelled->value)->count(), 'Possível ruído operacional', 'warning', $this->companiesUrl()),
-            $this->card('Jobs falhados', (string) $this->failedJobsSince($todayStart), 'Falhas nas últimas 24h', 'danger', '/telescope/jobs'),
+            $this->card('Jobs falhados', (string) $this->failedJobsSince($todayStart), 'Falhas nas últimas 24h', 'danger', '/admin/operacao/jobs-falhos'),
         ];
     }
 
@@ -104,14 +104,14 @@ class AdminDashboardAggregator
                 'Jobs falhados hoje',
                 $this->failedJobsSince($todayStart),
                 'Investigue fila, SMTP, WhatsApp e jobs longos.',
-                '/telescope/jobs',
+                '/admin/operacao/jobs-falhos',
                 'danger',
             ),
             $this->alert(
                 'Webhooks Evolution com erro hoje',
                 $this->evolutionWebhookErrorsToday($todayStart, $todayEnd),
                 'Pode indicar número inválido, bloqueio ou falha da instância.',
-                '/telescope/requests',
+                '/admin/operacao/webhooks',
                 'danger',
             ),
             $this->alert(

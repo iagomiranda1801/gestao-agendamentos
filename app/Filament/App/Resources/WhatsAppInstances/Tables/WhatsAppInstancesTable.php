@@ -110,6 +110,34 @@ class WhatsAppInstancesTable
                                 ->send();
                         }
                     }),
+                Action::make('delete')
+                    ->label('Excluir')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Excluir conexão do WhatsApp?')
+                    ->modalDescription('A instância será removida da Evolution e os contatos importados desta conexão serão excluídos. Essa ação não pode ser desfeita.')
+                    ->action(function (CompanyWhatsAppInstance $record): void {
+                        /** @var Company $company */
+                        $company = Filament::getTenant();
+
+                        try {
+                            app(CompanyWhatsAppInstanceService::class)->delete($company, $record);
+
+                            Notification::make()
+                                ->success()
+                                ->title('Conexão excluída')
+                                ->send();
+                        } catch (Throwable $exception) {
+                            report($exception);
+
+                            Notification::make()
+                                ->danger()
+                                ->title('Não foi possível excluir a conexão')
+                                ->body(self::evolutionErrorMessage($exception))
+                                ->send();
+                        }
+                    }),
             ])
             ->searchable();
     }

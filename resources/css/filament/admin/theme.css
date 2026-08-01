@@ -221,6 +221,211 @@
     text-align: center;
 }
 
+/* Admin operations */
+
+.admin-operations-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.admin-operations-page__intro {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.admin-operations-page__eyebrow {
+    margin: 0 0 0.35rem;
+    color: #2563eb;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.admin-operations-page__title {
+    margin: 0;
+    color: #0f172a;
+    font-size: 1.5rem;
+    line-height: 2rem;
+}
+
+.admin-operations-page__description {
+    margin: 0.35rem 0 0;
+    color: #64748b;
+    font-size: 0.875rem;
+}
+
+.admin-operations-count,
+.admin-operations-status,
+.admin-operations-method {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.admin-operations-count {
+    padding: 0.35rem 0.625rem;
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.admin-operations-table-wrap {
+    overflow-x: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+}
+
+.admin-operations-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+}
+
+.admin-operations-table th,
+.admin-operations-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    text-align: left;
+    vertical-align: top;
+}
+
+.admin-operations-table th {
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 750;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.admin-operations-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.admin-operations-table td strong,
+.admin-operations-table td small {
+    display: block;
+}
+
+.admin-operations-table td small {
+    margin-top: 0.2rem;
+    color: #64748b;
+}
+
+.admin-operations-table code {
+    display: block;
+    max-width: 30rem;
+    overflow-wrap: anywhere;
+    color: #475569;
+    font-size: 0.75rem;
+    white-space: normal;
+}
+
+.admin-operations-table__actions {
+    display: flex;
+    min-width: 15rem;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+
+.admin-operations-button {
+    display: inline-flex;
+    min-height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 0.7rem;
+    border: 0;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.admin-operations-button--primary {
+    background: #126bff;
+    color: #fff;
+}
+
+.admin-operations-button--secondary {
+    background: #e2e8f0;
+    color: #334155;
+}
+
+.admin-operations-button--danger {
+    background: #fff1f2;
+    color: #be123c;
+}
+
+.admin-operations-button:hover {
+    filter: brightness(0.96);
+}
+
+.admin-operations-empty {
+    padding: 2rem;
+    border: 1px dashed #cbd5e1;
+    border-radius: 0.5rem;
+    background: #fff;
+    color: #64748b;
+    text-align: center;
+}
+
+.admin-operations-status {
+    padding: 0.25rem 0.5rem;
+}
+
+.admin-operations-status--success {
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.admin-operations-status--danger {
+    background: #fff1f2;
+    color: #be123c;
+}
+
+.admin-operations-method {
+    padding: 0.25rem 0.45rem;
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.dark .admin-operations-page__title {
+    color: #f8fafc;
+}
+
+.dark .admin-operations-page__description,
+.dark .admin-operations-table td small {
+    color: #94a3b8;
+}
+
+.dark .admin-operations-table-wrap,
+.dark .admin-operations-empty {
+    border-color: #334155;
+    background: #0f172a;
+}
+
+.dark .admin-operations-table th {
+    border-color: #334155;
+    background: #1e293b;
+    color: #94a3b8;
+}
+
+.dark .admin-operations-table td {
+    border-color: #1e293b;
+}
+
+.dark .admin-operations-table code {
+    color: #cbd5e1;
+}
+
 @media (max-width: 767px) {
     .admin-auth-root {
         display: block;

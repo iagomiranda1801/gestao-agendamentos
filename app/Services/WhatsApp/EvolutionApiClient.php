@@ -145,6 +145,29 @@ class EvolutionApiClient
     /**
      * @return array<string, mixed>
      */
+    public function deleteInstance(string $instanceName): array
+    {
+        $instanceName = $this->resolveInstance($instanceName);
+
+        if ($instanceName === '') {
+            throw new RuntimeException('Instância Evolution não configurada.');
+        }
+
+        $response = $this->http()
+            ->acceptJson()
+            ->timeout(30)
+            ->delete($this->url("/instance/delete/{$instanceName}"));
+
+        if ($response->failed()) {
+            throw new RequestException($response);
+        }
+
+        return $response->json() ?? [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function connectionState(string $instanceName): array
     {
         $response = $this->http()

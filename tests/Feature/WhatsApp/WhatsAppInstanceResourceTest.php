@@ -81,6 +81,46 @@ class WhatsAppInstanceResourceTest extends TestCase
         $this->assertSame('11999990001', $setting->whatsapp_sender_phone);
     }
 
+    public function test_deleting_default_instance_removes_evolution_connection_contacts_and_legacy_settings(): void
+    {
+        config([
+            'services.evolution.url' => 'https://evolution.test',
+            'services.evolution.key' => 'secret',
+        ]);
+
+        Http::fake([
+            'https://evolution.test/instance/delete/estudio-ana' => Http::response([
+                'status' => 'success',
+            ]),
+        ]);
+
+        $company = $this->createCompany();
+        $instance = app(CompanyWhatsAppInstanceService::class)->create($company, [
+            'name' => 'Principal',
+            'instance_name' => 'estudio-ana',
+            'sender_phone' => '(11) 99999-0001',
+            'is_default' => true,
+        ]);
+        $contact = $instance->contacts()->create([
+            'company_id' => $company->getKey(),
+            'phone' => '5511999990001',
+            'phone_normalized' => '5511999990001',
+        ]);
+
+        app(CompanyWhatsAppInstanceService::class)->delete($company, $instance);
+
+        $this->assertDatabaseMissing('company_whats_app_instances', ['id' => $instance->getKey()]);
+        $this->assertDatabaseMissing('whatsapp_contacts', ['id' => $contact->getKey()]);
+        Http::assertSent(fn ($request): bool => $request->method() === 'DELETE'
+            && $request->url() === 'https://evolution.test/instance/delete/estudio-ana');
+
+        $setting = app(CompanySchedulingSettingService::class)->getOrCreate($company);
+
+        $this->assertFalse($setting->whatsapp_notifications_enabled);
+        $this->assertNull($setting->whatsapp_instance);
+        $this->assertNull($setting->whatsapp_instance_token);
+    }
+
     public function test_generate_qr_updates_instance_and_legacy_settings(): void
     {
         config([

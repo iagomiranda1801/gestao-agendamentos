@@ -8,6 +8,7 @@ use App\Models\CompanySchedulingSetting;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Support\PhoneNormalizer;
 use Illuminate\Support\Arr;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -146,6 +147,60 @@ class CompanyWhatsAppInstanceService
         }
 
         return $instance->refresh();
+    }
+
+    public function delete(Company $company, CompanyWhatsAppInstance $instance): void
+    {
+        $this->ensureBelongsToCompany($company, $instance);
+
+        $instanceName = trim((string) $instance->instance_name);
+
+        if ($instanceName !== '') {
+            try {
+                $this->client->deleteInstance($instanceName);
+            } catch (RequestException $exception) {
+                if ($exception->response->status() !== 404) {
+                    throw $exception;
+                }
+            }
+        }
+
+        DB::transaction(function () use ($company, $instance, $instanceName): void {
+            $wasDefault = $instance->is_default;
+            $instance->delete();
+
+            $setting = $this->settings->getOrCreate($company);
+            $pointsToDeletedInstance = $instanceName !== ''
+                && $setting->whatsapp_instance === $instanceName;
+
+            if (! $wasDefault && ! $pointsToDeletedInstance) {
+                return;
+            }
+
+            $replacement = CompanyWhatsAppInstance::query()
+                ->where('company_id', $company->getKey())
+                ->latest('updated_at')
+                ->first();
+
+            if ($replacement) {
+                $this->clearDefault($company);
+                $replacement->update(['is_default' => true]);
+                $this->syncDefaultToSchedulingSettings($replacement);
+
+                return;
+            }
+
+            $setting->fill([
+                'whatsapp_notifications_enabled' => false,
+                'whatsapp_instance' => null,
+                'whatsapp_instance_token' => null,
+                'whatsapp_instance_status' => null,
+                'whatsapp_instance_qr_code' => null,
+                'whatsapp_instance_connected_at' => null,
+                'whatsapp_sender_phone' => null,
+            ]);
+            $setting->save();
+        });
     }
 
     public function defaultForCompany(Company $company): ?CompanyWhatsAppInstance

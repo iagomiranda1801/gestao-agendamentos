@@ -9,6 +9,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationItem;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Assets\Css;
@@ -69,6 +70,15 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->navigationGroups([
                 'Gestão de Agendamentos',
+                'Operação',
+            ])
+            ->navigationItems([
+                NavigationItem::make('Telescope')
+                    ->group('Operação')
+                    ->icon('heroicon-o-chart-bar-square')
+                    ->url('/telescope')
+                    ->openUrlInNewTab()
+                    ->sort(10),
             ]);
     }
 }
