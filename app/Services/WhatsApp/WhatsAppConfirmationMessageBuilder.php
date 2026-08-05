@@ -9,6 +9,64 @@ use Carbon\CarbonImmutable;
 
 class WhatsAppConfirmationMessageBuilder
 {
+    public function professionalSubject(Company $company, string $notificationType): string
+    {
+        $action = match ($notificationType) {
+            'confirmed' => 'Agendamento confirmado',
+            'rescheduled' => 'Agendamento remarcado',
+            'cancelled' => 'Agendamento cancelado',
+            default => 'Novo agendamento',
+        };
+
+        return "{$action} - {$company->name}";
+    }
+
+    public function buildForProfessional(
+        Company $company,
+        Appointment $appointment,
+        string $notificationType,
+        ?CarbonImmutable $oldStartAt = null,
+    ): string {
+        $localStart = CompanyDateTime::utcToLocal($company, $appointment->start_at);
+        $oldLocalStart = $oldStartAt ? CompanyDateTime::utcToLocal($company, $oldStartAt) : null;
+        $title = match ($notificationType) {
+            'confirmed' => 'Agendamento confirmado',
+            'rescheduled' => 'Agendamento remarcado',
+            'cancelled' => 'Agendamento cancelado',
+            default => 'Novo agendamento',
+        };
+        $status = $appointment->status->label();
+        $origin = $appointment->origin->label();
+        $clientName = (string) ($appointment->client_name_snapshot ?: $appointment->client?->name ?: 'Cliente');
+        $clientPhone = (string) ($appointment->client_phone_snapshot ?: $appointment->client?->phone ?: 'Não informado');
+
+        $lines = [
+            "{$title} em {$company->name}",
+            '',
+            "Cliente: {$clientName}",
+            "Telefone: {$clientPhone}",
+            "Serviço: {$appointment->service_name_snapshot}",
+            "Data: {$localStart->format('d/m/Y')}",
+            "Horário: {$localStart->format('H:i')}",
+            "Status: {$status}",
+            "Origem: {$origin}",
+        ];
+
+        if ($notificationType === 'rescheduled' && $oldLocalStart !== null) {
+            $lines[] = "Horário anterior: {$oldLocalStart->format('d/m/Y H:i')}";
+        }
+
+        if ($notificationType === 'cancelled' && filled($appointment->cancellation_reason)) {
+            $lines[] = "Motivo: {$appointment->cancellation_reason}";
+        }
+
+        if (filled($appointment->notes)) {
+            $lines[] = "Observações: {$appointment->notes}";
+        }
+
+        return implode("\n", $lines);
+    }
+
     public function build(Company $company, Appointment $appointment, ?string $manageUrl = null): string
     {
         $settings = $company->schedulingSetting;

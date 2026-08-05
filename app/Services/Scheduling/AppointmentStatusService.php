@@ -5,6 +5,7 @@ namespace App\Services\Scheduling;
 use App\Enums\AppointmentHistoryType;
 use App\Enums\AppointmentStatus;
 use App\Events\AppointmentCancelled;
+use App\Events\AppointmentConfirmed;
 use App\Models\Appointment;
 use App\Models\AppointmentHistory;
 use App\Models\Company;
@@ -34,6 +35,8 @@ class AppointmentStatusService
             $appointment->save();
 
             $this->recordHistory($company, $user, $appointment, AppointmentHistoryType::Confirmed, $oldStatus);
+
+            DB::afterCommit(fn () => event(new AppointmentConfirmed($appointment->refresh())));
 
             return $appointment->refresh();
         });

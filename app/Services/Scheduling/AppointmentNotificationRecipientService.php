@@ -13,7 +13,7 @@ class AppointmentNotificationRecipientService
     /**
      * @return Collection<int, User>
      */
-    public function staffUsers(Appointment $appointment): Collection
+    public function administrativeUsers(Appointment $appointment): Collection
     {
         $company = $appointment->company;
 
@@ -26,7 +26,10 @@ class AppointmentNotificationRecipientService
             CompanyRole::Manager->value,
         ];
 
-        $admins = $company->users()
+        $professionalUserId = $appointment->professional?->user_id;
+        $professionalEmail = mb_strtolower(trim((string) ($appointment->professional?->email ?? '')));
+
+        return $company->users()
             ->where('users.is_active', true)
             ->wherePivot('is_active', true)
             ->get()
@@ -35,7 +38,30 @@ class AppointmentNotificationRecipientService
                 $value = $role instanceof CompanyRole ? $role->value : (string) $role;
 
                 return in_array($value, $allowedRoles, true);
-            });
+            })
+            ->reject(function (User $user) use ($professionalUserId, $professionalEmail): bool {
+                if ($professionalUserId !== null && (int) $user->getKey() === (int) $professionalUserId) {
+                    return true;
+                }
+
+                return $professionalEmail !== ''
+                    && mb_strtolower(trim((string) $user->email)) === $professionalEmail;
+            })
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    public function staffUsers(Appointment $appointment): Collection
+    {
+        $company = $appointment->company;
+
+        if ($company === null) {
+            return collect();
+        }
+
+        $admins = $this->administrativeUsers($appointment);
 
         $recipients = $admins->keyBy(fn (User $user): int => (int) $user->getKey());
 
@@ -56,10 +82,10 @@ class AppointmentNotificationRecipientService
     {
         $companyPhone = PhoneNormalizer::normalize($appointment->company?->phone)
             ?? PhoneNormalizer::normalize($senderPhoneFallback);
+        $professionalPhone = $this->professionalPhone($appointment);
 
         $candidates = [
-            'company' => $companyPhone,
-            'professional' => PhoneNormalizer::normalize($appointment->professional?->phone),
+            'company' => $companyPhone === $professionalPhone ? null : $companyPhone,
         ];
 
         $seen = [];
@@ -75,5 +101,18 @@ class AppointmentNotificationRecipientService
         }
 
         return $recipients;
+    }
+
+    public function professionalEmail(Appointment $appointment): ?string
+    {
+        $email = $appointment->professional?->email
+            ?: $appointment->professional?->user?->email;
+
+        return filled($email) ? (string) $email : null;
+    }
+
+    public function professionalPhone(Appointment $appointment): ?string
+    {
+        return PhoneNormalizer::normalize($appointment->professional?->phone);
     }
 }

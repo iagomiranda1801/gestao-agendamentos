@@ -102,6 +102,8 @@ class SchedulingSettingsPage extends Page
             'whatsapp_instance' => $setting->whatsapp_instance,
             'whatsapp_sender_phone' => $setting->whatsapp_sender_phone,
             'whatsapp_confirmation_template' => $setting->whatsapp_confirmation_template,
+            'notify_professional_by_email' => $setting->notify_professional_by_email,
+            'notify_professional_by_whatsapp' => $setting->notify_professional_by_whatsapp,
             'business_hours' => $hours !== [] ? $hours : [
                 [
                     'weekday' => 1,
@@ -330,6 +332,23 @@ class SchedulingSettingsPage extends Page
                             ->rows(6)
                             ->maxLength(4000)
                             ->columnSpanFull(),
+                    ])
+                    ->columns(2)
+                    ->visible(fn (): bool => (new CompanySchedulingSettingPolicy)->update(
+                        auth()->user(),
+                        app(CompanySchedulingSettingService::class)->getOrCreate(Filament::getTenant()),
+                    )),
+                Section::make('Avisos ao profissional')
+                    ->description('Notifica diretamente o profissional responsável quando houver criação, confirmação, remarcação ou cancelamento.')
+                    ->schema([
+                        Toggle::make('notify_professional_by_email')
+                            ->label('Avisar o profissional por e-mail')
+                            ->helperText('Usa o e-mail do cadastro do profissional e, se estiver vazio, o e-mail do usuário vinculado.')
+                            ->default(true),
+                        Toggle::make('notify_professional_by_whatsapp')
+                            ->label('Avisar o profissional por WhatsApp')
+                            ->helperText('Requer telefone no cadastro do profissional e as notificações da Evolution API habilitadas.')
+                            ->default(true),
                     ])
                     ->columns(2)
                     ->visible(fn (): bool => (new CompanySchedulingSettingPolicy)->update(

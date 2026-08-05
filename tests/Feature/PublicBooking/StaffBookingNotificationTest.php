@@ -18,7 +18,7 @@ class StaffBookingNotificationTest extends TestCase
     use CreatesPublicBookingFixtures;
     use CreatesSchedulingFixtures;
 
-    public function test_staff_whatsapp_goes_to_company_and_professional(): void
+    public function test_staff_whatsapp_goes_to_company_without_duplicating_professional_channel(): void
     {
         config([
             'services.evolution.url' => 'https://evolution.test',
@@ -59,12 +59,12 @@ class StaffBookingNotificationTest extends TestCase
             app(WhatsAppConfirmationMessageBuilder::class),
         );
 
-        Http::assertSentCount(2);
+        Http::assertSentCount(1);
 
         Http::assertSent(fn ($request): bool => ($request['number'] ?? null) === '5511900001111'
             && str_contains((string) ($request['text'] ?? ''), 'Novo agendamento online'));
 
-        Http::assertSent(fn ($request): bool => ($request['number'] ?? null) === '5511922223333');
+        Http::assertNotSent(fn ($request): bool => ($request['number'] ?? null) === '5511922223333');
     }
 
     public function test_staff_whatsapp_falls_back_to_sender_phone(): void
@@ -108,7 +108,7 @@ class StaffBookingNotificationTest extends TestCase
         Http::assertSent(fn ($request): bool => ($request['number'] ?? null) === '5534999206651');
     }
 
-    public function test_staff_whatsapp_deduplicates_same_phone(): void
+    public function test_staff_whatsapp_leaves_shared_phone_to_professional_channel(): void
     {
         config([
             'services.evolution.url' => 'https://evolution.test',
@@ -145,7 +145,7 @@ class StaffBookingNotificationTest extends TestCase
             app(WhatsAppConfirmationMessageBuilder::class),
         );
 
-        Http::assertSentCount(1);
+        Http::assertNothingSent();
     }
 
     public function test_panel_notification_reaches_admin_and_professional_user(): void

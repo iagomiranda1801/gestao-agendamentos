@@ -49,7 +49,7 @@ class SendAppointmentCreatedEmailJob implements ShouldQueue
             );
         }
 
-        foreach ($recipients->staffUsers($appointment) as $user) {
+        foreach ($recipients->administrativeUsers($appointment) as $user) {
             if (! filled($user->email)) {
                 continue;
             }

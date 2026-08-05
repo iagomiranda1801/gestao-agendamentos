@@ -5,9 +5,9 @@ namespace App\Services\Scheduling;
 use App\Enums\AppointmentHistoryType;
 use App\Enums\AppointmentOrigin;
 use App\Enums\AppointmentStatus;
-use App\Events\AppointmentRescheduled;
-use App\Events\AppointmentCreated;
 use App\Enums\CompanyRole;
+use App\Events\AppointmentCreated;
+use App\Events\AppointmentRescheduled;
 use App\Models\Appointment;
 use App\Models\AppointmentHistory;
 use App\Models\Client;
@@ -74,6 +74,9 @@ class AppointmentService
                 'notes' => $data['notes'] ?? null,
                 'internal_notes' => $data['internal_notes'] ?? null,
                 'reference_key' => $data['reference_key'] ?? null,
+                'client_name_snapshot' => $client->name,
+                'client_phone_snapshot' => $client->phone,
+                'client_email_snapshot' => $client->email,
             ]);
 
             $appointment->company()->associate($company);

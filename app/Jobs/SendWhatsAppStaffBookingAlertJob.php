@@ -82,10 +82,10 @@ class SendWhatsAppStaffBookingAlertJob implements ShouldQueue
     {
         $companyPhone = PhoneNormalizer::normalize($appointment->company?->phone)
             ?? PhoneNormalizer::normalize($senderPhoneFallback);
+        $professionalPhone = PhoneNormalizer::normalize($appointment->professional?->phone);
 
         $candidates = [
-            'company' => $companyPhone,
-            'professional' => PhoneNormalizer::normalize($appointment->professional?->phone),
+            'company' => $companyPhone === $professionalPhone ? null : $companyPhone,
         ];
 
         $seen = [];

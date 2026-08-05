@@ -84,6 +84,7 @@ class AppointmentChangeNotificationTest extends TestCase
         $setup['company']->update(['email' => 'empresa@example.test']);
         $setup['client']->update(['email' => 'cliente@example.test']);
         $setup['admin']->update(['email' => 'admin@example.test']);
+        $setup['professional']->update(['email' => null, 'user_id' => null]);
 
         $appointment = app(AppointmentService::class)->createInternalAppointment(
             $setup['company'],
@@ -114,6 +115,7 @@ class AppointmentChangeNotificationTest extends TestCase
         $setup['company']->update(['email' => 'empresa@example.test']);
         $setup['client']->update(['email' => 'cliente@example.test']);
         $setup['admin']->update(['email' => 'admin@example.test']);
+        $setup['professional']->update(['email' => null, 'user_id' => null]);
 
         $appointment = app(AppointmentService::class)->createInternalAppointment(
             $setup['company'],

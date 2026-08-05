@@ -43,6 +43,8 @@ class CompanySchedulingSettingFactory extends Factory
             'whatsapp_instance' => null,
             'whatsapp_sender_phone' => null,
             'whatsapp_confirmation_template' => null,
+            'notify_professional_by_email' => true,
+            'notify_professional_by_whatsapp' => true,
         ];
     }
 
