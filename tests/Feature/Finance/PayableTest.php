@@ -5,8 +5,11 @@ namespace Tests\Feature\Finance;
 use App\Enums\CompanyRole;
 use App\Enums\PayableOrigin;
 use App\Enums\PayableStatus;
+use App\Enums\PaymentMethod;
 use App\Models\Company;
+use App\Models\FinancialTransaction;
 use App\Models\Payable;
+use App\Models\PayablePayment;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Services\Financial\PayableService;
@@ -171,6 +174,71 @@ class PayableTest extends TestCase
         $this->assertSame(PayableStatus::Open, $payable->status);
         $this->assertDatabaseCount('financial_transactions', 0);
         $this->assertDatabaseCount('payable_payments', 0);
+    }
+
+    public function test_manual_paid_expense_can_be_cancelled_with_payment_reversal(): void
+    {
+        $category = $this->createOperationalCategory($this->company);
+        $account = $this->createFinancialAccount($this->company);
+        $this->fundAccount($this->company, $account, '500.00', $this->user);
+
+        $payable = app(PayableService::class)->createQuickExpense(
+            $this->company,
+            $category,
+            [
+                'description' => 'Compra lançada em duplicidade',
+                'total_amount' => '45.00',
+                'due_date' => now(),
+                'paid_now' => true,
+                'method' => PaymentMethod::Cash,
+                'paid_at' => now(),
+            ],
+            $this->user,
+            null,
+            $account,
+        );
+
+        $cancelled = app(PayableService::class)->cancelManualExpense(
+            $this->company,
+            $payable,
+            $this->user,
+            'Lançamento duplicado',
+        );
+
+        $payment = PayablePayment::query()->where('payable_id', $payable->getKey())->firstOrFail();
+
+        $this->assertSame(PayableStatus::Cancelled, $cancelled->status);
+        $this->assertSame('Lançamento duplicado', $cancelled->cancellation_reason);
+        $this->assertSame('cancelled', $payment->fresh()->status->value);
+        $this->assertSame('500.00', $account->fresh()->getCurrentBalance());
+        $originalTransaction = FinancialTransaction::query()
+            ->where('reference_key', $payment->ledgerReferenceKey())
+            ->firstOrFail();
+
+        $this->assertDatabaseHas('financial_transactions', [
+            'reference_key' => "financial-transaction:{$originalTransaction->getKey()}:reversal",
+        ]);
+    }
+
+    public function test_automatic_expense_cannot_be_cancelled_as_manual_expense(): void
+    {
+        $category = $this->createOperationalCategory($this->company);
+        $payable = Payable::factory()
+            ->forCompany($this->company)
+            ->recurring()
+            ->create([
+                'expense_category_id' => $category->getKey(),
+                'status' => PayableStatus::Open,
+            ]);
+
+        $this->expectException(ValidationException::class);
+
+        app(PayableService::class)->cancelManualExpense(
+            $this->company,
+            $payable,
+            $this->user,
+            'Não deve permitir',
+        );
     }
 
     public function test_overdue_is_not_persisted_as_status(): void

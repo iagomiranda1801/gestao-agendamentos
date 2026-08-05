@@ -220,6 +220,55 @@ class PayableService
         });
     }
 
+    public function cancelManualExpense(
+        Company $company,
+        Payable $payable,
+        User $user,
+        string $reason,
+    ): Payable {
+        return DB::transaction(function () use ($company, $payable, $user, $reason): Payable {
+            $locked = $this->lockPayable($payable);
+            $this->ensurePayableBelongsToCompany($company, $locked);
+
+            if (trim($reason) === '') {
+                throw ValidationException::withMessages([
+                    'cancellation_reason' => 'Informe o motivo da exclusão da despesa.',
+                ]);
+            }
+
+            if ($locked->origin !== PayableOrigin::Manual) {
+                throw ValidationException::withMessages([
+                    'origin' => 'Somente despesas lançadas manualmente podem ser excluídas.',
+                ]);
+            }
+
+            if ($locked->isCancelled()) {
+                throw ValidationException::withMessages([
+                    'status' => 'Esta despesa já foi cancelada.',
+                ]);
+            }
+
+            $payments = $locked->payments()
+                ->where('status', 'confirmed')
+                ->orderBy('id')
+                ->get();
+
+            foreach ($payments as $payment) {
+                app(PayablePaymentService::class)->cancel($company, $payment, $user, $reason);
+            }
+
+            $locked->refresh();
+            $locked->forceFill([
+                'status' => PayableStatus::Cancelled,
+                'cancelled_by' => $user->getKey(),
+                'cancelled_at' => now(),
+                'cancellation_reason' => $reason,
+            ])->save();
+
+            return $locked->refresh();
+        });
+    }
+
     public function recalculateStatus(Payable $payable): Payable
     {
         if (in_array($payable->status, [PayableStatus::Draft, PayableStatus::Cancelled], true)) {

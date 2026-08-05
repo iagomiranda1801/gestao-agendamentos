@@ -51,11 +51,9 @@ class PayablePolicy
 
     public function cancel(User $user, Payable $payable): bool
     {
-        if (! $this->view($user, $payable)) {
-            return false;
-        }
-
-        return ! in_array($payable->status, [PayableStatus::Cancelled, PayableStatus::Paid], true);
+        return $this->view($user, $payable)
+            && $payable->origin->value === 'manual'
+            && $payable->status !== PayableStatus::Cancelled;
     }
 
     public function registerPayment(User $user, Payable $payable): bool

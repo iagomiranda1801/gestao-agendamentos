@@ -4,14 +4,15 @@ namespace App\Filament\App\Resources\Payables\Tables;
 
 use App\DataTransferObjects\Financial\PayablePaymentData;
 use App\Enums\PayableOrigin;
-use App\Enums\PaymentMethod;
 use App\Enums\PayableStatus;
+use App\Enums\PaymentMethod;
 use App\Models\Company;
 use App\Models\FinancialAccount;
 use App\Models\Payable;
 use App\Models\PayableInstallment;
 use App\Models\User;
 use App\Services\Financial\PayablePaymentService;
+use App\Services\Financial\PayableService;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DateTimePicker;
@@ -23,8 +24,8 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 
 class PayablesTable
 {
@@ -143,6 +144,7 @@ class PayablesTable
             ->defaultSort('competence_date', 'desc')
             ->recordActions([
                 self::makeRegisterPaymentAction(),
+                self::makeCancelExpenseAction(),
             ])
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['supplier', 'expenseCategory', 'installments']));
     }
@@ -157,6 +159,45 @@ class PayablesTable
             ->modalHeading('Registrar pagamento')
             ->schema(fn (Payable $record): array => self::paymentFormSchema($record))
             ->action(fn (Payable $record, array $data): mixed => self::processPayment($record, $data));
+    }
+
+    protected static function makeCancelExpenseAction(): Action
+    {
+        return Action::make('cancelExpense')
+            ->label('Excluir despesa')
+            ->icon('heroicon-o-trash')
+            ->color('danger')
+            ->visible(fn (Payable $record): bool => auth()->user()?->can('cancel', $record) ?? false)
+            ->modalHeading('Excluir despesa')
+            ->modalDescription('Os pagamentos realizados serão estornados e a despesa ficará registrada como cancelada.')
+            ->modalSubmitActionLabel('Excluir despesa')
+            ->schema([
+                Textarea::make('cancellation_reason')
+                    ->label('Motivo da exclusão')
+                    ->required()
+                    ->minLength(3)
+                    ->maxLength(1000)
+                    ->rows(3),
+            ])
+            ->action(function (Payable $record, array $data): void {
+                /** @var Company $company */
+                $company = Filament::getTenant();
+                /** @var User $user */
+                $user = auth()->user();
+
+                app(PayableService::class)->cancelManualExpense(
+                    $company,
+                    $record,
+                    $user,
+                    $data['cancellation_reason'],
+                );
+
+                Notification::make()
+                    ->success()
+                    ->title('Despesa excluída')
+                    ->body('O histórico foi preservado e os pagamentos, quando existentes, foram estornados.')
+                    ->send();
+            });
     }
 
     /**

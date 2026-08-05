@@ -5,12 +5,12 @@ namespace Tests\Feature\Filament;
 use App\Enums\AppointmentStatus;
 use App\Enums\CommissionType;
 use App\Enums\CompanyRole;
+use App\Enums\PayableStatus;
+use App\Enums\PaymentMethod;
 use App\Filament\App\Resources\Appointments\Pages\ViewAppointment;
 use App\Filament\App\Resources\Attendances\Pages\ListAttendances;
 use App\Filament\App\Resources\Payables\Pages\ListPayables;
 use App\Filament\App\Resources\Receivables\Pages\ListReceivables;
-use App\Enums\PaymentMethod;
-use App\Enums\PayableStatus;
 use App\Models\Appointment;
 use App\Models\Attendance;
 use App\Models\Company;
@@ -116,6 +116,32 @@ class FinancialResourceAuthorizationTest extends TestCase
 
         $this->assertSame(PayableStatus::Paid, $payable->fresh()->status);
         $this->assertSame('-15.00', $account->fresh()->getCurrentBalance());
+    }
+
+    public function test_manager_can_exclude_manual_payable_from_table(): void
+    {
+        $manager = $this->createCompanyUser($this->company, [], CompanyRole::Manager);
+        $category = ExpenseCategory::factory()->forCompany($this->company)->create();
+        $payableService = app(PayableService::class);
+        $payable = $payableService->createDraft($this->company, $category, [
+            'description' => 'Despesa cadastrada incorretamente',
+            'total_amount' => '15.00',
+        ], $this->admin);
+        $payableService->createInstallments($this->company, $payable, [[
+            'due_date' => now()->toDateString(),
+            'amount' => '15.00',
+        ]]);
+        $payable = $payableService->launch($this->company, $payable->refresh());
+
+        $this->authenticateForAppTenant($manager, $this->company);
+
+        Livewire::test(ListPayables::class)
+            ->assertTableActionVisible('cancelExpense', $payable)
+            ->callTableAction('cancelExpense', $payable, [
+                'cancellation_reason' => 'Despesa duplicada',
+            ]);
+
+        $this->assertSame(PayableStatus::Cancelled, $payable->fresh()->status);
     }
 
     public function test_employee_can_list_own_attendances_only(): void
