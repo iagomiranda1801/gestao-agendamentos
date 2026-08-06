@@ -33,6 +33,7 @@ class WhatsAppCampaignsTable
                     ->badge()
                     ->color(fn (WhatsAppCampaignStatus $state): string => match ($state) {
                         WhatsAppCampaignStatus::Draft => 'gray',
+                        WhatsAppCampaignStatus::Scheduled => 'info',
                         WhatsAppCampaignStatus::Sending => 'warning',
                         WhatsAppCampaignStatus::Completed => 'success',
                         WhatsAppCampaignStatus::Cancelled => 'danger',
@@ -58,6 +59,11 @@ class WhatsAppCampaignsTable
                     ->dateTime('d/m/Y H:i')
                     ->sortable()
                     ->toggleable(),
+                TextColumn::make('scheduled_at')
+                    ->label('Agendada para')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('created_at')
                     ->label('Criada em')
                     ->dateTime('d/m/Y H:i')
@@ -72,38 +78,22 @@ class WhatsAppCampaignsTable
             ->defaultSort('created_at', 'desc')
             ->recordActions([
                 EditAction::make(),
-                Action::make('prepareRecipients')
-                    ->label('Preparar lista')
-                    ->icon('heroicon-o-user-group')
-                    ->color('gray')
-                    ->requiresConfirmation()
-                    ->modalHeading('Preparar destinatários')
-                    ->modalDescription('A lista será recriada usando apenas clientes ativos com aceite de campanha no WhatsApp.')
-                    ->visible(fn (WhatsAppCampaign $record): bool => $record->status === WhatsAppCampaignStatus::Draft)
-                    ->action(function (WhatsAppCampaign $record): void {
-                        /** @var Company $company */
-                        $company = Filament::getTenant();
-
-                        $count = app(WhatsAppCampaignService::class)->prepareRecipients($company, $record);
-
-                        Notification::make()
-                            ->success()
-                            ->title("Lista preparada: {$count} destinatário(s)")
-                            ->send();
-                    }),
                 Action::make('startSending')
-                    ->label('Enviar')
+                    ->label('Enviar agora')
                     ->icon('heroicon-o-paper-airplane')
                     ->color('warning')
                     ->requiresConfirmation()
                     ->modalHeading('Enviar campanha WhatsApp')
-                    ->modalDescription('As mensagens serão colocadas na fila com intervalo entre cada envio. Confirme somente se a campanha foi autorizada pelos clientes.')
-                    ->visible(fn (WhatsAppCampaign $record): bool => $record->status === WhatsAppCampaignStatus::Draft && $record->total_recipients > 0)
+                    ->modalDescription('A lista será preparada automaticamente usando somente clientes ativos e autorizados.')
+                    ->visible(fn (WhatsAppCampaign $record): bool => in_array($record->status, [
+                        WhatsAppCampaignStatus::Draft,
+                        WhatsAppCampaignStatus::Scheduled,
+                    ], true))
                     ->action(function (WhatsAppCampaign $record): void {
                         /** @var Company $company */
                         $company = Filament::getTenant();
 
-                        app(WhatsAppCampaignService::class)->startSending($company, $record);
+                        app(WhatsAppCampaignService::class)->sendNow($company, $record);
 
                         Notification::make()
                             ->success()
@@ -117,6 +107,7 @@ class WhatsAppCampaignsTable
                     ->requiresConfirmation()
                     ->visible(fn (WhatsAppCampaign $record): bool => in_array($record->status, [
                         WhatsAppCampaignStatus::Draft,
+                        WhatsAppCampaignStatus::Scheduled,
                         WhatsAppCampaignStatus::Sending,
                     ], true))
                     ->action(function (WhatsAppCampaign $record): void {
@@ -157,7 +148,10 @@ class WhatsAppCampaignsTable
                     ->requiresConfirmation()
                     ->modalHeading('Reenviar campanha')
                     ->modalDescription('Será criada uma nova cópia da campanha e ela será colocada na fila de envio imediatamente.')
-                    ->visible(fn (WhatsAppCampaign $record): bool => $record->status !== WhatsAppCampaignStatus::Draft)
+                    ->visible(fn (WhatsAppCampaign $record): bool => in_array($record->status, [
+                        WhatsAppCampaignStatus::Completed,
+                        WhatsAppCampaignStatus::Cancelled,
+                    ], true))
                     ->action(function (WhatsAppCampaign $record): void {
                         /** @var Company $company */
                         $company = Filament::getTenant();

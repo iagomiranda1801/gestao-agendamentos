@@ -2,7 +2,6 @@
 
 namespace App\Filament\App\Resources\WhatsAppContacts\Tables;
 
-use App\Models\Client;
 use App\Models\Company;
 use App\Models\CompanyWhatsAppInstance;
 use App\Models\WhatsAppContact;
@@ -12,14 +11,15 @@ use Filament\Actions\BulkAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Checkbox;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 
 class WhatsAppContactsTable
 {
@@ -81,7 +81,7 @@ class WhatsAppContactsTable
                     ->visible(fn (WhatsAppContact $record): bool => $record->imported_as_client_at === null)
                     ->requiresConfirmation()
                     ->modalHeading('Importar contato como cliente')
-                    ->modalDescription('O cliente será criado ou vinculado sem autorização automática para campanhas WhatsApp.')
+                    ->modalDescription('Cria ou vincula o cliente. Esta ação não altera a autorização para campanhas.')
                     ->action(function (WhatsAppContact $record): void {
                         /** @var Company $company */
                         $company = Filament::getTenant();
@@ -96,6 +96,34 @@ class WhatsAppContactsTable
                             ->title($result['created'] > 0 ? 'Cliente criado' : 'Contato vinculado')
                             ->send();
                     }),
+                Action::make('importAndAuthorizeMarketing')
+                    ->label('Autorizar campanhas')
+                    ->icon('heroicon-o-megaphone')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalHeading('Autorizar campanhas')
+                    ->modalDescription('O contato será importado ou vinculado, se necessário. Use somente quando ele autorizou receber mensagens promocionais no WhatsApp.')
+                    ->form([
+                        Checkbox::make('marketing_consent_confirmed')
+                            ->label('Confirmo que este contato autorizou receber campanhas no WhatsApp.')
+                            ->accepted()
+                            ->required(),
+                    ])
+                    ->action(function (WhatsAppContact $record): void {
+                        /** @var Company $company */
+                        $company = Filament::getTenant();
+
+                        $result = app(WhatsAppContactService::class)->importAsClients(
+                            $company,
+                            new Collection([$record]),
+                            true,
+                        );
+
+                        Notification::make()
+                            ->success()
+                            ->title($result['created'] > 0 ? 'Cliente criado e autorizado' : 'Contato autorizado para campanhas')
+                            ->send();
+                    }),
                 DeleteAction::make()
                     ->label('Excluir contato')
                     ->modalHeading('Excluir contato WhatsApp')
@@ -107,7 +135,7 @@ class WhatsAppContactsTable
                     ->icon('heroicon-o-user-plus')
                     ->requiresConfirmation()
                     ->modalHeading('Importar contatos selecionados')
-                    ->modalDescription('Os contatos serão criados ou vinculados sem autorização automática para campanhas WhatsApp.')
+                    ->modalDescription('Cria ou vincula os clientes. Esta ação não altera a autorização para campanhas.')
                     ->action(function (Collection $records): void {
                         /** @var Company $company */
                         $company = Filament::getTenant();
@@ -118,6 +146,31 @@ class WhatsAppContactsTable
                             ->success()
                             ->title('Importação concluída')
                             ->body("{$result['created']} cliente(s) criado(s) e {$result['linked']} contato(s) vinculado(s).")
+                            ->send();
+                    }),
+                BulkAction::make('importAndAuthorizeSelected')
+                    ->label('Autorizar campanhas')
+                    ->icon('heroicon-o-megaphone')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalHeading('Autorizar campanhas')
+                    ->modalDescription('Os contatos serão importados ou vinculados, se necessário. Use somente quando todos os selecionados autorizaram receber mensagens promocionais no WhatsApp.')
+                    ->form([
+                        Checkbox::make('marketing_consent_confirmed')
+                            ->label('Confirmo que todos os contatos selecionados autorizaram receber campanhas no WhatsApp.')
+                            ->accepted()
+                            ->required(),
+                    ])
+                    ->action(function (Collection $records): void {
+                        /** @var Company $company */
+                        $company = Filament::getTenant();
+
+                        $result = app(WhatsAppContactService::class)->importAsClients($company, $records, true);
+
+                        Notification::make()
+                            ->success()
+                            ->title('Importação e autorização concluídas')
+                            ->body("{$result['created']} cliente(s) criado(s) e {$result['linked']} contato(s) vinculado(s) e autorizados.")
                             ->send();
                     }),
                 DeleteBulkAction::make()

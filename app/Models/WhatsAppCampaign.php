@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'started_at',
     'completed_at',
     'cancelled_at',
+    'scheduled_at',
 ])]
 class WhatsAppCampaign extends Model
 {
@@ -56,6 +57,7 @@ class WhatsAppCampaign extends Model
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'scheduled_at' => 'datetime',
         ];
     }
 

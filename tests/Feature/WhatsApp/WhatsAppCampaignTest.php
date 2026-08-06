@@ -7,12 +7,14 @@ use App\Enums\WhatsAppCampaignAudience;
 use App\Enums\WhatsAppCampaignRecipientStatus;
 use App\Enums\WhatsAppCampaignStatus;
 use App\Filament\App\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
-use App\Jobs\SendWhatsAppCampaignRecipientJob;
 use App\Jobs\SendWhatsAppCampaignEmailJob;
+use App\Jobs\SendWhatsAppCampaignRecipientJob;
+use App\Jobs\StartScheduledWhatsAppCampaignJob;
 use App\Models\Client;
 use App\Models\CompanySchedulingSetting;
-use App\Models\WhatsAppCampaign;
+use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\Campaigns\WhatsAppCampaignService;
+use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Http;
@@ -86,12 +88,14 @@ class WhatsAppCampaignTest extends TestCase
 
         $selectedA = Client::factory()
             ->forCompany($company)
+            ->optedInForWhatsAppMarketing()
             ->create([
                 'name' => 'Cliente Um',
                 'phone' => '(11) 99999-1001',
             ]);
         $selectedB = Client::factory()
             ->forCompany($company)
+            ->optedInForWhatsAppMarketing()
             ->create([
                 'name' => 'Cliente Dois',
                 'phone' => '(11) 99999-1002',
@@ -191,8 +195,8 @@ class WhatsAppCampaignTest extends TestCase
 
         (new SendWhatsAppCampaignRecipientJob($recipient->getKey()))->handle(
             app(EvolutionApiClient::class),
-            app(\App\Services\Scheduling\CompanySchedulingSettingService::class),
-            app(\App\Services\WhatsApp\CompanyWhatsAppInstanceService::class),
+            app(CompanySchedulingSettingService::class),
+            app(CompanyWhatsAppInstanceService::class),
             app(WhatsAppCampaignService::class),
         );
 
@@ -201,6 +205,32 @@ class WhatsAppCampaignTest extends TestCase
         Http::assertSent(fn ($request): bool => $request->url() === 'https://evolution.test/message/sendText/loja-1'
             && $request['number'] === '5511999990001');
         Queue::assertPushed(SendWhatsAppCampaignEmailJob::class, 1);
+    }
+
+    public function test_campaign_can_be_scheduled_after_preparing_its_recipients(): void
+    {
+        Queue::fake();
+
+        $company = $this->createCompany();
+        $user = $this->createCompanyUser($company);
+        Client::factory()
+            ->forCompany($company)
+            ->optedInForWhatsAppMarketing()
+            ->create(['phone' => '(11) 99999-0001']);
+
+        $campaign = app(WhatsAppCampaignService::class)->create($company, $user, [
+            'name' => 'Campanha agendada',
+            'audience_type' => WhatsAppCampaignAudience::OptedInActiveClients->value,
+            'message_template' => 'Mensagem',
+            'send_interval_seconds' => 10,
+        ]);
+        app(WhatsAppCampaignService::class)->prepareRecipients($company, $campaign);
+
+        $scheduled = app(WhatsAppCampaignService::class)->schedule($company, $campaign, now()->addHour());
+
+        $this->assertSame(WhatsAppCampaignStatus::Scheduled, $scheduled->status);
+        $this->assertNotNull($scheduled->scheduled_at);
+        Queue::assertPushed(StartScheduledWhatsAppCampaignJob::class);
     }
 
     public function test_campaign_job_marks_pending_provider_response_as_accepted_not_sent(): void
@@ -240,8 +270,8 @@ class WhatsAppCampaignTest extends TestCase
 
         (new SendWhatsAppCampaignRecipientJob($recipient->getKey()))->handle(
             app(EvolutionApiClient::class),
-            app(\App\Services\Scheduling\CompanySchedulingSettingService::class),
-            app(\App\Services\WhatsApp\CompanyWhatsAppInstanceService::class),
+            app(CompanySchedulingSettingService::class),
+            app(CompanyWhatsAppInstanceService::class),
             app(WhatsAppCampaignService::class),
         );
 
@@ -255,6 +285,38 @@ class WhatsAppCampaignTest extends TestCase
         $this->assertSame(0, $campaign->sent_count);
         $this->assertSame(1, $campaign->accepted_count);
         $this->assertSame(WhatsAppCampaignStatus::Completed, $campaign->status);
+    }
+
+    public function test_campaign_job_skips_client_that_withdrew_marketing_consent(): void
+    {
+        $company = $this->createCompany();
+        $user = $this->createCompanyUser($company);
+        $client = Client::factory()
+            ->forCompany($company)
+            ->optedInForWhatsAppMarketing()
+            ->create(['phone' => '(11) 99999-0001']);
+
+        $campaign = app(WhatsAppCampaignService::class)->create($company, $user, [
+            'name' => 'Campanha',
+            'audience_type' => WhatsAppCampaignAudience::OptedInActiveClients->value,
+            'message_template' => 'Mensagem',
+            'send_interval_seconds' => 10,
+        ]);
+        app(WhatsAppCampaignService::class)->prepareRecipients($company, $campaign);
+        $recipient = $campaign->recipients()->firstOrFail();
+        $recipient->forceFill(['status' => WhatsAppCampaignRecipientStatus::Queued])->save();
+        $campaign->forceFill(['status' => WhatsAppCampaignStatus::Sending])->save();
+        $client->forceFill(['whatsapp_marketing_opt_in' => false])->save();
+
+        (new SendWhatsAppCampaignRecipientJob($recipient->getKey()))->handle(
+            app(EvolutionApiClient::class),
+            app(CompanySchedulingSettingService::class),
+            app(CompanyWhatsAppInstanceService::class),
+            app(WhatsAppCampaignService::class),
+        );
+
+        $this->assertSame(WhatsAppCampaignRecipientStatus::Skipped, $recipient->refresh()->status);
+        $this->assertSame(WhatsAppCampaignStatus::Completed, $campaign->refresh()->status);
     }
 
     public function test_completed_campaign_can_be_copied_to_edit_again(): void
@@ -289,6 +351,7 @@ class WhatsAppCampaignTest extends TestCase
         $user = $this->createCompanyUser($company);
         $client = Client::factory()
             ->forCompany($company)
+            ->optedInForWhatsAppMarketing()
             ->create(['phone' => '(11) 99999-0001']);
 
         $campaign = app(WhatsAppCampaignService::class)->create($company, $user, [

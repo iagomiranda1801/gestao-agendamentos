@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Enums\WhatsAppCampaignRecipientStatus;
 use App\Enums\WhatsAppCampaignStatus;
-use App\Jobs\SendWhatsAppCampaignEmailJob;
 use App\Models\WhatsAppCampaignRecipient;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\Campaigns\WhatsAppCampaignService;
@@ -32,7 +31,7 @@ class SendWhatsAppCampaignRecipientJob implements ShouldQueue
         WhatsAppCampaignService $campaigns,
     ): void {
         $recipient = WhatsAppCampaignRecipient::query()
-            ->with(['campaign.company'])
+            ->with(['campaign.company', 'client'])
             ->find($this->recipientId);
 
         if (! $recipient || $recipient->status !== WhatsAppCampaignRecipientStatus::Queued) {
@@ -40,6 +39,16 @@ class SendWhatsAppCampaignRecipientJob implements ShouldQueue
         }
 
         $campaign = $recipient->campaign;
+
+        if (! $recipient->client || ! $recipient->client->is_active || ! $recipient->client->whatsapp_marketing_opt_in) {
+            $recipient->forceFill([
+                'status' => WhatsAppCampaignRecipientStatus::Skipped,
+                'error_message' => 'Cliente sem autorização ativa para campanhas WhatsApp.',
+            ])->save();
+            $campaigns->refreshCounters($campaign);
+
+            return;
+        }
 
         if ($campaign->status !== WhatsAppCampaignStatus::Sending) {
             $recipient->forceFill([

@@ -5,6 +5,7 @@ namespace App\Enums;
 enum WhatsAppCampaignStatus: string
 {
     case Draft = 'draft';
+    case Scheduled = 'scheduled';
     case Sending = 'sending';
     case Completed = 'completed';
     case Cancelled = 'cancelled';
@@ -13,6 +14,7 @@ enum WhatsAppCampaignStatus: string
     {
         return match ($this) {
             self::Draft => 'Rascunho',
+            self::Scheduled => 'Agendada',
             self::Sending => 'Enviando',
             self::Completed => 'Concluída',
             self::Cancelled => 'Cancelada',

@@ -7,6 +7,7 @@ use App\Models\WhatsAppContact;
 use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Services\WhatsApp\WhatsAppContactCleanupService;
 use App\Services\WhatsApp\WhatsAppContactService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -92,7 +93,7 @@ class WhatsAppContactTest extends TestCase
         $service->sync($company, $instance);
 
         $contact = $company->whatsappContacts()->firstOrFail();
-        $result = $service->importAsClients($company, new \Illuminate\Database\Eloquent\Collection([$contact]));
+        $result = $service->importAsClients($company, new Collection([$contact]));
 
         $this->assertSame(1, $result['created']);
         $this->assertDatabaseHas('clients', [
@@ -101,6 +102,36 @@ class WhatsAppContactTest extends TestCase
             'whatsapp_marketing_opt_in' => false,
         ]);
         $this->assertNotNull($contact->refresh()->imported_as_client_at);
+    }
+
+    public function test_import_can_grant_marketing_consent_when_it_was_confirmed(): void
+    {
+        $company = $this->createCompany();
+        $instance = app(CompanyWhatsAppInstanceService::class)->create($company, [
+            'name' => 'Principal',
+            'instance_name' => 'principal',
+        ]);
+        $contact = WhatsAppContact::query()->create([
+            'company_id' => $company->getKey(),
+            'company_whatsapp_instance_id' => $instance->getKey(),
+            'name' => 'Contato autorizado',
+            'phone' => '34999990003',
+            'phone_normalized' => '34999990003',
+            'last_synced_at' => now(),
+        ]);
+
+        $result = app(WhatsAppContactService::class)->importAsClients(
+            $company,
+            new Collection([$contact]),
+            true,
+        );
+
+        $this->assertSame(1, $result['created']);
+        $this->assertDatabaseHas('clients', [
+            'company_id' => $company->getKey(),
+            'phone_normalized' => '34999990003',
+            'whatsapp_marketing_opt_in' => true,
+        ]);
     }
 
     public function test_cleanup_deletes_only_contacts_matching_filters(): void

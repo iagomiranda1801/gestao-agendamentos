@@ -6,11 +6,14 @@ use App\Enums\WhatsAppCampaignAudience;
 use App\Enums\WhatsAppCampaignRecipientStatus;
 use App\Enums\WhatsAppCampaignStatus;
 use App\Jobs\SendWhatsAppCampaignRecipientJob;
+use App\Jobs\StartScheduledWhatsAppCampaignJob;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\User;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppCampaignRecipient;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -40,10 +43,21 @@ class WhatsAppCampaignService
     public function update(Company $company, WhatsAppCampaign $campaign, array $data): WhatsAppCampaign
     {
         $this->ensureBelongsToCompany($company, $campaign);
-        $this->ensureDraft($campaign);
+        $this->ensureEditable($campaign);
+        $deliveryType = $data['delivery_type'] ?? 'now';
 
         $campaign->fill($this->preparePayload($data));
         $campaign->save();
+
+        if ($campaign->status === WhatsAppCampaignStatus::Scheduled && $deliveryType === 'scheduled') {
+            $this->prepareRecipients($company, $campaign);
+            $this->schedule($company, $campaign, $campaign->scheduled_at);
+        } elseif ($campaign->status === WhatsAppCampaignStatus::Scheduled) {
+            $campaign->forceFill([
+                'status' => WhatsAppCampaignStatus::Draft,
+                'scheduled_at' => null,
+            ])->save();
+        }
 
         return $campaign->refresh();
     }
@@ -51,7 +65,7 @@ class WhatsAppCampaignService
     public function prepareRecipients(Company $company, WhatsAppCampaign $campaign): int
     {
         $this->ensureBelongsToCompany($company, $campaign);
-        $this->ensureDraft($campaign);
+        $this->ensureEditable($campaign);
 
         return DB::transaction(function () use ($company, $campaign): int {
             $campaign->recipients()->delete();
@@ -97,7 +111,7 @@ class WhatsAppCampaignService
     public function startSending(Company $company, WhatsAppCampaign $campaign): WhatsAppCampaign
     {
         $this->ensureBelongsToCompany($company, $campaign);
-        $this->ensureDraft($campaign);
+        $this->ensureReadyToSend($campaign);
 
         if ($campaign->recipients()->where('status', WhatsAppCampaignRecipientStatus::Pending)->doesntExist()) {
             throw ValidationException::withMessages([
@@ -111,6 +125,7 @@ class WhatsAppCampaignService
                 'started_at' => now(),
                 'completed_at' => null,
                 'cancelled_at' => null,
+                'scheduled_at' => null,
             ])->save();
 
             $delay = 0;
@@ -145,6 +160,7 @@ class WhatsAppCampaignService
             'status' => WhatsAppCampaignStatus::Cancelled,
             'cancelled_at' => now(),
             'cancelled_by' => $user->getKey(),
+            'scheduled_at' => null,
         ])->save();
 
         $campaign->recipients()
@@ -171,6 +187,7 @@ class WhatsAppCampaignService
                 'selected_client_ids' => $campaign->selected_client_ids,
                 'message_template' => $campaign->message_template,
                 'send_interval_seconds' => $campaign->send_interval_seconds,
+                'scheduled_at' => null,
                 'status' => WhatsAppCampaignStatus::Draft->value,
                 'total_recipients' => 0,
                 'sent_count' => 0,
@@ -192,6 +209,51 @@ class WhatsAppCampaignService
         $this->prepareRecipients($company, $copy);
 
         return $this->startSending($company, $copy->refresh());
+    }
+
+    public function sendNow(Company $company, WhatsAppCampaign $campaign): WhatsAppCampaign
+    {
+        $count = $this->prepareRecipients($company, $campaign);
+
+        if ($count === 0) {
+            throw ValidationException::withMessages([
+                'recipients' => 'Não há clientes ativos e autorizados para receber esta campanha.',
+            ]);
+        }
+
+        return $this->startSending($company, $campaign->refresh());
+    }
+
+    public function schedule(Company $company, WhatsAppCampaign $campaign, mixed $scheduledAt): WhatsAppCampaign
+    {
+        $this->ensureBelongsToCompany($company, $campaign);
+        $this->ensureEditable($campaign);
+
+        $scheduledAt = $scheduledAt instanceof Carbon ? $scheduledAt : Carbon::parse($scheduledAt);
+
+        if ($scheduledAt->lte(now())) {
+            throw ValidationException::withMessages([
+                'scheduled_at' => 'Escolha uma data e hora futuras para agendar a campanha.',
+            ]);
+        }
+
+        if ($campaign->recipients()->where('status', WhatsAppCampaignRecipientStatus::Pending)->doesntExist()) {
+            throw ValidationException::withMessages([
+                'recipients' => 'Não há destinatários autorizados para esta campanha.',
+            ]);
+        }
+
+        $campaign->forceFill([
+            'status' => WhatsAppCampaignStatus::Scheduled,
+            'scheduled_at' => $scheduledAt,
+            'started_at' => null,
+            'completed_at' => null,
+            'cancelled_at' => null,
+        ])->save();
+
+        StartScheduledWhatsAppCampaignJob::dispatch($campaign->getKey())->delay($scheduledAt);
+
+        return $campaign->refresh();
     }
 
     public function refreshCounters(WhatsAppCampaign $campaign): void
@@ -229,13 +291,18 @@ class WhatsAppCampaignService
         }
     }
 
-    protected function ensureDraft(WhatsAppCampaign $campaign): void
+    protected function ensureEditable(WhatsAppCampaign $campaign): void
     {
-        if ($campaign->status !== WhatsAppCampaignStatus::Draft) {
+        if (! in_array($campaign->status, [WhatsAppCampaignStatus::Draft, WhatsAppCampaignStatus::Scheduled], true)) {
             throw ValidationException::withMessages([
-                'status' => 'Somente campanhas em rascunho podem ser alteradas ou preparadas.',
+                'status' => 'Somente campanhas em rascunho ou agendadas podem ser alteradas.',
             ]);
         }
+    }
+
+    protected function ensureReadyToSend(WhatsAppCampaign $campaign): void
+    {
+        $this->ensureEditable($campaign);
     }
 
     /**
@@ -245,6 +312,11 @@ class WhatsAppCampaignService
     protected function preparePayload(array $data): array
     {
         unset($data['company_id'], $data['created_by'], $data['cancelled_by']);
+        unset($data['delivery_type'], $data['message_suggestion']);
+
+        if (blank($data['name'] ?? null)) {
+            $data['name'] = 'Campanha '.now()->format('d/m/Y H:i');
+        }
 
         $interval = (int) ($data['send_interval_seconds'] ?? 20);
         $data['send_interval_seconds'] = max(10, min(300, $interval));
@@ -273,9 +345,9 @@ class WhatsAppCampaignService
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Builder<Client>
+     * @return Builder<Client>
      */
-    protected function audienceQuery(Company $company, WhatsAppCampaign $campaign): \Illuminate\Database\Eloquent\Builder
+    protected function audienceQuery(Company $company, WhatsAppCampaign $campaign): Builder
     {
         return match ($campaign->audience_type) {
             WhatsAppCampaignAudience::OptedInActiveClients => Client::query()
@@ -288,13 +360,13 @@ class WhatsAppCampaignService
                 ->where('company_id', $company->getKey())
                 ->whereKey($campaign->selected_client_ids ?? [])
                 ->active()
+                ->whatsappMarketingOptedIn()
                 ->whereNotNull('phone_normalized')
                 ->where('phone_normalized', '!=', ''),
         };
     }
 
     /**
-     * @param  mixed  $ids
      * @return list<int>
      */
     protected function normalizeSelectedClientIds(mixed $ids): array

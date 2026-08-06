@@ -29,40 +29,49 @@ class EditWhatsAppCampaign extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('prepareRecipients')
-                ->label('Preparar lista')
-                ->icon('heroicon-o-user-group')
-                ->color('gray')
+            Action::make('startSending')
+                ->label('Enviar agora')
+                ->icon('heroicon-o-paper-airplane')
+                ->color('warning')
                 ->requiresConfirmation()
-                ->visible(fn (): bool => $this->record->status === WhatsAppCampaignStatus::Draft)
+                ->modalHeading('Enviar campanha WhatsApp')
+                ->modalDescription('A lista será preparada automaticamente usando somente clientes ativos e autorizados.')
+                ->visible(fn (): bool => in_array($this->record->status, [
+                    WhatsAppCampaignStatus::Draft,
+                    WhatsAppCampaignStatus::Scheduled,
+                ], true))
                 ->action(function (): void {
                     /** @var Company $company */
                     $company = Filament::getTenant();
 
                     /** @var WhatsAppCampaign $campaign */
                     $campaign = $this->record;
-                    $count = app(WhatsAppCampaignService::class)->prepareRecipients($company, $campaign);
-
-                    Notification::make()
-                        ->success()
-                        ->title("Lista preparada: {$count} destinatário(s)")
-                        ->send();
-                }),
-            Action::make('startSending')
-                ->label('Enviar campanha')
-                ->icon('heroicon-o-paper-airplane')
-                ->color('warning')
-                ->requiresConfirmation()
-                ->visible(fn (): bool => $this->record->status === WhatsAppCampaignStatus::Draft && $this->record->total_recipients > 0)
-                ->action(function (): void {
-                    /** @var Company $company */
-                    $company = Filament::getTenant();
-
-                    app(WhatsAppCampaignService::class)->startSending($company, $this->record);
+                    app(WhatsAppCampaignService::class)->sendNow($company, $campaign);
 
                     Notification::make()
                         ->success()
                         ->title('Campanha colocada na fila')
+                        ->send();
+                }),
+            Action::make('cancel')
+                ->label('Cancelar campanha')
+                ->icon('heroicon-o-x-circle')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->visible(fn (): bool => in_array($this->record->status, [
+                    WhatsAppCampaignStatus::Draft,
+                    WhatsAppCampaignStatus::Scheduled,
+                    WhatsAppCampaignStatus::Sending,
+                ], true))
+                ->action(function (): void {
+                    /** @var Company $company */
+                    $company = Filament::getTenant();
+
+                    app(WhatsAppCampaignService::class)->cancel($company, $this->record, auth()->user());
+
+                    Notification::make()
+                        ->success()
+                        ->title('Campanha cancelada')
                         ->send();
                 }),
             Action::make('duplicateForResend')
@@ -94,7 +103,10 @@ class EditWhatsAppCampaign extends EditRecord
                 ->requiresConfirmation()
                 ->modalHeading('Reenviar campanha')
                 ->modalDescription('Será criada uma nova cópia da campanha e ela será colocada na fila de envio imediatamente.')
-                ->visible(fn (): bool => $this->record->status !== WhatsAppCampaignStatus::Draft)
+                ->visible(fn (): bool => in_array($this->record->status, [
+                    WhatsAppCampaignStatus::Completed,
+                    WhatsAppCampaignStatus::Cancelled,
+                ], true))
                 ->action(function (): void {
                     /** @var Company $company */
                     $company = Filament::getTenant();

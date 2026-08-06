@@ -18,6 +18,16 @@ class CreateWhatsAppCampaign extends CreateRecord
         /** @var Company $company */
         $company = Filament::getTenant();
 
-        return app(WhatsAppCampaignService::class)->create($company, auth()->user(), $data);
+        $campaigns = app(WhatsAppCampaignService::class);
+        $campaign = $campaigns->create($company, auth()->user(), $data);
+
+        if (($data['delivery_type'] ?? 'now') === 'scheduled') {
+            $campaigns->prepareRecipients($company, $campaign);
+            $campaigns->schedule($company, $campaign, $data['scheduled_at']);
+        } else {
+            $campaigns->sendNow($company, $campaign);
+        }
+
+        return $campaign;
     }
 }

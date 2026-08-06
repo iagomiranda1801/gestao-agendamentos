@@ -83,13 +83,13 @@ class WhatsAppContactService
      * @param  Collection<int, WhatsAppContact>  $contacts
      * @return array{created: int, linked: int, skipped: int}
      */
-    public function importAsClients(Company $company, Collection $contacts): array
+    public function importAsClients(Company $company, Collection $contacts, bool $grantMarketingConsent = false): array
     {
         $created = 0;
         $linked = 0;
         $skipped = 0;
 
-        DB::transaction(function () use ($company, $contacts, &$created, &$linked, &$skipped): void {
+        DB::transaction(function () use ($company, $contacts, $grantMarketingConsent, &$created, &$linked, &$skipped): void {
             foreach ($contacts as $contact) {
                 if ((int) $contact->company_id !== (int) $company->getKey()) {
                     abort(404);
@@ -109,6 +109,10 @@ class WhatsAppContactService
                     $created++;
                 } else {
                     $linked++;
+                }
+
+                if ($grantMarketingConsent && ! $client->whatsapp_marketing_opt_in) {
+                    $client->forceFill(['whatsapp_marketing_opt_in' => true])->save();
                 }
 
                 $contact->client()->associate($client);
