@@ -76,7 +76,8 @@ class WhatsAppContactTest extends TestCase
             'https://evolution.test/chat/findContacts/estudio-ana' => Http::response([
                 [
                     'id' => '553499206651@s.whatsapp.net',
-                    'pushName' => 'Novo contato',
+                    'name' => 'Nome salvo na agenda',
+                    'pushName' => 'Nome público do WhatsApp',
                     'number' => '553499206651',
                 ],
             ]),
@@ -98,6 +99,7 @@ class WhatsAppContactTest extends TestCase
         $this->assertSame(1, $result['created']);
         $this->assertDatabaseHas('clients', [
             'company_id' => $company->getKey(),
+            'name' => 'Nome salvo na agenda',
             'phone_normalized' => '553499206651',
             'whatsapp_marketing_opt_in' => false,
         ]);

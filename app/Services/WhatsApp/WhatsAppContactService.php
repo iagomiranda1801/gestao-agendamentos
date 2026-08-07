@@ -136,7 +136,9 @@ class WhatsAppContactService
      */
     protected function contactName(array $payload, string $phone): string
     {
-        return Str::squish((string) ($payload['pushName'] ?? $payload['name'] ?? '')) ?: $phone;
+        // O campo "name" é o nome salvo na agenda do número conectado. Já o
+        // "pushName" é o nome público informado pelo próprio contato no WhatsApp.
+        return Str::squish((string) ($payload['name'] ?? $payload['pushName'] ?? '')) ?: $phone;
     }
 
     /**
