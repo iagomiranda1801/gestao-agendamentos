@@ -29,6 +29,10 @@ class DentalAnamnesisPolicy
 
     public function update(User $user, DentalAnamnesis $record): bool
     {
+        if ($record->status !== 'draft') {
+            return $this->allowsClinical($user, CompanyPermission::ViewClinicalRecords, $record);
+        }
+
         return $record->status === 'draft'
             && ((int) $record->created_by === (int) $user->getKey()
                 || $user->hasActiveRoleInCompany($record->company, CompanyRole::CompanyAdmin))

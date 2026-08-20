@@ -45,6 +45,11 @@ class EditAnamnesis extends EditRecord
         ];
     }
 
+    protected function getFormActions(): array
+    {
+        return $this->record->status === 'draft' ? parent::getFormActions() : [];
+    }
+
     protected function handleRecordUpdate(Model $record, array $data): Model
     {
         /** @var Company $company */ $company = Filament::getTenant();

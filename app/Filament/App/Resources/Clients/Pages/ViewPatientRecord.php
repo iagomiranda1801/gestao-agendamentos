@@ -67,7 +67,7 @@ class ViewPatientRecord extends ViewRecord
             ])->columns(3),
             Section::make('Alertas clínicos ativos')->schema([
                 RepeatableEntry::make('activeClinicalAlerts')->label('')->schema([
-                    TextEntry::make('severity')->label('Nível')->badge(),
+                    TextEntry::make('severity')->label('Nível')->badge()->formatStateUsing(fn (string $state): string => static::alertSeverityLabel($state)),
                     TextEntry::make('title')->label('Alerta'),
                     TextEntry::make('description')->label('Detalhes')->placeholder('—'),
                 ])->columns(3),
@@ -77,13 +77,15 @@ class ViewPatientRecord extends ViewRecord
                     TextEntry::make('occurred_at')->label('Data')->dateTime('d/m/Y H:i'),
                     TextEntry::make('professional.name')->label('Dentista'),
                     TextEntry::make('procedure_performed')->label('Procedimento')->placeholder('—'),
-                    TextEntry::make('status')->label('Status')->badge(),
+                    TextEntry::make('status')->label('Status')->badge()->formatStateUsing(fn (string $state): string => $state === 'finalized' ? 'Finalizada' : 'Rascunho'),
                 ])->columns(4),
             ])->visible(fn (): bool => $this->canViewClinical()),
             Section::make('Anamneses')->schema([
                 RepeatableEntry::make('dentalAnamneses')->label('')->schema([
                     TextEntry::make('version')->label('Versão'),
-                    TextEntry::make('status')->label('Status')->badge(),
+                    TextEntry::make('status')->label('Status')->badge()->formatStateUsing(fn (string $state): string => match ($state) {
+                        'completed' => 'Concluída', 'superseded' => 'Substituída', default => 'Rascunho',
+                    }),
                     TextEntry::make('reviewer.name')->label('Revisada por')->placeholder('—'),
                     TextEntry::make('completed_at')->label('Conclusão')->dateTime('d/m/Y H:i')->placeholder('—'),
                 ])->columns(4),
@@ -92,14 +94,14 @@ class ViewPatientRecord extends ViewRecord
                 RepeatableEntry::make('treatmentPlans')->label('')->schema([
                     TextEntry::make('title')->label('Plano'),
                     TextEntry::make('professional.name')->label('Dentista'),
-                    TextEntry::make('status')->label('Status')->badge(),
+                    TextEntry::make('status')->label('Situação')->badge()->formatStateUsing(fn (string $state): string => static::treatmentStatusLabel($state)),
                     TextEntry::make('total_amount')->label('Total')->money('BRL', locale: 'pt_BR'),
                 ])->columns(4),
             ])->visible(fn (): bool => $this->canManagePlans()),
             Section::make('Documentos')->schema([
                 RepeatableEntry::make('clinicalAttachments')->label('')->schema([
                     TextEntry::make('title')->label('Documento'),
-                    TextEntry::make('type')->label('Tipo')->badge(),
+                    TextEntry::make('type')->label('Tipo')->badge()->formatStateUsing(fn (string $state): string => static::attachmentTypeLabel($state)),
                     TextEntry::make('document_date')->label('Data')->date('d/m/Y')->placeholder('—'),
                     TextEntry::make('original_name')->label('Arquivo'),
                 ])->columns(4),
@@ -149,7 +151,7 @@ class ViewPatientRecord extends ViewRecord
             'clinical_entry.finalized' => 'Evolução finalizada',
             'anamnesis.created' => 'Anamnese criada',
             'anamnesis.updated' => 'Anamnese atualizada',
-            'anamnesis.finalized' => 'Anamnese finalizada',
+            'anamnesis.completed' => 'Anamnese concluída',
             'treatment_plan.created' => 'Plano de tratamento criado',
             'treatment_plan.updated' => 'Plano de tratamento atualizado',
             default => filled($action) ? str($action)->replace(['.', '_'], ' ')->ucfirst()->toString() : 'Alteração registrada',
@@ -161,6 +163,42 @@ class ViewPatientRecord extends ViewRecord
         return match ($entity) {
             Client::class => 'Paciente',
             default => 'Prontuário do paciente',
+        };
+    }
+
+    protected static function treatmentStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'draft' => 'Rascunho',
+            'presented' => 'Apresentado',
+            'partially_approved' => 'Parcialmente aprovado',
+            'in_progress' => 'Em execução',
+            'completed' => 'Concluído',
+            'cancelled' => 'Cancelado',
+            default => 'Não informado',
+        };
+    }
+
+    protected static function alertSeverityLabel(string $severity): string
+    {
+        return match ($severity) {
+            'information' => 'Informativo',
+            'attention' => 'Atenção',
+            'critical' => 'Crítico',
+            default => 'Não informado',
+        };
+    }
+
+    protected static function attachmentTypeLabel(string $type): string
+    {
+        return match ($type) {
+            'radiograph' => 'Radiografia',
+            'photo' => 'Fotografia',
+            'exam' => 'Exame',
+            'prescription' => 'Receita',
+            'certificate' => 'Atestado',
+            'consent' => 'Termo / consentimento',
+            default => 'Documento geral',
         };
     }
 }

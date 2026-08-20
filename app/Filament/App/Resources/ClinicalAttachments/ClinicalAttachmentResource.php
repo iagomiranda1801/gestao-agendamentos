@@ -68,7 +68,10 @@ class ClinicalAttachmentResource extends Resource
         return $table->columns([
             TextColumn::make('client.name')->label('Paciente')->searchable(),
             TextColumn::make('title')->label('Documento')->searchable(),
-            TextColumn::make('type')->label('Tipo')->badge(),
+            TextColumn::make('type')->label('Tipo')->badge()->formatStateUsing(fn (string $state): string => match ($state) {
+                'radiograph' => 'Radiografia', 'photo' => 'Fotografia', 'exam' => 'Exame', 'prescription' => 'Receita',
+                'certificate' => 'Atestado', 'consent' => 'Termo / consentimento', default => 'Documento geral',
+            }),
             TextColumn::make('document_date')->label('Data')->date('d/m/Y')->placeholder('—'),
             TextColumn::make('original_name')->label('Arquivo')->limit(40),
             TextColumn::make('created_at')->label('Enviado em')->dateTime('d/m/Y H:i'),

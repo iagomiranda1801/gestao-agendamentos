@@ -76,7 +76,9 @@ class ClinicalAlertResource extends Resource
     {
         return $table->columns([
             TextColumn::make('client.name')->label('Paciente')->searchable(), TextColumn::make('title')->label('Alerta')->searchable(),
-            TextColumn::make('severity')->label('Severidade')->badge(), IconColumn::make('is_active')->label('Ativo')->boolean(),
+            TextColumn::make('severity')->label('Severidade')->badge()->formatStateUsing(fn (string $state): string => match ($state) {
+                'information' => 'Informativo', 'attention' => 'Atenção', 'critical' => 'Crítico', default => 'Não informado',
+            }), IconColumn::make('is_active')->label('Ativo')->boolean(),
             TextColumn::make('created_at')->label('Criado em')->dateTime('d/m/Y H:i'),
         ])->recordActions([Action::make('deactivate')->label('Desativar')->requiresConfirmation()->visible(fn (PatientClinicalAlert $record): bool => $record->is_active)->action(function (PatientClinicalAlert $record): void {
             /** @var Company $company */ $company = Filament::getTenant();

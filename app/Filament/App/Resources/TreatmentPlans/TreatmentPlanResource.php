@@ -54,7 +54,15 @@ class TreatmentPlanResource extends Resource
             TextColumn::make('client.name')->label('Paciente')->searchable()->sortable(),
             TextColumn::make('title')->label('Plano')->searchable(),
             TextColumn::make('professional.name')->label('Dentista'),
-            TextColumn::make('status')->label('Status')->badge(),
+            TextColumn::make('status')->label('Situação')->badge()->formatStateUsing(fn (string $state): string => match ($state) {
+                'draft' => 'Rascunho',
+                'presented' => 'Apresentado',
+                'partially_approved' => 'Parcialmente aprovado',
+                'in_progress' => 'Em execução',
+                'completed' => 'Concluído',
+                'cancelled' => 'Cancelado',
+                default => 'Não informado',
+            }),
             TextColumn::make('total_amount')->label('Total')->money('BRL', locale: 'pt_BR'),
         ])->defaultSort('plan_date', 'desc');
     }
