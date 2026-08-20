@@ -16,6 +16,7 @@ use App\Models\Attendance;
 use App\Models\AttendanceHistory;
 use App\Models\AttendanceMaterial;
 use App\Models\Company;
+use App\Models\DentalClinicalEntry;
 use App\Models\Product;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
@@ -57,6 +58,18 @@ class AttendanceCompletionService
         }
 
         $appointment->load(['client', 'professional', 'service']);
+
+        if ($company->isDentalClinic()
+            && $company->dentalClinicSetting()->where('clinical_entry_required_to_complete', true)->exists()
+            && ! DentalClinicalEntry::query()
+                ->where('company_id', $company->getKey())
+                ->where('appointment_id', $appointment->getKey())
+                ->where('status', 'finalized')
+                ->exists()) {
+            throw ValidationException::withMessages([
+                'clinical_entry' => 'Finalize a evolução clínica deste paciente antes de concluir o atendimento.',
+            ]);
+        }
 
         $grossAmount = $this->resolveGrossAmount($appointment, $data);
         $discountAmount = $this->normalizeNonNegativeMoney($data->discountAmount, 'discount_amount');
@@ -150,6 +163,14 @@ class AttendanceCompletionService
             $attendance->service()->associate($lockedAppointment->service);
             $attendance->completedBy()->associate($user);
             $attendance->save();
+
+            if ($company->isDentalClinic()) {
+                DentalClinicalEntry::query()
+                    ->where('company_id', $company->getKey())
+                    ->where('appointment_id', $lockedAppointment->getKey())
+                    ->whereNull('attendance_id')
+                    ->update(['attendance_id' => $attendance->getKey()]);
+            }
 
             $stockDocument = $this->createAndPostStockDocument(
                 $company,

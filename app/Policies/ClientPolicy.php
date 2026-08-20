@@ -2,40 +2,40 @@
 
 namespace App\Policies;
 
-use App\Enums\CompanyRole;
+use App\Enums\CompanyPermission;
 use App\Models\Client;
+use App\Models\Company;
 use App\Models\User;
 use App\Policies\Concerns\AuthorizesCompanyRecords;
+use App\Services\Company\CompanyPermissionService;
+use Filament\Facades\Filament;
 
 class ClientPolicy
 {
     use AuthorizesCompanyRecords;
 
-    /**
-     * @return list<CompanyRole>
-     */
-    protected function allowedRoles(): array
+    protected function canManagePatients(User $user, ?Company $company = null): bool
     {
-        return [
-            CompanyRole::CompanyAdmin,
-            CompanyRole::Manager,
-        ];
+        $company ??= Filament::getTenant();
+
+        return $company instanceof Company
+            && app(CompanyPermissionService::class)->allows($user, $company, CompanyPermission::ManagePatients);
     }
 
     public function viewAny(User $user): bool
     {
-        return $this->userCanManageRecords($user, null, ...$this->allowedRoles());
+        return $this->canManagePatients($user);
     }
 
     public function view(User $user, Client $client): bool
     {
         return $this->recordBelongsToAccessibleTenant($user, $client->company)
-            && $this->userCanManageRecords($user, $client->company, ...$this->allowedRoles());
+            && $this->canManagePatients($user, $client->company);
     }
 
     public function create(User $user): bool
     {
-        return $this->userCanManageRecords($user, null, ...$this->allowedRoles());
+        return $this->canManagePatients($user);
     }
 
     public function update(User $user, Client $client): bool

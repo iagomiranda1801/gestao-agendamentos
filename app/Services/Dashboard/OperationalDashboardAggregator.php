@@ -22,7 +22,6 @@ use App\Filament\App\Resources\Sales\SaleResource;
 use App\Models\Appointment;
 use App\Models\Attendance;
 use App\Models\Company;
-use App\Models\Payable;
 use App\Models\PayableInstallment;
 use App\Models\Product;
 use App\Models\Receivable;
@@ -30,6 +29,7 @@ use App\Models\Sale;
 use App\Models\StockDocument;
 use App\Services\Company\CompanyModuleService;
 use App\Support\CompanyDateTime;
+use App\Support\CompanyTerminology;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
@@ -58,7 +58,7 @@ class OperationalDashboardAggregator
             'company' => $company,
             'dateLabel' => $localToday->translatedFormat('d/m/Y'),
             'modules' => $modules,
-            'quickActions' => $this->quickActions($modules),
+            'quickActions' => $this->quickActions($company, $modules),
             'cards' => $this->cards($company, $modules, $todayStart, $todayEnd, $todayDate, $nextWeekDate),
             'alerts' => $this->alerts($company, $modules, $todayStart, $todayEnd, $todayDate, $nextWeekDate),
             'agenda' => $this->todayAgenda($company, $modules, $todayStart, $todayEnd),
@@ -70,11 +70,11 @@ class OperationalDashboardAggregator
      * @param  list<string>  $modules
      * @return list<array{label: string, description: string, url: string}>
      */
-    protected function quickActions(array $modules): array
+    protected function quickActions(Company $company, array $modules): array
     {
         $actions = [
             [
-                'label' => 'Novo cliente',
+                'label' => 'Novo '.CompanyTerminology::client($company, capitalized: false),
                 'description' => 'Cadastre uma pessoa',
                 'url' => ClientResource::getUrl('create'),
             ],

@@ -3,15 +3,20 @@
 namespace App\Filament\App\Resources\Appointments\Schemas;
 
 use App\Enums\AppointmentOrigin;
+use App\Enums\CompanyPermission;
 use App\Enums\CompanyRole;
 use App\Models\Appointment;
 use App\Models\Company;
+use App\Models\PatientClinicalAlert;
 use App\Models\Professional;
 use App\Models\Service;
 use App\Services\Client\ClientService;
+use App\Services\Company\CompanyPermissionService;
 use App\Support\CompanyDateTime;
+use App\Support\CompanyTerminology;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -21,6 +26,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
 
 class AppointmentForm
 {
@@ -31,7 +37,7 @@ class AppointmentForm
                 Section::make('Agendamento')
                     ->schema([
                         Select::make('client_id')
-                            ->label('Cliente')
+                            ->label(CompanyTerminology::client())
                             ->relationship(
                                 'client',
                                 'name',
@@ -43,6 +49,7 @@ class AppointmentForm
                             ->preload()
                             ->required()
                             ->native(false)
+                            ->live()
                             ->disabled($readOnly)
                             ->createOptionForm([
                                 TextInput::make('name')->label('Nome')->required(),
@@ -73,7 +80,7 @@ class AppointmentForm
                                 }
                             }),
                         Select::make('professional_id')
-                            ->label('Profissional')
+                            ->label(CompanyTerminology::professional())
                             ->options(fn (Get $get): array => self::professionalOptions($get('service_id')))
                             ->searchable()
                             ->required()
@@ -123,6 +130,29 @@ class AppointmentForm
                             ->visible(fn (?string $operation): bool => $operation !== 'create'),
                     ])
                     ->columns(2),
+                Section::make('Alertas clínicos')
+                    ->schema([
+                        Placeholder::make('clinical_alerts_summary')
+                            ->label('Cuidados importantes')
+                            ->content(function (Get $get): HtmlString|string {
+                                $clientId = $get('client_id');
+                                if (! $clientId) {
+                                    return 'Selecione o paciente para consultar os alertas.';
+                                }
+                                $alerts = PatientClinicalAlert::query()
+                                    ->where('company_id', Filament::getTenant()?->getKey())
+                                    ->where('client_id', $clientId)
+                                    ->where('is_active', true)
+                                    ->orderByRaw("CASE severity WHEN 'critical' THEN 1 WHEN 'attention' THEN 2 ELSE 3 END")
+                                    ->get();
+                                if ($alerts->isEmpty()) {
+                                    return 'Nenhum alerta clínico ativo.';
+                                }
+
+                                return new HtmlString($alerts->map(fn (PatientClinicalAlert $alert): string => '<div><strong>'.e($alert->title).'</strong>'.(filled($alert->description) ? ' — '.e($alert->description) : '').'</div>')->implode(''));
+                            }),
+                    ])
+                    ->visible(fn (): bool => self::canViewClinicalAlerts()),
                 Section::make('Agendamento online')
                     ->schema([
                         TextInput::make('public_confirmation_code')
@@ -188,6 +218,16 @@ class AppointmentForm
             CompanyRole::CompanyAdmin,
             CompanyRole::Manager,
         );
+    }
+
+    protected static function canViewClinicalAlerts(): bool
+    {
+        $company = Filament::getTenant();
+
+        return $company instanceof Company
+            && $company->isDentalClinic()
+            && auth()->user() !== null
+            && app(CompanyPermissionService::class)->allows(auth()->user(), $company, CompanyPermission::ViewClinicalAlerts);
     }
 
     /**

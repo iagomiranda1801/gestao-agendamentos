@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use App\Enums\CompanyRole;
 use App\Enums\CompanyProfile;
+use App\Enums\CompanyRole;
 use App\Enums\SubscriptionStatus;
 use Database\Factories\CompanyFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -82,9 +82,14 @@ class Company extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class)
-            ->withPivot(['role', 'is_active'])
+            ->withPivot(['role', 'is_active', 'permissions'])
             ->withTimestamps()
             ->using(CompanyUser::class);
+    }
+
+    public function isDentalClinic(): bool
+    {
+        return $this->business_profile === CompanyProfile::DentalClinic;
     }
 
     public function hasActiveAdmin(): bool
@@ -192,6 +197,11 @@ class Company extends Model
     public function schedulingSetting(): HasOne
     {
         return $this->hasOne(CompanySchedulingSetting::class);
+    }
+
+    public function dentalClinicSetting(): HasOne
+    {
+        return $this->hasOne(DentalClinicSetting::class);
     }
 
     /**

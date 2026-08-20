@@ -63,6 +63,7 @@ class AppPanelProvider extends PanelProvider
             ->renderHook(PanelsRenderHook::BODY_START, fn (): string => view('filament.hooks.trial-banner')->render())
             ->navigationGroups([
                 NavigationGroup::make('Cadastros')->collapsed(),
+                NavigationGroup::make('Clínico')->collapsed(),
                 NavigationGroup::make('Agenda')->collapsed(),
                 NavigationGroup::make('Estoque')->collapsed(),
                 NavigationGroup::make('Financeiro')->collapsed(),

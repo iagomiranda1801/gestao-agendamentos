@@ -9,6 +9,7 @@ use App\Enums\SubscriptionStatus;
 use App\Enums\Weekday;
 use App\Models\Company;
 use App\Models\User;
+use App\Services\Clinical\DentalClinicSettingService;
 use App\Services\Scheduling\CompanyBusinessHoursService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,7 @@ class CompanyProvisioningService
         protected CompanyModuleService $moduleService,
         protected CompanySchedulingSettingService $schedulingSettingService,
         protected CompanyBusinessHoursService $businessHoursService,
+        protected DentalClinicSettingService $dentalClinicSettingService,
     ) {}
 
     /**
@@ -106,6 +108,10 @@ class CompanyProvisioningService
 
             if ($modules->contains(CompanyModule::Scheduling)) {
                 $this->provisionSchedulingDefaults($company);
+            }
+
+            if ($profile === CompanyProfile::DentalClinic) {
+                $this->dentalClinicSettingService->getOrCreate($company);
             }
 
             return [

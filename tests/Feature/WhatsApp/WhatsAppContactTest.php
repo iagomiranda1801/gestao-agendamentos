@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\WhatsApp;
 
+use App\Enums\CompanyProfile;
 use App\Models\Client;
 use App\Models\WhatsAppContact;
 use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
@@ -134,6 +135,60 @@ class WhatsAppContactTest extends TestCase
             'phone_normalized' => '34999990003',
             'whatsapp_marketing_opt_in' => true,
         ]);
+    }
+
+    public function test_import_creates_a_dental_patient_profile_and_record_number_for_dental_clinic(): void
+    {
+        $company = $this->createCompany(['business_profile' => CompanyProfile::DentalClinic]);
+        $instance = app(CompanyWhatsAppInstanceService::class)->create($company, [
+            'name' => 'Principal',
+            'instance_name' => 'principal',
+        ]);
+        $contact = WhatsAppContact::query()->create([
+            'company_id' => $company->getKey(),
+            'company_whatsapp_instance_id' => $instance->getKey(),
+            'name' => 'Paciente WhatsApp',
+            'phone' => '34999990004',
+            'phone_normalized' => '34999990004',
+            'last_synced_at' => now(),
+        ]);
+
+        $result = app(WhatsAppContactService::class)->importAsClients($company, new Collection([$contact]));
+
+        $this->assertSame(1, $result['created']);
+        $client = $contact->refresh()->client;
+        $this->assertNotNull($client);
+        $this->assertSame('whatsapp', $client->source);
+        $this->assertNotNull($client->source_imported_at);
+        $this->assertDatabaseHas('dental_patient_profiles', [
+            'company_id' => $company->getKey(),
+            'client_id' => $client->getKey(),
+            'record_number' => 'P'.str_pad((string) $client->getKey(), 6, '0', STR_PAD_LEFT),
+        ]);
+    }
+
+    public function test_import_links_existing_dental_patient_and_repairs_missing_profile(): void
+    {
+        $company = $this->createCompany(['business_profile' => CompanyProfile::DentalClinic]);
+        $patient = Client::factory()->forCompany($company)->create(['phone' => '34999990005']);
+        $instance = app(CompanyWhatsAppInstanceService::class)->create($company, [
+            'name' => 'Principal',
+            'instance_name' => 'principal',
+        ]);
+        $contact = WhatsAppContact::query()->create([
+            'company_id' => $company->getKey(),
+            'company_whatsapp_instance_id' => $instance->getKey(),
+            'name' => 'Paciente existente',
+            'phone' => '5534999990005',
+            'phone_normalized' => '5534999990005',
+            'last_synced_at' => now(),
+        ]);
+
+        $result = app(WhatsAppContactService::class)->importAsClients($company, new Collection([$contact]));
+
+        $this->assertSame(0, $result['created']);
+        $this->assertSame($patient->getKey(), $contact->refresh()->client_id);
+        $this->assertDatabaseHas('dental_patient_profiles', ['client_id' => $patient->getKey()]);
     }
 
     public function test_cleanup_deletes_only_contacts_matching_filters(): void

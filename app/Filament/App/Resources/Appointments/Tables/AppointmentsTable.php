@@ -7,6 +7,7 @@ use App\Enums\AppointmentStatus;
 use App\Models\Appointment;
 use App\Models\Company;
 use App\Support\CompanyDateTime;
+use App\Support\CompanyTerminology;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
@@ -41,7 +42,7 @@ class AppointmentsTable
                         return CompanyDateTime::utcToLocal($company, $record->start_at)->format('H:i');
                     }),
                 TextColumn::make('client.name')
-                    ->label('Cliente')
+                    ->label(CompanyTerminology::client())
                     ->searchable(['client.name', 'client.phone', 'client.phone_normalized'])
                     ->sortable(),
                 TextColumn::make('service_name_snapshot')
@@ -49,7 +50,7 @@ class AppointmentsTable
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('professional.name')
-                    ->label('Profissional')
+                    ->label(CompanyTerminology::professional())
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('duration_minutes_snapshot')
@@ -135,7 +136,7 @@ class AppointmentsTable
                     ->toggle()
                     ->query(fn (Builder $query): Builder => $query->where('origin', AppointmentOrigin::Online)),
                 SelectFilter::make('client_id')
-                    ->label('Cliente')
+                    ->label(CompanyTerminology::client())
                     ->relationship('client', 'name', fn (Builder $query): Builder => $query->where(
                         'company_id',
                         Filament::getTenant()?->getKey(),

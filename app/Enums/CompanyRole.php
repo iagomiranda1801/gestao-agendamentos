@@ -7,6 +7,8 @@ enum CompanyRole: string
     case CompanyAdmin = 'company_admin';
     case Manager = 'manager';
     case Employee = 'employee';
+    case Receptionist = 'receptionist';
+    case Dentist = 'dentist';
 
     public function label(): string
     {
@@ -14,6 +16,8 @@ enum CompanyRole: string
             self::CompanyAdmin => 'Administrador',
             self::Manager => 'Gerente',
             self::Employee => 'Colaborador',
+            self::Receptionist => 'Recepção / Secretária',
+            self::Dentist => 'Dentista',
         };
     }
 

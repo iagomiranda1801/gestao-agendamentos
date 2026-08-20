@@ -18,6 +18,7 @@ use App\Services\Scheduling\AppointmentService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\Scheduling\ScheduleBlockService;
 use App\Support\CompanyDateTime;
+use App\Support\CompanyTerminology;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
@@ -321,7 +322,7 @@ class CalendarPage extends Page
                 ->icon('heroicon-o-plus')
                 ->schema([
                     Select::make('client_id')
-                        ->label('Cliente')
+                        ->label(CompanyTerminology::client())
                         ->options(fn (): array => Client::query()
                             ->where('company_id', Filament::getTenant()?->getKey())
                             ->active()

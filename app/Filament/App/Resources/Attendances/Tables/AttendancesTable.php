@@ -6,6 +6,7 @@ use App\Models\Attendance;
 use App\Models\Company;
 use App\Policies\AttendancePolicy;
 use App\Support\CompanyDateTime;
+use App\Support\CompanyTerminology;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
@@ -37,7 +38,7 @@ class AttendancesTable
                     })
                     ->sortable(),
                 TextColumn::make('client_name_snapshot')
-                    ->label('Cliente')
+                    ->label(CompanyTerminology::client())
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('service_name_snapshot')
@@ -45,7 +46,7 @@ class AttendancesTable
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('professional_name_snapshot')
-                    ->label('Profissional')
+                    ->label(CompanyTerminology::professional())
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('final_amount')
@@ -128,7 +129,7 @@ class AttendancesTable
                     ->preload()
                     ->native(false),
                 SelectFilter::make('client_id')
-                    ->label('Cliente')
+                    ->label(CompanyTerminology::client())
                     ->relationship('client', 'name', fn (Builder $query): Builder => $query->where(
                         'company_id',
                         Filament::getTenant()?->getKey(),

@@ -17,6 +17,7 @@ class CompanyUser extends Pivot
         return [
             'role' => CompanyRole::class,
             'is_active' => 'boolean',
+            'permissions' => 'array',
         ];
     }
 }

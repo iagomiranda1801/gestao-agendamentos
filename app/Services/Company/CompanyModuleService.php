@@ -47,6 +47,10 @@ class CompanyModuleService
 
     public function hasModule(Company $company, CompanyModule $module): bool
     {
+        if ($module === CompanyModule::ClinicalRecords && $company->isDentalClinic()) {
+            return true;
+        }
+
         $enabled = $this->enabledModules($company);
 
         // Companies created before WhatsApp became independent used Marketing for the connection.

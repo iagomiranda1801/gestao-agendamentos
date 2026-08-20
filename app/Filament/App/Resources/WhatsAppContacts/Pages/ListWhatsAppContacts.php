@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\CompanyWhatsAppInstance;
 use App\Services\WhatsApp\WhatsAppContactCleanupService;
 use App\Services\WhatsApp\WhatsAppContactService;
+use App\Support\CompanyTerminology;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
@@ -66,7 +67,7 @@ class ListWhatsAppContacts extends ListRecords
                 ->color('danger')
                 ->requiresConfirmation()
                 ->modalHeading('Limpar contatos WhatsApp')
-                ->modalDescription('Isso remove apenas contatos sincronizados/importados do WhatsApp. Clientes já cadastrados não serão apagados.')
+                ->modalDescription(fn (): string => 'Isso remove apenas contatos sincronizados/importados do WhatsApp. '.CompanyTerminology::client(plural: true).' já cadastrados não serão apagados.')
                 ->form([
                     Select::make('instance_id')
                         ->label('Instância')
@@ -80,8 +81,8 @@ class ListWhatsAppContacts extends ListRecords
                     Select::make('import_status')
                         ->label('Importação')
                         ->options([
-                            'not_imported' => 'Somente não importados como cliente',
-                            'imported' => 'Somente importados como cliente',
+                            'not_imported' => 'Somente não importados como '.CompanyTerminology::client(capitalized: false),
+                            'imported' => 'Somente importados como '.CompanyTerminology::client(capitalized: false),
                             'all' => 'Todos os contatos WhatsApp',
                         ])
                         ->default('not_imported')
@@ -105,7 +106,7 @@ class ListWhatsAppContacts extends ListRecords
                     Notification::make()
                         ->success()
                         ->title('Contatos removidos')
-                        ->body("{$deleted} contato(s) WhatsApp removido(s). Clientes vinculados foram mantidos.")
+                        ->body("{$deleted} contato(s) WhatsApp removido(s). ".CompanyTerminology::client(plural: true).' vinculados foram mantidos.')
                         ->send();
                 }),
         ];

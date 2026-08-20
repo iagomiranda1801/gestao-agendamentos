@@ -5,10 +5,13 @@ namespace App\Filament\App\Resources\Clients;
 use App\Filament\App\Resources\Clients\Pages\CreateClient;
 use App\Filament\App\Resources\Clients\Pages\EditClient;
 use App\Filament\App\Resources\Clients\Pages\ListClients;
+use App\Filament\App\Resources\Clients\Pages\ViewPatientRecord;
 use App\Filament\App\Resources\Clients\Schemas\ClientForm;
 use App\Filament\App\Resources\Clients\Tables\ClientsTable;
 use App\Models\Client;
+use App\Models\Company;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -42,6 +45,28 @@ class ClientResource extends Resource
         return ClientForm::configure($schema);
     }
 
+    public static function getModelLabel(): string
+    {
+        return static::isDentalTenant() ? 'paciente' : 'cliente';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return static::isDentalTenant() ? 'pacientes' : 'clientes';
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return static::isDentalTenant() ? 'Pacientes' : 'Clientes';
+    }
+
+    protected static function isDentalTenant(): bool
+    {
+        $company = Filament::getTenant();
+
+        return $company instanceof Company && $company->isDentalClinic();
+    }
+
     public static function table(Table $table): Table
     {
         return ClientsTable::configure($table);
@@ -65,6 +90,7 @@ class ClientResource extends Resource
         return [
             'index' => ListClients::route('/'),
             'create' => CreateClient::route('/create'),
+            'view' => ViewPatientRecord::route('/{record}'),
             'edit' => EditClient::route('/{record}/edit'),
         ];
     }

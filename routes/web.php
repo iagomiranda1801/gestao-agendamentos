@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\EvolutionWebhookController;
+use App\Http\Controllers\PrintDentalTreatmentPlanController;
 use App\Livewire\PublicBooking\BookingWizard;
 use App\Livewire\PublicBooking\ManageAppointment;
 use App\Livewire\Signup\CompanySignupWizard;
@@ -16,3 +17,7 @@ Route::get('/agendar/{company:slug}', BookingWizard::class)->name('public.bookin
 Route::get('/agendamento/{token}', ManageAppointment::class)->name('public.appointment.manage');
 Route::post('/webhooks/evolution/{instance?}', EvolutionWebhookController::class)
     ->name('webhooks.evolution');
+
+Route::get('/app/empresa/{company:slug}/clinico/planos/{plan}/imprimir', PrintDentalTreatmentPlanController::class)
+    ->middleware('auth')
+    ->name('dental.treatment-plan.print');

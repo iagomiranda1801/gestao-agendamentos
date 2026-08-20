@@ -6,6 +6,7 @@ use App\Models\Attendance;
 use App\Models\Company;
 use App\Policies\AttendancePolicy;
 use App\Support\CompanyDateTime;
+use App\Support\CompanyTerminology;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Textarea;
@@ -35,13 +36,13 @@ class AttendanceForm
                                 return CompanyDateTime::formatLocal($company, $record->completed_at);
                             }),
                         Placeholder::make('client_name_snapshot')
-                            ->label('Cliente')
+                            ->label(CompanyTerminology::client())
                             ->content(fn (?Attendance $record): string => $record?->client_name_snapshot ?? '—'),
                         Placeholder::make('service_name_snapshot')
                             ->label('Serviço')
                             ->content(fn (?Attendance $record): string => $record?->service_name_snapshot ?? '—'),
                         Placeholder::make('professional_name_snapshot')
-                            ->label('Profissional')
+                            ->label(CompanyTerminology::professional())
                             ->content(fn (?Attendance $record): string => $record?->professional_name_snapshot ?? '—'),
                         Placeholder::make('completedBy.name')
                             ->label('Concluído por')

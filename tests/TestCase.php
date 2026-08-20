@@ -17,6 +17,10 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        // Filament stores transient notifications in the session. Explicitly
+        // isolate that state so one Livewire test cannot consume another's alert.
+        session()->flush();
+
         Filament::setCurrentPanel('admin');
     }
 
@@ -53,5 +57,6 @@ abstract class TestCase extends BaseTestCase
         $panel->boot();
         Filament::setServingStatus(true);
         Filament::setTenant($company, isQuiet: true);
+        session()->flush();
     }
 }

@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\Company;
 use App\Models\CompanyWhatsAppInstance;
 use App\Models\WhatsAppContact;
+use App\Services\Client\ClientService;
 use App\Support\PhoneNormalizer;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,7 @@ class WhatsAppContactService
 {
     public function __construct(
         protected EvolutionApiClient $client,
+        protected ClientService $clientService,
     ) {}
 
     public function sync(Company $company, CompanyWhatsAppInstance $instance): int
@@ -98,16 +100,19 @@ class WhatsAppContactService
                 $client = $contact->client ?: $this->findClient($company, $contact->phone_normalized);
 
                 if ($client === null) {
-                    $client = new Client([
+                    $client = $this->clientService->create($company, [
                         'name' => $contact->name ?: "Contato {$contact->phone_normalized}",
                         'phone' => $contact->phone_normalized,
                         'is_active' => true,
                         'whatsapp_marketing_opt_in' => false,
+                        'source' => 'whatsapp',
+                        'source_imported_at' => now(),
                     ]);
-                    $client->company()->associate($company);
-                    $client->save();
                     $created++;
                 } else {
+                    if ($company->isDentalClinic()) {
+                        $this->clientService->ensureDentalProfile($company, $client);
+                    }
                     $linked++;
                 }
 

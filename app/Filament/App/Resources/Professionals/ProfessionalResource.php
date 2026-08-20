@@ -10,6 +10,7 @@ use App\Filament\App\Resources\Professionals\RelationManagers\WorkingHoursRelati
 use App\Filament\App\Resources\Professionals\Schemas\ProfessionalForm;
 use App\Filament\App\Resources\Professionals\Tables\ProfessionalsTable;
 use App\Models\Professional;
+use App\Support\CompanyTerminology;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -42,6 +43,21 @@ class ProfessionalResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return ProfessionalForm::configure($schema);
+    }
+
+    public static function getModelLabel(): string
+    {
+        return CompanyTerminology::professional(capitalized: false);
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return CompanyTerminology::professional(plural: true, capitalized: false);
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return CompanyTerminology::professional(plural: true);
     }
 
     public static function table(Table $table): Table

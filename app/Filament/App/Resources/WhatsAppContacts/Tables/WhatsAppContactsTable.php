@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\CompanyWhatsAppInstance;
 use App\Models\WhatsAppContact;
 use App\Services\WhatsApp\WhatsAppContactService;
+use App\Support\CompanyTerminology;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\DeleteAction;
@@ -39,8 +40,8 @@ class WhatsAppContactsTable
                     ->label('Instância')
                     ->sortable(),
                 TextColumn::make('client.name')
-                    ->label('Cliente')
-                    ->placeholder('Ainda não importado')
+                    ->label(fn (): string => CompanyTerminology::client())
+                    ->placeholder(fn (): string => 'Ainda não importado como '.CompanyTerminology::client(capitalized: false))
                     ->searchable(),
                 IconColumn::make('imported_as_client_at')
                     ->label('Importado')
@@ -66,7 +67,7 @@ class WhatsAppContactsTable
                         ->pluck('name', 'id')
                         ->all()),
                 TernaryFilter::make('imported_as_client_at')
-                    ->label('Importado como cliente')
+                    ->label(fn (): string => 'Importado como '.CompanyTerminology::client(capitalized: false))
                     ->nullable()
                     ->queries(
                         true: fn (Builder $query): Builder => $query->whereNotNull('imported_as_client_at'),
@@ -76,12 +77,12 @@ class WhatsAppContactsTable
             ])
             ->recordActions([
                 Action::make('import')
-                    ->label('Importar como cliente')
+                    ->label(fn (): string => 'Importar como '.CompanyTerminology::client(capitalized: false))
                     ->icon('heroicon-o-user-plus')
                     ->visible(fn (WhatsAppContact $record): bool => $record->imported_as_client_at === null)
                     ->requiresConfirmation()
-                    ->modalHeading('Importar contato como cliente')
-                    ->modalDescription('Cria ou vincula o cliente. Esta ação não altera a autorização para campanhas.')
+                    ->modalHeading(fn (): string => 'Importar contato como '.CompanyTerminology::client(capitalized: false))
+                    ->modalDescription(fn (): string => 'Cria ou vincula '.CompanyTerminology::client(capitalized: false).'. Em clínica odontológica, o prontuário é gerado quando necessário. Esta ação não altera a autorização para campanhas.')
                     ->action(function (WhatsAppContact $record): void {
                         /** @var Company $company */
                         $company = Filament::getTenant();
@@ -93,7 +94,7 @@ class WhatsAppContactsTable
 
                         Notification::make()
                             ->success()
-                            ->title($result['created'] > 0 ? 'Cliente criado' : 'Contato vinculado')
+                            ->title($result['created'] > 0 ? CompanyTerminology::client().' criado' : 'Contato vinculado')
                             ->send();
                     }),
                 Action::make('importAndAuthorizeMarketing')
@@ -121,13 +122,13 @@ class WhatsAppContactsTable
 
                         Notification::make()
                             ->success()
-                            ->title($result['created'] > 0 ? 'Cliente criado e autorizado' : 'Contato autorizado para campanhas')
+                            ->title($result['created'] > 0 ? CompanyTerminology::client().' criado e autorizado' : 'Contato autorizado para campanhas')
                             ->send();
                     }),
                 DeleteAction::make()
                     ->label('Excluir contato')
                     ->modalHeading('Excluir contato WhatsApp')
-                    ->modalDescription('Isso remove apenas o contato sincronizado do WhatsApp. O cliente vinculado, se existir, será mantido. Você pode sincronizar novamente depois.'),
+                    ->modalDescription(fn (): string => 'Isso remove apenas o contato sincronizado do WhatsApp. '.CompanyTerminology::client().' vinculado, se existir, será mantido. Você pode sincronizar novamente depois.'),
             ])
             ->bulkActions([
                 BulkAction::make('importSelected')
@@ -135,7 +136,7 @@ class WhatsAppContactsTable
                     ->icon('heroicon-o-user-plus')
                     ->requiresConfirmation()
                     ->modalHeading('Importar contatos selecionados')
-                    ->modalDescription('Cria ou vincula os clientes. Esta ação não altera a autorização para campanhas.')
+                    ->modalDescription(fn (): string => 'Cria ou vincula '.CompanyTerminology::client(plural: true, capitalized: false).'. Em clínica odontológica, os prontuários necessários serão gerados. Esta ação não altera a autorização para campanhas.')
                     ->action(function (Collection $records): void {
                         /** @var Company $company */
                         $company = Filament::getTenant();
@@ -145,7 +146,7 @@ class WhatsAppContactsTable
                         Notification::make()
                             ->success()
                             ->title('Importação concluída')
-                            ->body("{$result['created']} cliente(s) criado(s) e {$result['linked']} contato(s) vinculado(s).")
+                            ->body("{$result['created']} ".CompanyTerminology::client(capitalized: false)."(s) criado(s) e {$result['linked']} contato(s) vinculado(s).")
                             ->send();
                     }),
                 BulkAction::make('importAndAuthorizeSelected')
@@ -170,7 +171,7 @@ class WhatsAppContactsTable
                         Notification::make()
                             ->success()
                             ->title('Importação e autorização concluídas')
-                            ->body("{$result['created']} cliente(s) criado(s) e {$result['linked']} contato(s) vinculado(s) e autorizados.")
+                            ->body("{$result['created']} ".CompanyTerminology::client(capitalized: false)."(s) criado(s) e {$result['linked']} contato(s) vinculado(s) e autorizados.")
                             ->send();
                     }),
                 DeleteBulkAction::make()

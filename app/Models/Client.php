@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'name',
@@ -21,6 +22,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'notes',
     'is_active',
     'whatsapp_marketing_opt_in',
+    'source',
+    'source_imported_at',
 ])]
 class Client extends Model
 {
@@ -50,6 +53,7 @@ class Client extends Model
             'birth_date' => 'date',
             'is_active' => 'boolean',
             'whatsapp_marketing_opt_in' => 'boolean',
+            'source_imported_at' => 'datetime',
         ];
     }
 
@@ -75,6 +79,61 @@ class Client extends Model
     public function attendances(): HasMany
     {
         return $this->hasMany(Attendance::class);
+    }
+
+    public function dentalProfile(): HasOne
+    {
+        return $this->hasOne(DentalPatientProfile::class);
+    }
+
+    public function guardians(): HasMany
+    {
+        return $this->hasMany(PatientGuardian::class);
+    }
+
+    public function insurances(): HasMany
+    {
+        return $this->hasMany(PatientInsurance::class);
+    }
+
+    public function dentalAnamneses(): HasMany
+    {
+        return $this->hasMany(DentalAnamnesis::class);
+    }
+
+    public function clinicalAlerts(): HasMany
+    {
+        return $this->hasMany(PatientClinicalAlert::class);
+    }
+
+    public function activeClinicalAlerts(): HasMany
+    {
+        return $this->hasMany(PatientClinicalAlert::class)->where('is_active', true);
+    }
+
+    public function clinicalEntries(): HasMany
+    {
+        return $this->hasMany(DentalClinicalEntry::class);
+    }
+
+    public function treatmentPlans(): HasMany
+    {
+        return $this->hasMany(DentalTreatmentPlan::class);
+    }
+
+    public function odontograms(): HasMany
+    {
+        return $this->hasMany(DentalOdontogram::class);
+    }
+
+    public function clinicalAttachments(): HasMany
+    {
+        return $this->hasMany(ClinicalAttachment::class);
+    }
+
+    public function clinicalAuditEvents(): HasMany
+    {
+        return $this->hasMany(ClinicalAuditEvent::class)->orderByDesc('occurred_at');
     }
 
     /**

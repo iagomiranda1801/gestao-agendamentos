@@ -7,9 +7,11 @@ use App\Models\Company;
 use App\Services\Client\ClientService;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -24,6 +26,11 @@ class ClientsTable
                     ->label('Nome')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('dentalProfile.record_number')
+                    ->label('Prontuário')
+                    ->searchable()
+                    ->toggleable()
+                    ->visible(fn (): bool => ($company = Filament::getTenant()) instanceof Company && $company->isDentalClinic()),
                 TextColumn::make('phone')
                     ->label('Telefone')
                     ->searchable(['phone', 'phone_normalized'])
@@ -69,9 +76,18 @@ class ClientsTable
                     ->trueLabel('Com aceite')
                     ->falseLabel('Sem aceite')
                     ->placeholder('Todos'),
+                Filter::make('incomplete_dental_registration')
+                    ->label('Cadastro incompleto')
+                    ->visible(fn (): bool => ($company = Filament::getTenant()) instanceof Company && $company->isDentalClinic())
+                    ->query(fn (Builder $query): Builder => $query->where(function (Builder $query): void {
+                        $query->whereNull('birth_date')
+                            ->orWhereNull('document')
+                            ->orWhereDoesntHave('dentalProfile');
+                    })),
             ])
             ->defaultSort('name')
             ->recordActions([
+                ViewAction::make()->visible(fn (): bool => ($company = Filament::getTenant()) instanceof Company && $company->isDentalClinic()),
                 EditAction::make(),
                 Action::make('activate')
                     ->label('Ativar')

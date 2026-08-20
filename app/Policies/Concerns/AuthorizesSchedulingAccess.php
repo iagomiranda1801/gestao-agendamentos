@@ -18,6 +18,7 @@ trait AuthorizesSchedulingAccess
         return [
             CompanyRole::CompanyAdmin,
             CompanyRole::Manager,
+            CompanyRole::Receptionist,
         ];
     }
 
