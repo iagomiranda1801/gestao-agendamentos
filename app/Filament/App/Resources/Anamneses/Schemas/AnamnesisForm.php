@@ -26,11 +26,22 @@ class AnamnesisForm
             $fields[] = Textarea::make('answers.'.$question['key'].'.details')->label('Detalhes')->rows(2)->disabled($disabled);
         }
 
-        return $schema->components([
-            Section::make('Paciente')->schema([
-                Select::make('client_id')->label('Paciente')->relationship('client', 'name', fn (Builder $query): Builder => $query->where('company_id', Filament::getTenant()?->getKey())->active())->searchable()->preload()->required()->disabled($disabled),
-            ]),
-            Section::make('Questionário clínico')->description('Respostas positivas relevantes geram alertas clínicos ao concluir.')->schema($fields)->columns(2),
+        return $schema->columns(1)->components([
+            Section::make('Anamnese')
+                ->description('Selecione o paciente e responda às perguntas. Quando necessário, informe os detalhes ao lado.')
+                ->schema([
+                    Select::make('client_id')
+                        ->label('Paciente')
+                        ->relationship('client', 'name', fn (Builder $query): Builder => $query->where('company_id', Filament::getTenant()?->getKey())->active())
+                        ->searchable()
+                        ->preload()
+                        ->required()
+                        ->disabled($disabled)
+                        ->columnSpanFull(),
+                    ...$fields,
+                ])
+                ->columns(2)
+                ->columnSpanFull(),
         ]);
     }
 }
