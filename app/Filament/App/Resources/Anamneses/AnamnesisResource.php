@@ -55,7 +55,7 @@ class AnamnesisResource extends Resource
             TextColumn::make('status')->label('Status')->badge()->formatStateUsing(fn (string $state): string => match ($state) {
                 'completed' => 'Concluída', 'superseded' => 'Substituída', default => 'Rascunho'
             }),
-            TextColumn::make('reviewer.name')->label('Dentista revisor')->placeholder('—'),
+            TextColumn::make('reviewer.name')->label('Dentista responsável pela validação')->placeholder('—'),
             TextColumn::make('completed_at')->label('Concluída em')->dateTime('d/m/Y H:i')->placeholder('—'),
         ])->defaultSort('created_at', 'desc');
     }

@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Enums\CompanyPermission;
+use App\Enums\CompanyRole;
 use App\Models\DentalAnamnesis;
 use App\Models\User;
 use App\Policies\Concerns\AuthorizesClinicalRecords;
@@ -28,7 +29,10 @@ class DentalAnamnesisPolicy
 
     public function update(User $user, DentalAnamnesis $record): bool
     {
-        return $record->status === 'draft' && (int) $record->created_by === (int) $user->getKey() && $this->allowsClinical($user, CompanyPermission::WriteClinicalRecords, $record);
+        return $record->status === 'draft'
+            && ((int) $record->created_by === (int) $user->getKey()
+                || $user->hasActiveRoleInCompany($record->company, CompanyRole::CompanyAdmin))
+            && $this->allowsClinical($user, CompanyPermission::WriteClinicalRecords, $record);
     }
 
     public function delete(User $user, DentalAnamnesis $record): bool

@@ -30,7 +30,11 @@ class EditAnamnesis extends EditRecord
     {
         return [
             Action::make('complete')->label('Concluir anamnese')->color('success')->visible(fn (): bool => $this->record->status === 'draft')->schema([
-                Select::make('reviewed_by')->label('Dentista revisor')->options(fn (): array => Professional::query()->where('company_id', Filament::getTenant()?->getKey())->where('user_id', auth()->id())->active()->pluck('name', 'id')->all())->required(),
+                Select::make('reviewed_by')
+                    ->label('Dentista responsável pela validação')
+                    ->helperText('Selecione o dentista que conferiu e confirmou esta anamnese.')
+                    ->options(fn (): array => Professional::query()->where('company_id', Filament::getTenant()?->getKey())->where('user_id', auth()->id())->active()->pluck('name', 'id')->all())
+                    ->required(),
             ])->requiresConfirmation()->action(function (array $data): void {
                 /** @var Company $company */ $company = Filament::getTenant();
                 $reviewer = Professional::query()->where('company_id', $company->getKey())->findOrFail($data['reviewed_by']);

@@ -3,6 +3,7 @@
 namespace App\Services\Clinical;
 
 use App\Enums\CompanyPermission;
+use App\Enums\CompanyRole;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\DentalAnamnesis;
@@ -55,7 +56,11 @@ class DentalAnamnesisService
         $client = $this->clientFor($company, $anamnesis);
         $this->authorization->authorize($user, $company, CompanyPermission::WriteClinicalRecords, $client);
         $this->assertDraft($anamnesis);
-        abort_unless((int) $anamnesis->created_by === (int) $user->getKey(), 403);
+        abort_unless(
+            (int) $anamnesis->created_by === (int) $user->getKey()
+                || $user->hasActiveRoleInCompany($company, CompanyRole::CompanyAdmin),
+            403,
+        );
 
         return DB::transaction(function () use ($company, $client, $anamnesis, $user, $answers): DentalAnamnesis {
             $anamnesis->update(['answers' => $answers]);
