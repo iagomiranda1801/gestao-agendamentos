@@ -341,7 +341,8 @@ class CalendarPage extends Page
                             ->orderBy('name')
                             ->pluck('name', 'id')
                             ->all())
-                        ->required()
+                        ->nullable()
+                        ->helperText('Opcional. Deixe em branco para definir o procedimento no atendimento.')
                         ->live()
                         ->native(false),
                     Select::make('professional_id')
@@ -350,7 +351,13 @@ class CalendarPage extends Page
                             $serviceId = $get('service_id');
 
                             if (! $serviceId) {
-                                return [];
+                                return Professional::query()
+                                    ->where('company_id', Filament::getTenant()?->getKey())
+                                    ->active()
+                                    ->bookable()
+                                    ->orderBy('name')
+                                    ->pluck('name', 'id')
+                                    ->all();
                             }
 
                             return Professional::query()
@@ -366,6 +373,14 @@ class CalendarPage extends Page
                         })
                         ->required()
                         ->native(false),
+                    TextInput::make('duration_minutes_snapshot')
+                        ->label('Duração prevista')
+                        ->numeric()
+                        ->minValue(15)
+                        ->maxValue(480)
+                        ->suffix('min')
+                        ->required(fn (callable $get): bool => blank($get('service_id')))
+                        ->visible(fn (callable $get): bool => blank($get('service_id'))),
                     DatePicker::make('appointment_date')
                         ->label('Data')
                         ->required()
@@ -374,6 +389,11 @@ class CalendarPage extends Page
                         ->label('Hora inicial')
                         ->seconds(false)
                         ->required(),
+                    Textarea::make('appointment_reason')
+                        ->label('Motivo da consulta')
+                        ->rows(2)
+                        ->visible(fn (callable $get): bool => blank($get('service_id')))
+                        ->columnSpanFull(),
                 ])
                 ->action(function (array $data): void {
                     $this->createFromSelection($data);
