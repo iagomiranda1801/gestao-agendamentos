@@ -45,14 +45,10 @@ class AppointmentService
         return DB::transaction(function () use ($company, $user, $client, $professional, $service, $localStart, $data): Appointment {
             $professional = Professional::query()->whereKey($professional->getKey())->lockForUpdate()->firstOrFail();
 
-            $isOpenService = ($data['service_selection_mode'] ?? 'defined') === 'to_be_defined';
+            $isOpenService = ($data['service_selection_mode'] ?? 'defined') === 'to_be_defined' || $service === null;
             if ($isOpenService && $service !== null) {
                 throw ValidationException::withMessages(['service_id' => 'Não selecione um serviço para um agendamento a definir.']);
             }
-            if (! $isOpenService && $service === null) {
-                throw ValidationException::withMessages(['service_id' => 'Selecione um serviço para o agendamento.']);
-            }
-
             $this->assertRelatedModels($company, $client, $professional, $service);
 
             $snapshots = $isOpenService
@@ -135,17 +131,13 @@ class AppointmentService
             $client = isset($data['client_id'])
                 ? Client::query()->findOrFail($data['client_id'])
                 : $appointment->client;
-            $isOpenService = ($data['service_selection_mode'] ?? $appointment->service_selection_mode) === 'to_be_defined';
+            $isOpenService = ($data['service_selection_mode'] ?? $appointment->service_selection_mode) === 'to_be_defined'
+                || blank($data['service_id'] ?? $appointment->service_id);
             $service = ! $isOpenService && isset($data['service_id'])
                 ? Service::query()->findOrFail($data['service_id'])
                 : $appointment->service;
             if ($isOpenService) {
                 $service = null;
-            }
-            if (! $isOpenService && $service === null) {
-                throw ValidationException::withMessages([
-                    'service_id' => 'Selecione um serviço para o agendamento.',
-                ]);
             }
             $professional = isset($data['professional_id'])
                 ? Professional::query()->whereKey($data['professional_id'])->lockForUpdate()->firstOrFail()

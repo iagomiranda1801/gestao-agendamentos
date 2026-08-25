@@ -84,12 +84,16 @@ class AppointmentForm
                             ->label('Serviço')
                             ->options(fn (): array => self::serviceOptions())
                             ->searchable()
-                            ->required(fn (Get $get): bool => $get('service_selection_mode') !== 'to_be_defined')
+                            ->nullable()
+                            ->helperText('Deixe em branco para definir o procedimento no atendimento.')
                             ->native(false)
                             ->live()
                             ->visible(fn (Get $get): bool => $get('service_selection_mode') !== 'to_be_defined')
                             ->disabled($readOnly)
                             ->afterStateUpdated(function (?int $state, Set $set, Get $get): void {
+                                if ($state !== null) {
+                                    $set('service_selection_mode', 'defined');
+                                }
                                 self::syncPreviewFields($set, $get, $state, $get('professional_id'));
                                 $professionalId = $get('professional_id');
                                 if ($professionalId && ! self::professionalEligible($state, $professionalId)) {
@@ -98,7 +102,7 @@ class AppointmentForm
                             }),
                         Select::make('professional_id')
                             ->label(CompanyTerminology::professional())
-                            ->options(fn (Get $get): array => $get('service_selection_mode') === 'to_be_defined'
+                            ->options(fn (Get $get): array => self::isOpenServiceSelection($get)
                                 ? self::openAppointmentProfessionalOptions()
                                 : self::professionalOptions($get('service_id')))
                             ->searchable()
@@ -118,8 +122,8 @@ class AppointmentForm
                             ->minValue(15)
                             ->maxValue(480)
                             ->suffix('min')
-                            ->required(fn (Get $get): bool => $get('service_selection_mode') === 'to_be_defined')
-                            ->visible(fn (Get $get): bool => $get('service_selection_mode') === 'to_be_defined')
+                            ->required(fn (Get $get): bool => self::isOpenServiceSelection($get))
+                            ->visible(fn (Get $get): bool => self::isOpenServiceSelection($get))
                             ->live()
                             ->afterStateUpdated(fn (Set $set, Get $get) => self::syncEndPreview($set, $get))
                             ->disabled($readOnly),
@@ -141,7 +145,7 @@ class AppointmentForm
                             ->label('Duração')
                             ->disabled()
                             ->dehydrated(false)
-                            ->visible(fn (Get $get): bool => $get('service_selection_mode') !== 'to_be_defined')
+                            ->visible(fn (Get $get): bool => ! self::isOpenServiceSelection($get))
                             ->formatStateUsing(fn ($state, Get $get): string => self::durationLabel($get('service_id'), $get('professional_id'))),
                         TextInput::make('end_time_preview')
                             ->label('Hora final')
@@ -153,7 +157,7 @@ class AppointmentForm
                             ->prefix('R$')
                             ->disabled()
                             ->dehydrated(false)
-                            ->formatStateUsing(fn ($state, Get $get): string => $get('service_selection_mode') === 'to_be_defined'
+                            ->formatStateUsing(fn ($state, Get $get): string => self::isOpenServiceSelection($get)
                                 ? 'A combinar'
                                 : self::priceLabel($get('service_id'), $get('professional_id'))),
                         TextInput::make('status_label')
@@ -225,7 +229,7 @@ class AppointmentForm
                             ->label('Motivo da consulta')
                             ->rows(2)
                             ->columnSpanFull()
-                            ->visible(fn (Get $get): bool => $get('service_selection_mode') === 'to_be_defined')
+                            ->visible(fn (Get $get): bool => self::isOpenServiceSelection($get))
                             ->disabled($readOnly),
                         Textarea::make('notes')
                             ->label('Observações')
@@ -327,6 +331,12 @@ class AppointmentForm
             ->all();
     }
 
+    protected static function isOpenServiceSelection(Get $get): bool
+    {
+        return $get('service_selection_mode') === 'to_be_defined'
+            || blank($get('service_id'));
+    }
+
     protected static function professionalEligible(?int $serviceId, ?int $professionalId): bool
     {
         if (! $serviceId || ! $professionalId) {
@@ -366,7 +376,7 @@ class AppointmentForm
     {
         $date = $get('appointment_date');
         $time = $get('appointment_time');
-        $duration = $get('service_selection_mode') === 'to_be_defined'
+        $duration = self::isOpenServiceSelection($get)
             ? (int) $get('duration_minutes_snapshot')
             : self::resolveDuration($get('service_id'), $get('professional_id'));
 

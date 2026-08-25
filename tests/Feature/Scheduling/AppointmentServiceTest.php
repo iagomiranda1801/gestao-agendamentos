@@ -309,4 +309,22 @@ class AppointmentServiceTest extends TestCase
         $this->assertSame(45, $appointment->duration_minutes_snapshot);
         $this->assertSame('Avaliação inicial', $appointment->appointment_reason);
     }
+
+    public function test_empty_service_automatically_creates_an_open_appointment(): void
+    {
+        $setup = $this->createBookableSetup();
+
+        $appointment = app(AppointmentService::class)->createInternalAppointment(
+            $setup['company'],
+            $setup['admin'],
+            $setup['client'],
+            $setup['professional'],
+            null,
+            $setup['localStart'],
+            ['duration_minutes_snapshot' => 30],
+        );
+
+        $this->assertTrue($appointment->hasServiceToBeDefined());
+        $this->assertSame(30, $appointment->duration_minutes_snapshot);
+    }
 }
