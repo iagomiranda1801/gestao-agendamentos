@@ -38,16 +38,26 @@ class AppointmentService
         User $user,
         Client $client,
         Professional $professional,
-        Service $service,
+        ?Service $service,
         CarbonImmutable $localStart,
         array $data = [],
     ): Appointment {
         return DB::transaction(function () use ($company, $user, $client, $professional, $service, $localStart, $data): Appointment {
             $professional = Professional::query()->whereKey($professional->getKey())->lockForUpdate()->firstOrFail();
 
+            $isOpenService = ($data['service_selection_mode'] ?? 'defined') === 'to_be_defined';
+            if ($isOpenService && $service !== null) {
+                throw ValidationException::withMessages(['service_id' => 'Não selecione um serviço para um agendamento a definir.']);
+            }
+            if (! $isOpenService && $service === null) {
+                throw ValidationException::withMessages(['service_id' => 'Selecione um serviço para o agendamento.']);
+            }
+
             $this->assertRelatedModels($company, $client, $professional, $service);
 
-            $snapshots = $this->resolveSnapshots($company, $professional, $service);
+            $snapshots = $isOpenService
+                ? $this->resolveOpenServiceSnapshots($data)
+                : $this->resolveSnapshots($company, $professional, $service);
             $startUtc = CompanyDateTime::localToUtc($company, $localStart);
             $endUtc = $startUtc->addMinutes($snapshots['duration_minutes_snapshot']);
 
@@ -64,6 +74,7 @@ class AppointmentService
             $appointment = new Appointment([
                 'status' => AppointmentStatus::Confirmed,
                 'origin' => AppointmentOrigin::Internal,
+                'service_selection_mode' => $isOpenService ? 'to_be_defined' : 'defined',
                 'start_at' => $startUtc,
                 'end_at' => $endUtc,
                 'service_name_snapshot' => $snapshots['service_name_snapshot'],
@@ -74,6 +85,7 @@ class AppointmentService
                 'notes' => $data['notes'] ?? null,
                 'internal_notes' => $data['internal_notes'] ?? null,
                 'reference_key' => $data['reference_key'] ?? null,
+                'appointment_reason' => $data['appointment_reason'] ?? null,
                 'client_name_snapshot' => $client->name,
                 'client_phone_snapshot' => $client->phone,
                 'client_email_snapshot' => $client->email,
@@ -82,7 +94,9 @@ class AppointmentService
             $appointment->company()->associate($company);
             $appointment->client()->associate($client);
             $appointment->professional()->associate($professional);
-            $appointment->service()->associate($service);
+            if ($service !== null) {
+                $appointment->service()->associate($service);
+            }
             $appointment->creator()->associate($user);
             $appointment->confirmer()->associate($user);
             $appointment->confirmed_at = now();
@@ -121,9 +135,18 @@ class AppointmentService
             $client = isset($data['client_id'])
                 ? Client::query()->findOrFail($data['client_id'])
                 : $appointment->client;
-            $service = isset($data['service_id'])
+            $isOpenService = ($data['service_selection_mode'] ?? $appointment->service_selection_mode) === 'to_be_defined';
+            $service = ! $isOpenService && isset($data['service_id'])
                 ? Service::query()->findOrFail($data['service_id'])
                 : $appointment->service;
+            if ($isOpenService) {
+                $service = null;
+            }
+            if (! $isOpenService && $service === null) {
+                throw ValidationException::withMessages([
+                    'service_id' => 'Selecione um serviço para o agendamento.',
+                ]);
+            }
             $professional = isset($data['professional_id'])
                 ? Professional::query()->whereKey($data['professional_id'])->lockForUpdate()->firstOrFail()
                 : Professional::query()->whereKey($appointment->professional_id)->lockForUpdate()->firstOrFail();
@@ -134,7 +157,9 @@ class AppointmentService
                 ? CompanyDateTime::parseLocal($company, $data['appointment_date'], $data['appointment_time'])
                 : CompanyDateTime::utcToLocal($company, $appointment->start_at);
 
-            $snapshots = $this->resolveSnapshots($company, $professional, $service);
+            $snapshots = $isOpenService
+                ? $this->resolveOpenServiceSnapshots($data, $appointment)
+                : $this->resolveSnapshots($company, $professional, $service);
             $startUtc = CompanyDateTime::localToUtc($company, $localStart);
             $endUtc = $startUtc->addMinutes($snapshots['duration_minutes_snapshot']);
 
@@ -152,7 +177,8 @@ class AppointmentService
             $appointment->fill([
                 'client_id' => $client->getKey(),
                 'professional_id' => $professional->getKey(),
-                'service_id' => $service->getKey(),
+                'service_id' => $service?->getKey(),
+                'service_selection_mode' => $isOpenService ? 'to_be_defined' : 'defined',
                 'start_at' => $startUtc,
                 'end_at' => $endUtc,
                 'service_name_snapshot' => $snapshots['service_name_snapshot'],
@@ -162,6 +188,7 @@ class AppointmentService
                 'buffer_after_minutes_snapshot' => $snapshots['buffer_after_minutes_snapshot'],
                 'notes' => $data['notes'] ?? $appointment->notes,
                 'internal_notes' => $data['internal_notes'] ?? $appointment->internal_notes,
+                'appointment_reason' => $data['appointment_reason'] ?? $appointment->appointment_reason,
                 'updated_by' => $user->getKey(),
             ]);
             $appointment->save();
@@ -300,7 +327,7 @@ class AppointmentService
     public function createFromSelection(Company $company, User $user, array $data): Appointment
     {
         $client = Client::query()->findOrFail($data['client_id']);
-        $service = Service::query()->findOrFail($data['service_id']);
+        $service = filled($data['service_id'] ?? null) ? Service::query()->findOrFail($data['service_id']) : null;
         $professional = Professional::query()->findOrFail($data['professional_id']);
         $localStart = CompanyDateTime::parseLocal($company, $data['appointment_date'], $data['appointment_time']);
 
@@ -394,24 +421,28 @@ class AppointmentService
         Company $company,
         Client $client,
         Professional $professional,
-        Service $service,
+        ?Service $service,
     ): void {
         if ((int) $client->company_id !== (int) $company->getKey()
             || (int) $professional->company_id !== (int) $company->getKey()
-            || (int) $service->company_id !== (int) $company->getKey()) {
+            || ($service !== null && (int) $service->company_id !== (int) $company->getKey())) {
             abort(404);
         }
 
-        if (! $client->is_active || ! $professional->is_active || ! $service->is_active) {
+        if (! $client->is_active || ! $professional->is_active || ($service !== null && ! $service->is_active)) {
             throw ValidationException::withMessages([
                 'status' => 'Cliente, profissional ou serviço inativo.',
             ]);
         }
 
-        if (! $professional->is_bookable || ! $service->is_bookable) {
+        if (! $professional->is_bookable || ($service !== null && ! $service->is_bookable)) {
             throw ValidationException::withMessages([
                 'status' => 'Profissional ou serviço indisponível para agendamento.',
             ]);
+        }
+
+        if ($service === null) {
+            return;
         }
 
         $linked = $professional->services()
@@ -429,6 +460,29 @@ class AppointmentService
     protected function resolveSnapshots(Company $company, Professional $professional, Service $service): array
     {
         return $this->snapshotResolver->resolve($company, $professional, $service);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{service_name_snapshot: string, price_snapshot: null, duration_minutes_snapshot: int, buffer_before_minutes_snapshot: int, buffer_after_minutes_snapshot: int}
+     */
+    protected function resolveOpenServiceSnapshots(array $data, ?Appointment $appointment = null): array
+    {
+        $duration = (int) ($data['duration_minutes_snapshot'] ?? $appointment?->duration_minutes_snapshot ?? 0);
+
+        if ($duration < 15 || $duration > 480) {
+            throw ValidationException::withMessages([
+                'duration_minutes_snapshot' => 'Informe uma duração entre 15 e 480 minutos.',
+            ]);
+        }
+
+        return [
+            'service_name_snapshot' => 'A definir no atendimento',
+            'price_snapshot' => null,
+            'duration_minutes_snapshot' => $duration,
+            'buffer_before_minutes_snapshot' => (int) ($data['buffer_before_minutes_snapshot'] ?? $appointment?->buffer_before_minutes_snapshot ?? 0),
+            'buffer_after_minutes_snapshot' => (int) ($data['buffer_after_minutes_snapshot'] ?? $appointment?->buffer_after_minutes_snapshot ?? 0),
+        ];
     }
 
     /**
@@ -500,7 +554,7 @@ class AppointmentService
         $localStart = CompanyDateTime::utcToLocal($company, $appointment->start_at);
         $localEnd = CompanyDateTime::utcToLocal($company, $appointment->end_at);
 
-        $title = "{$appointment->client->name} — {$appointment->service_name_snapshot}";
+        $title = "{$appointment->client->name} — ".($appointment->service_name_snapshot ?? 'A definir no atendimento');
 
         if ($user->hasActiveRoleInCompany($company, CompanyRole::CompanyAdmin, CompanyRole::Manager) || $user->is_super_admin) {
             $title .= " + {$appointment->professional->name}";

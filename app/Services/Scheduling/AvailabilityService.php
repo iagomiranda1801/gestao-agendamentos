@@ -27,7 +27,7 @@ class AvailabilityService
     public function assertAvailable(
         Company $company,
         Professional $professional,
-        Service $service,
+        ?Service $service,
         CarbonImmutable $localStart,
         int $durationMinutes,
         int $bufferBefore,
@@ -39,7 +39,7 @@ class AvailabilityService
         }
 
         if ((int) $professional->company_id !== (int) $company->getKey()
-            || (int) $service->company_id !== (int) $company->getKey()) {
+            || ($service !== null && (int) $service->company_id !== (int) $company->getKey())) {
             return AvailabilityResult::fail('Registros inválidos para esta empresa.');
         }
 
@@ -47,8 +47,12 @@ class AvailabilityService
             return AvailabilityResult::fail('Profissional indisponível para agendamento.');
         }
 
-        if (! $service->is_active || ! $service->is_bookable) {
+        if ($service !== null && (! $service->is_active || ! $service->is_bookable)) {
             return AvailabilityResult::fail('Serviço indisponível para agendamento.');
+        }
+
+        if ($service === null) {
+            return $this->assertScheduleAvailability($company, $professional, $localStart, $durationMinutes, $bufferBefore, $bufferAfter, $ignore);
         }
 
         $linked = $professional->services()
@@ -60,6 +64,18 @@ class AvailabilityService
             return AvailabilityResult::fail('Profissional não está associado a este serviço.');
         }
 
+        return $this->assertScheduleAvailability($company, $professional, $localStart, $durationMinutes, $bufferBefore, $bufferAfter, $ignore);
+    }
+
+    protected function assertScheduleAvailability(
+        Company $company,
+        Professional $professional,
+        CarbonImmutable $localStart,
+        int $durationMinutes,
+        int $bufferBefore,
+        int $bufferAfter,
+        ?Appointment $ignore,
+    ): AvailabilityResult {
         if ($localStart->lt(CompanyDateTime::nowLocal($company))) {
             return AvailabilityResult::fail('Não é possível agendar no passado.');
         }

@@ -35,7 +35,9 @@ class CreateAppointment extends CreateRecord
         $company = Filament::getTenant();
 
         $client = Client::query()->findOrFail($data['client_id']);
-        $service = Service::query()->findOrFail($data['service_id']);
+        $service = filled($data['service_id'] ?? null)
+            ? Service::query()->findOrFail($data['service_id'])
+            : null;
         $professional = Professional::query()->findOrFail($data['professional_id']);
 
         $localStart = CompanyDateTime::parseLocal(

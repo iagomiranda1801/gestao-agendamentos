@@ -78,9 +78,8 @@ class ClinicalAttachmentResource extends Resource
         ])->recordActions([
             Action::make('download')->label('Baixar')->icon('heroicon-o-arrow-down-tray')->action(function (ClinicalAttachment $record) {
                 /** @var Company $company */ $company = Filament::getTenant();
-                $path = app(ClinicalAttachmentService::class)->download($company, $record, auth()->user());
 
-                return response()->download($path, $record->original_name);
+                return app(ClinicalAttachmentService::class)->download($company, $record, auth()->user());
             }),
             Action::make('remove')->label('Remover')->color('danger')->requiresConfirmation()->schema([Textarea::make('reason')->label('Motivo')->required()])->action(function (ClinicalAttachment $record, array $data): void {
                 /** @var Company $company */ $company = Filament::getTenant();

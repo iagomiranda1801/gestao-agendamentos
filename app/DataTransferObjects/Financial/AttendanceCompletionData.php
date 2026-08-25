@@ -18,5 +18,6 @@ readonly class AttendanceCompletionData
         public ?string $internalNotes = null,
         public ?CarbonInterface $completedAt = null,
         public ?string $grossAmount = null,
+        public ?int $actualServiceId = null,
     ) {}
 }

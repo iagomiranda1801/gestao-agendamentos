@@ -264,7 +264,8 @@ trait InteractsWithAppointmentActions
         $record = $this->getRecord()->loadMissing(['client', 'professional', 'service.consumptions.product']);
 
         return [
-            'gross_amount' => (string) $record->price_snapshot,
+            'gross_amount' => $record->hasServiceToBeDefined() ? null : (string) $record->price_snapshot,
+            'actual_service_id' => null,
             'discount_amount' => '0.00',
             'materials' => self::defaultMaterialsForAppointment($record),
             'payments' => [],
@@ -322,7 +323,14 @@ trait InteractsWithAppointmentActions
                 ->step(0.01)
                 ->prefix('R$')
                 ->required()
-                ->visible($canManageFinancial),
+                ->visible(fn (): bool => $canManageFinancial() || $this->getRecord()->hasServiceToBeDefined()),
+            Select::make('actual_service_id')
+                ->label('Procedimento realizado')
+                ->options(fn (): array => self::actualServiceOptions($this->getRecord()))
+                ->searchable()
+                ->native(false)
+                ->required(fn (): bool => $this->getRecord()->hasServiceToBeDefined())
+                ->visible(fn (): bool => $this->getRecord()->hasServiceToBeDefined()),
             TextInput::make('discount_amount')
                 ->label('Desconto')
                 ->numeric()
@@ -529,9 +537,10 @@ trait InteractsWithAppointmentActions
             completedAt: $canManageFinancial && filled($data['completed_at'] ?? null)
                 ? Carbon::parse($data['completed_at'])
                 : null,
-            grossAmount: $canManageFinancial && filled($data['gross_amount'] ?? null)
+            grossAmount: ($canManageFinancial || $this->getRecord()->hasServiceToBeDefined()) && filled($data['gross_amount'] ?? null)
                 ? number_format((float) $data['gross_amount'], 2, '.', '')
                 : null,
+            actualServiceId: filled($data['actual_service_id'] ?? null) ? (int) $data['actual_service_id'] : null,
         );
     }
 
@@ -549,6 +558,20 @@ trait InteractsWithAppointmentActions
                 'quantity' => (string) $consumption->quantity,
                 'notes' => $consumption->notes,
             ])
+            ->all() ?? [];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected static function actualServiceOptions(Appointment $appointment): array
+    {
+        return $appointment->professional
+            ?->services()
+            ->where('professional_service.is_active', true)
+            ->where('services.is_active', true)
+            ->orderBy('services.name')
+            ->pluck('services.name', 'services.id')
             ->all() ?? [];
     }
 

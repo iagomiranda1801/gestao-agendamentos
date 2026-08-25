@@ -83,6 +83,7 @@ class CompanyProfilePage extends Page
             'phone' => $data['phone'] ?? null,
             'email' => $data['email'] ?? null,
             'logo_path' => $this->normalizeLogoPath($data['logo_path'] ?? null),
+            'logo_disk' => $this->logoDiskFor($company, $data['logo_path'] ?? null),
             'timezone' => $data['timezone'],
         ]);
 
@@ -107,12 +108,12 @@ class CompanyProfilePage extends Page
                         FileUpload::make('logo_path')
                             ->label('Logo da empresa')
                             ->helperText('Usada no painel da empresa e na página pública de agendamento. Se ficar vazia, o sistema mostra a logo padrão.')
-                            ->disk('public')
+                            ->disk((string) config('filesystems.company_logo_disk', 's3'))
                             ->directory(function (): string {
                                 /** @var Company $company */
                                 $company = Filament::getTenant();
 
-                                return 'company-logos/'.$company->getKey();
+                                return 'agendaqui/'.$company->slug.'/empresa/logo';
                             })
                             ->visibility('public')
                             ->image()
@@ -204,5 +205,12 @@ class CompanyProfilePage extends Page
         }
 
         return filled($logoPath) ? (string) $logoPath : null;
+    }
+
+    protected function logoDiskFor(Company $company, mixed $logoPath): string
+    {
+        return $this->normalizeLogoPath($logoPath) === $company->logo_path
+            ? ($company->logo_disk ?: 'public')
+            : (string) config('filesystems.company_logo_disk', 's3');
     }
 }

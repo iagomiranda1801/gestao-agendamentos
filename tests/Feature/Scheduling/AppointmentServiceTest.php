@@ -283,4 +283,30 @@ class AppointmentServiceTest extends TestCase
         $this->assertSame($movementsBefore, StockMovement::query()->count());
         $this->assertSame($balancesBefore, InventoryBalance::query()->count());
     }
+
+    public function test_internal_appointment_can_be_created_with_service_to_be_defined(): void
+    {
+        $setup = $this->createBookableSetup();
+
+        $appointment = app(AppointmentService::class)->createInternalAppointment(
+            $setup['company'],
+            $setup['admin'],
+            $setup['client'],
+            $setup['professional'],
+            null,
+            $setup['localStart'],
+            [
+                'service_selection_mode' => 'to_be_defined',
+                'duration_minutes_snapshot' => 45,
+                'appointment_reason' => 'Avaliação inicial',
+            ],
+        );
+
+        $this->assertNull($appointment->service_id);
+        $this->assertSame('to_be_defined', $appointment->service_selection_mode);
+        $this->assertSame('A definir no atendimento', $appointment->service_name_snapshot);
+        $this->assertNull($appointment->price_snapshot);
+        $this->assertSame(45, $appointment->duration_minutes_snapshot);
+        $this->assertSame('Avaliação inicial', $appointment->appointment_reason);
+    }
 }

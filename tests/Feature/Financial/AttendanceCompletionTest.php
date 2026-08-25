@@ -441,6 +441,40 @@ class AttendanceCompletionTest extends TestCase
             ]);
     }
 
+    public function test_open_service_appointment_uses_actual_service_when_completed(): void
+    {
+        $setup = $this->createBookableSetup($this->company);
+        $appointment = Appointment::factory()
+            ->forCompany($this->company)
+            ->create([
+                'client_id' => $setup['client']->getKey(),
+                'professional_id' => $setup['professional']->getKey(),
+                'service_id' => null,
+                'service_selection_mode' => 'to_be_defined',
+                'service_name_snapshot' => 'A definir no atendimento',
+                'price_snapshot' => null,
+                'status' => AppointmentStatus::Confirmed,
+                'client_name_snapshot' => $setup['client']->name,
+            ]);
+
+        $attendance = $this->service->complete(
+            $this->company,
+            $this->user,
+            $appointment,
+            new AttendanceCompletionData(
+                discountAmount: '0.00',
+                materials: [],
+                payments: [],
+                grossAmount: '150.00',
+                actualServiceId: $setup['service']->getKey(),
+            ),
+        );
+
+        $this->assertSame($setup['service']->getKey(), $attendance->service_id);
+        $this->assertSame($setup['service']->name, $attendance->service_name_snapshot);
+        $this->assertSame('150.00', (string) $attendance->gross_amount);
+    }
+
     /**
      * @param  list<AttendanceMaterialInput>  $materials
      * @param  list<PaymentData>  $payments

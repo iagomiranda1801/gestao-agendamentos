@@ -15,6 +15,10 @@ return [
 
     'default' => env('FILESYSTEM_DISK', 'local'),
 
+    'clinical_disk' => env('CLINICAL_FILESYSTEM_DISK', 's3'),
+
+    'company_logo_disk' => env('COMPANY_LOGO_FILESYSTEM_DISK', 's3'),
+
     /*
     |--------------------------------------------------------------------------
     | Filesystem Disks

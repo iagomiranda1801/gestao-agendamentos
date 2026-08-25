@@ -18,6 +18,7 @@ use App\Models\AttendanceMaterial;
 use App\Models\Company;
 use App\Models\DentalClinicalEntry;
 use App\Models\Product;
+use App\Models\Service;
 use App\Models\StockDocument;
 use App\Models\StockDocumentItem;
 use App\Models\StockMovement;
@@ -58,6 +59,7 @@ class AttendanceCompletionService
         }
 
         $appointment->load(['client', 'professional', 'service']);
+        $effectiveService = $this->resolveEffectiveService($company, $appointment, $data);
 
         if ($company->isDentalClinic()
             && $company->dentalClinicSetting()->where('clinical_entry_required_to_complete', true)->exists()
@@ -83,7 +85,7 @@ class AttendanceCompletionService
         $commissionResult = $this->commissionResolver->resolve(
             $company,
             $appointment->professional,
-            $appointment->service,
+            $effectiveService,
             $finalAmount,
         );
         $financialResult = $this->calculator->calculateDistribution(
@@ -107,6 +109,7 @@ class AttendanceCompletionService
             $discountAmount,
             $finalAmount,
             $financialResult,
+            $effectiveService,
             $validatedMaterials,
             $completedAt,
         ): Attendance {
@@ -134,7 +137,7 @@ class AttendanceCompletionService
             $this->validateStockAvailability($company, $validatedMaterials);
 
             $attendance = new Attendance([
-                'service_name_snapshot' => $lockedAppointment->service_name_snapshot,
+                'service_name_snapshot' => $effectiveService->name,
                 'client_name_snapshot' => $lockedAppointment->client_name_snapshot ?? $lockedAppointment->client->name,
                 'professional_name_snapshot' => $lockedAppointment->professional->name,
                 'gross_amount' => $grossAmount,
@@ -160,7 +163,7 @@ class AttendanceCompletionService
             $attendance->appointment()->associate($lockedAppointment);
             $attendance->client()->associate($lockedAppointment->client);
             $attendance->professional()->associate($lockedAppointment->professional);
-            $attendance->service()->associate($lockedAppointment->service);
+            $attendance->service()->associate($effectiveService);
             $attendance->completedBy()->associate($user);
             $attendance->save();
 
@@ -246,6 +249,49 @@ class AttendanceCompletionService
         }
 
         return DecimalMoney::round((string) $appointment->price_snapshot);
+    }
+
+    protected function resolveEffectiveService(
+        Company $company,
+        Appointment $appointment,
+        AttendanceCompletionData $data,
+    ): Service {
+        if (! $appointment->hasServiceToBeDefined()) {
+            return $appointment->service ?? throw ValidationException::withMessages([
+                'service_id' => 'O agendamento não possui um serviço válido.',
+            ]);
+        }
+
+        if (! $data->actualServiceId) {
+            throw ValidationException::withMessages([
+                'actual_service_id' => 'Informe o procedimento realizado antes de concluir o atendimento.',
+            ]);
+        }
+
+        $service = Service::query()
+            ->whereKey($data->actualServiceId)
+            ->where('company_id', $company->getKey())
+            ->where('is_active', true)
+            ->first();
+
+        if (! $service) {
+            throw ValidationException::withMessages([
+                'actual_service_id' => 'O procedimento informado não está disponível para esta empresa.',
+            ]);
+        }
+
+        $isLinked = $appointment->professional->services()
+            ->where('services.id', $service->getKey())
+            ->wherePivot('is_active', true)
+            ->exists();
+
+        if (! $isLinked) {
+            throw ValidationException::withMessages([
+                'actual_service_id' => 'O profissional não está associado ao procedimento informado.',
+            ]);
+        }
+
+        return $service;
     }
 
     /**

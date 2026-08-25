@@ -47,6 +47,7 @@ class AppointmentsTable
                     ->sortable(),
                 TextColumn::make('service_name_snapshot')
                     ->label('Serviço')
+                    ->default('A definir no atendimento')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('professional.name')
@@ -59,7 +60,7 @@ class AppointmentsTable
                     ->sortable(),
                 TextColumn::make('price_snapshot')
                     ->label('Preço previsto')
-                    ->money('BRL', locale: 'pt_BR'),
+                    ->formatStateUsing(fn ($state): string => $state === null ? 'A combinar' : 'R$ '.number_format((float) $state, 2, ',', '.')),
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()

@@ -48,6 +48,9 @@ class ViewAppointment extends ViewRecord
 
         $data['client_id'] = $record->client_id;
         $data['service_id'] = $record->service_id;
+        $data['service_selection_mode'] = $record->service_selection_mode;
+        $data['appointment_reason'] = $record->appointment_reason;
+        $data['duration_minutes_snapshot'] = $record->duration_minutes_snapshot;
         $data['professional_id'] = $record->professional_id;
         $data['appointment_date'] = $localStart->toDateString();
         $data['appointment_time'] = $localStart->format('H:i');

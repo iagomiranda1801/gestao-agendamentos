@@ -19,7 +19,10 @@ class ClinicalAttachment extends Model
 
     protected function casts(): array
     {
-        return ['document_date' => 'date'];
+        return [
+            'document_date' => 'date',
+            'storage_migrated_at' => 'datetime',
+        ];
     }
 
     public function client(): BelongsTo

@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class ClinicalAttachmentService
@@ -21,7 +20,11 @@ class ClinicalAttachmentService
         'application/dicom', 'application/octet-stream',
     ];
 
-    public function __construct(protected ClinicalAuthorizationService $authorization, protected ClinicalAuditService $audit) {}
+    public function __construct(
+        protected ClinicalAuthorizationService $authorization,
+        protected ClinicalAuditService $audit,
+        protected ClinicalStorageService $storage,
+    ) {}
 
     public function upload(
         Company $company,
@@ -45,11 +48,8 @@ class ClinicalAttachmentService
         }
 
         return DB::transaction(function () use ($company, $client, $user, $file, $type, $title, $attachable, $description, $documentDate): ClinicalAttachment {
-            $path = $file->storeAs(
-                'clinical/'.$company->getKey().'/'.$client->getKey(),
-                Str::uuid()->toString().'.'.$file->guessExtension(),
-                'local',
-            );
+            $disk = $this->storage->disk();
+            $path = $this->storage->store($company, $client, $file, $type);
 
             if ($path === false) {
                 throw ValidationException::withMessages(['file' => 'Não foi possível armazenar o arquivo.']);
@@ -63,7 +63,7 @@ class ClinicalAttachmentService
                     'title' => $title,
                     'description' => $description,
                     'document_date' => $documentDate,
-                    'disk' => 'local',
+                    'disk' => $disk,
                     'path' => $path,
                     'original_name' => $file->getClientOriginalName(),
                     'mime_type' => $file->getMimeType(),
@@ -77,13 +77,13 @@ class ClinicalAttachmentService
 
                 return $attachment->refresh();
             } catch (\Throwable $exception) {
-                Storage::disk('local')->delete($path);
+                Storage::disk($disk)->delete($path);
                 throw $exception;
             }
         });
     }
 
-    public function download(Company $company, ClinicalAttachment $attachment, User $user): string
+    public function download(Company $company, ClinicalAttachment $attachment, User $user): mixed
     {
         abort_unless((int) $attachment->company_id === (int) $company->getKey(), 404);
         $client = Client::query()->where('company_id', $company->getKey())->findOrFail($attachment->client_id);
@@ -92,7 +92,7 @@ class ClinicalAttachmentService
 
         abort_unless(Storage::disk($attachment->disk)->exists($attachment->path), 404);
 
-        return Storage::disk($attachment->disk)->path($attachment->path);
+        return Storage::disk($attachment->disk)->download($attachment->path, $attachment->original_name);
     }
 
     public function softDelete(Company $company, ClinicalAttachment $attachment, User $user, string $reason): void

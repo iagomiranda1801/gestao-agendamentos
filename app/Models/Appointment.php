@@ -19,9 +19,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'client_id',
     'professional_id',
     'service_id',
+    'service_selection_mode',
     'status',
     'origin',
     'reference_key',
+    'appointment_reason',
     'start_at',
     'end_at',
     'service_name_snapshot',
@@ -177,6 +179,11 @@ class Appointment extends Model
     public function canBeConfirmed(): bool
     {
         return $this->status === AppointmentStatus::Pending;
+    }
+
+    public function hasServiceToBeDefined(): bool
+    {
+        return $this->service_selection_mode === 'to_be_defined';
     }
 
     public function effectiveBlockStartUtc(): CarbonImmutable

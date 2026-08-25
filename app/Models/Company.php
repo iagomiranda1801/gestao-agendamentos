@@ -23,6 +23,7 @@ use Illuminate\Support\Str;
     'phone',
     'email',
     'logo_path',
+    'logo_disk',
     'timezone',
     'is_active',
     'enabled_modules',
@@ -116,7 +117,7 @@ class Company extends Model
             return asset((string) $this->logo_path);
         }
 
-        return Storage::disk('public')->url((string) $this->logo_path);
+        return Storage::disk($this->logo_disk ?: 'public')->url((string) $this->logo_path);
     }
 
     public function activeAdminsCount(): int
