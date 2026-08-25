@@ -597,13 +597,18 @@ trait InteractsWithAppointmentActions
      */
     protected static function rescheduleProfessionalOptions(Appointment $record): array
     {
-        return Professional::query()
+        $query = Professional::query()
             ->where('company_id', $record->company_id)
             ->active()
-            ->bookable()
-            ->whereHas('services', fn ($query) => $query
+            ->bookable();
+
+        if (! $record->hasServiceToBeDefined()) {
+            $query->whereHas('services', fn ($query) => $query
                 ->where('services.id', $record->service_id)
-                ->where('professional_service.is_active', true))
+                ->where('professional_service.is_active', true));
+        }
+
+        return $query
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();

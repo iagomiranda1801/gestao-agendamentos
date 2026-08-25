@@ -327,4 +327,31 @@ class AppointmentServiceTest extends TestCase
         $this->assertTrue($appointment->hasServiceToBeDefined());
         $this->assertSame(30, $appointment->duration_minutes_snapshot);
     }
+
+    public function test_open_appointment_can_be_rescheduled_to_any_bookable_professional(): void
+    {
+        $setup = $this->createBookableSetup();
+        $otherProfessional = Professional::factory()->forCompany($setup['company'])->bookable()->active()->create();
+        $this->seedStandardWorkingHours($setup['company'], $otherProfessional);
+
+        $appointment = app(AppointmentService::class)->createInternalAppointment(
+            $setup['company'],
+            $setup['admin'],
+            $setup['client'],
+            $setup['professional'],
+            null,
+            $setup['localStart'],
+            ['duration_minutes_snapshot' => 30],
+        );
+
+        $rescheduled = app(AppointmentService::class)->reschedule(
+            $setup['company'],
+            $setup['admin'],
+            $appointment,
+            $setup['localStart']->addHours(2),
+            $otherProfessional,
+        );
+
+        $this->assertSame($otherProfessional->getKey(), $rescheduled->professional_id);
+    }
 }
