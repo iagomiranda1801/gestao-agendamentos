@@ -34,7 +34,7 @@ enum CompanyModule: string
             self::Finance => 'Contas a pagar/receber, caixa, transferências, relatórios e configurações financeiras.',
             self::Sales => 'Venda rápida, PDV, carrinho de produtos e checkout.',
             self::WhatsApp => 'Conexão do WhatsApp e mensagens operacionais de agendamento.',
-            self::Marketing => 'Campanhas, listas e comunicação promocional com clientes.',
+            self::Marketing => 'Campanhas, automações de reconquista, listas e comunicação promocional com clientes.',
         };
     }
 

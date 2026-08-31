@@ -166,4 +166,12 @@ class Attendance extends Model
     {
         return $this->hasOne(Payable::class);
     }
+
+    /**
+     * @return HasMany<WhatsAppAutomationSend, $this>
+     */
+    public function whatsappAutomationSends(): HasMany
+    {
+        return $this->hasMany(WhatsAppAutomationSend::class);
+    }
 }

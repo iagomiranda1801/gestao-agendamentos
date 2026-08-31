@@ -5,6 +5,7 @@ namespace App\Filament\App\Resources\Clients\Schemas;
 use App\Models\Company;
 use App\Support\CompanyTerminology;
 use App\Support\Cpf;
+use App\Support\VehiclePlate;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Repeater;
@@ -64,9 +65,22 @@ class ClientForm
                             ->default(true),
                         Toggle::make('whatsapp_marketing_opt_in')
                             ->label('Aceita campanhas no WhatsApp')
-                            ->helperText('Use somente quando '.CompanyTerminology::client(capitalized: false).' autorizou receber mensagens promocionais.')
+                            ->helperText('Use somente quando '.CompanyTerminology::client(capitalized: false).' autorizou receber mensagens promocionais. Lembretes de horário não dependem deste aceite.')
                             ->default(false),
                     ]),
+                Section::make('Veículo')
+                    ->schema([
+                        TextInput::make('vehicle_plate')
+                            ->label('Placa')
+                            ->maxLength(8)
+                            ->helperText('Opcional. Formato ABC-1234 ou ABC1D23.')
+                            ->dehydrateStateUsing(fn (?string $state): ?string => VehiclePlate::normalize($state)),
+                        TextInput::make('vehicle_model')
+                            ->label('Modelo')
+                            ->maxLength(120),
+                    ])
+                    ->columns(2)
+                    ->visible(fn (): bool => self::isCarWashTenant()),
                 Section::make('Dados do paciente')
                     ->description('Informações específicas do prontuário odontológico.')
                     ->schema([
@@ -140,5 +154,12 @@ class ClientForm
         $company = Filament::getTenant();
 
         return $company instanceof Company && $company->isDentalClinic();
+    }
+
+    protected static function isCarWashTenant(): bool
+    {
+        $company = Filament::getTenant();
+
+        return $company instanceof Company && $company->isCarWash();
     }
 }

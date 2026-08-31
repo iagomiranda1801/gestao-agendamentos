@@ -24,7 +24,7 @@ class SendWhatsAppAppointmentConfirmationJob implements ShouldQueue
         WhatsAppConfirmationMessageBuilder $messageBuilder,
     ): void {
         $appointment = Appointment::query()
-            ->with(['company.schedulingSetting'])
+            ->with(['company.schedulingSetting', 'client'])
             ->find($this->appointmentId);
 
         if ($appointment === null) {

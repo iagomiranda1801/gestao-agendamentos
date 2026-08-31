@@ -150,6 +150,14 @@ class Appointment extends Model
         return $this->hasOne(Attendance::class);
     }
 
+    /**
+     * @return HasMany<WhatsAppAutomationSend, $this>
+     */
+    public function whatsappAutomationSends(): HasMany
+    {
+        return $this->hasMany(WhatsAppAutomationSend::class);
+    }
+
     public function isBlockingTime(): bool
     {
         return $this->status->blocksTime();

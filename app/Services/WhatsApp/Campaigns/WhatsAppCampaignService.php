@@ -12,6 +12,8 @@ use App\Models\Company;
 use App\Models\User;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppCampaignRecipient;
+use App\Services\WhatsApp\Automations\InactiveClientQuery;
+use App\Support\VehiclePlate;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -185,6 +187,7 @@ class WhatsAppCampaignService
                 'name' => $campaign->name.' - reenvio',
                 'audience_type' => $campaign->audience_type->value,
                 'selected_client_ids' => $campaign->selected_client_ids,
+                'inactive_since_days' => $campaign->inactive_since_days,
                 'message_template' => $campaign->message_template,
                 'send_interval_seconds' => $campaign->send_interval_seconds,
                 'scheduled_at' => null,
@@ -337,6 +340,20 @@ class WhatsAppCampaignService
             ]);
         }
 
+        if ($audienceType === WhatsAppCampaignAudience::InactiveSinceDays->value) {
+            $days = (int) ($data['inactive_since_days'] ?? 30);
+
+            if ($days < 7 || $days > 365) {
+                throw ValidationException::withMessages([
+                    'inactive_since_days' => 'Informe entre 7 e 365 dias sem visita.',
+                ]);
+            }
+
+            $data['inactive_since_days'] = $days;
+        } else {
+            $data['inactive_since_days'] = null;
+        }
+
         if ($audienceType !== WhatsAppCampaignAudience::SelectedClients->value) {
             $data['selected_client_ids'] = [];
         }
@@ -363,6 +380,8 @@ class WhatsAppCampaignService
                 ->whatsappMarketingOptedIn()
                 ->whereNotNull('phone_normalized')
                 ->where('phone_normalized', '!=', ''),
+            WhatsAppCampaignAudience::InactiveSinceDays => app(InactiveClientQuery::class)
+                ->optedInInactive($company, (int) ($campaign->inactive_since_days ?: 30)),
         };
     }
 
@@ -388,6 +407,7 @@ class WhatsAppCampaignService
         return strtr($campaign->message_template, [
             '{nome}' => $client->name,
             '{empresa}' => $campaign->company->name,
+            '{placa}' => VehiclePlate::format($client->vehicle_plate) ?? ($client->vehicle_plate ?: ''),
         ]);
     }
 }

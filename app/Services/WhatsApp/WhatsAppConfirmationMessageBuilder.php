@@ -5,6 +5,7 @@ namespace App\Services\WhatsApp;
 use App\Models\Appointment;
 use App\Models\Company;
 use App\Support\CompanyDateTime;
+use App\Support\VehiclePlate;
 use Carbon\CarbonImmutable;
 
 class WhatsAppConfirmationMessageBuilder
@@ -84,6 +85,7 @@ class WhatsAppConfirmationMessageBuilder
             '{codigo}' => (string) ($appointment->public_confirmation_code ?? ''),
             '{link}' => (string) ($manageUrl ?? ''),
             '{empresa}' => (string) $company->name,
+            '{placa}' => (string) (VehiclePlate::format($appointment->client?->vehicle_plate) ?? $appointment->client?->vehicle_plate ?? ''),
         ];
 
         return strtr($template, $replacements);

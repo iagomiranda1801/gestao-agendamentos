@@ -27,6 +27,7 @@ use App\Policies\AttendancePolicy;
 use App\Services\Scheduling\AppointmentService;
 use App\Services\Stock\StockDocumentPostingService;
 use App\Services\Stock\StockDocumentService;
+use App\Services\WhatsApp\Automations\WhatsAppAutomationService;
 use App\Support\DecimalMoney;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Carbon;
@@ -232,13 +233,20 @@ class AttendanceCompletionService
             $this->recordAppointmentHistory($company, $user, $lockedAppointment, $oldStatus);
             $this->recordAttendanceHistory($company, $user, $attendance, $finalAmount);
 
-            return $attendance->refresh()->load([
+            $completedAttendance = $attendance->refresh()->load([
                 'materials',
                 'receivable',
                 'payments',
                 'stockDocument',
                 'commissionPayable.installments',
             ]);
+
+            DB::afterCommit(function () use ($completedAttendance): void {
+                app(WhatsAppAutomationService::class)
+                    ->queueAfterSalesIfEnabled($completedAttendance);
+            });
+
+            return $completedAttendance;
         });
     }
 

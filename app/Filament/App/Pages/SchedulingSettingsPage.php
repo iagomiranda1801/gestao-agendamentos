@@ -4,11 +4,13 @@ namespace App\Filament\App\Pages;
 
 use App\Enums\CompanyModule;
 use App\Enums\Weekday;
+use App\Enums\WhatsAppAutomationType;
 use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Models\Company;
 use App\Policies\CompanySchedulingSettingPolicy;
 use App\Services\Scheduling\CompanyBusinessHoursService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
+use App\Services\WhatsApp\Automations\WhatsAppAutomationService;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -71,6 +73,9 @@ class SchedulingSettingsPage extends Page
 
         $setting = app(CompanySchedulingSettingService::class)->getOrCreate($company);
         $hours = app(CompanyBusinessHoursService::class)->getWeeklyHours($company);
+        $automations = app(WhatsAppAutomationService::class)->ensureDefaults($company);
+        $reminder = $automations[WhatsAppAutomationType::Reminder->value];
+        $afterSales = $automations[WhatsAppAutomationType::AfterSales->value];
 
         $this->form->fill([
             'slot_interval_minutes' => $setting->slot_interval_minutes,
@@ -104,6 +109,14 @@ class SchedulingSettingsPage extends Page
             'whatsapp_confirmation_template' => $setting->whatsapp_confirmation_template,
             'notify_professional_by_email' => $setting->notify_professional_by_email,
             'notify_professional_by_whatsapp' => $setting->notify_professional_by_whatsapp,
+            'reminder_enabled' => $reminder->is_enabled,
+            'reminder_delay_value' => $reminder->delay_value,
+            'reminder_template' => $reminder->message_template,
+            'reminder_quiet_hours_start' => substr((string) $reminder->quiet_hours_start, 0, 5),
+            'reminder_quiet_hours_end' => substr((string) $reminder->quiet_hours_end, 0, 5),
+            'after_sales_enabled' => $afterSales->is_enabled,
+            'after_sales_delay_value' => $afterSales->delay_value,
+            'after_sales_template' => $afterSales->message_template,
             'business_hours' => $hours !== [] ? $hours : [
                 [
                     'weekday' => 1,
@@ -125,8 +138,38 @@ class SchedulingSettingsPage extends Page
         $businessHours = $data['business_hours'] ?? [];
         unset($data['business_hours']);
 
+        $automationPayload = [
+            'reminder' => [
+                'is_enabled' => (bool) ($data['reminder_enabled'] ?? false),
+                'delay_value' => (int) ($data['reminder_delay_value'] ?? 24),
+                'message_template' => $data['reminder_template'] ?? '',
+                'quiet_hours_start' => $data['reminder_quiet_hours_start'] ?? '08:00',
+                'quiet_hours_end' => $data['reminder_quiet_hours_end'] ?? '20:00',
+            ],
+            'after_sales' => [
+                'is_enabled' => (bool) ($data['after_sales_enabled'] ?? false),
+                'delay_value' => (int) ($data['after_sales_delay_value'] ?? 2),
+                'message_template' => $data['after_sales_template'] ?? '',
+                'quiet_hours_start' => $data['reminder_quiet_hours_start'] ?? '08:00',
+                'quiet_hours_end' => $data['reminder_quiet_hours_end'] ?? '20:00',
+            ],
+        ];
+
+        unset(
+            $data['reminder_enabled'],
+            $data['reminder_delay_value'],
+            $data['reminder_template'],
+            $data['reminder_quiet_hours_start'],
+            $data['reminder_quiet_hours_end'],
+            $data['after_sales_enabled'],
+            $data['after_sales_delay_value'],
+            $data['after_sales_template'],
+        );
+
         app(CompanySchedulingSettingService::class)->update($company, $data);
         app(CompanyBusinessHoursService::class)->replaceWeeklyHours($company, $businessHours);
+        app(WhatsAppAutomationService::class)->update($company, WhatsAppAutomationType::Reminder, $automationPayload['reminder']);
+        app(WhatsAppAutomationService::class)->update($company, WhatsAppAutomationType::AfterSales, $automationPayload['after_sales']);
 
         Notification::make()
             ->success()
@@ -328,8 +371,55 @@ class SchedulingSettingsPage extends Page
                             ->maxLength(20),
                         Textarea::make('whatsapp_confirmation_template')
                             ->label('Modelo da mensagem')
-                            ->helperText('Placeholders: {nome}, {servico}, {data}, {hora}, {codigo}, {link}, {empresa}')
+                            ->helperText('Placeholders: {nome}, {servico}, {data}, {hora}, {codigo}, {link}, {empresa}, {placa}')
                             ->rows(6)
+                            ->maxLength(4000)
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2)
+                    ->visible(fn (): bool => (new CompanySchedulingSettingPolicy)->update(
+                        auth()->user(),
+                        app(CompanySchedulingSettingService::class)->getOrCreate(Filament::getTenant()),
+                    )),
+                Section::make('Lembrete e pós-venda no WhatsApp')
+                    ->description('Mensagens operacionais. Lembrete exige confirmação WhatsApp ligada. Reconquista fica em Marketing.')
+                    ->schema([
+                        Toggle::make('reminder_enabled')
+                            ->label('Enviar lembrete antes do horário')
+                            ->live(),
+                        TextInput::make('reminder_delay_value')
+                            ->label('Horas de antecedência')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxValue(168)
+                            ->required(fn (Get $get): bool => (bool) $get('reminder_enabled')),
+                        TimePicker::make('reminder_quiet_hours_start')
+                            ->label('Não enviar antes das')
+                            ->seconds(false)
+                            ->required(),
+                        TimePicker::make('reminder_quiet_hours_end')
+                            ->label('Não enviar depois das')
+                            ->seconds(false)
+                            ->required(),
+                        Textarea::make('reminder_template')
+                            ->label('Modelo do lembrete')
+                            ->helperText('Placeholders: {nome}, {servico}, {data}, {hora}, {codigo}, {link}, {empresa}, {placa}')
+                            ->rows(6)
+                            ->maxLength(4000)
+                            ->columnSpanFull(),
+                        Toggle::make('after_sales_enabled')
+                            ->label('Enviar agradecimento após o atendimento')
+                            ->live(),
+                        TextInput::make('after_sales_delay_value')
+                            ->label('Horas após a conclusão')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxValue(168)
+                            ->required(fn (Get $get): bool => (bool) $get('after_sales_enabled')),
+                        Textarea::make('after_sales_template')
+                            ->label('Modelo do pós-venda')
+                            ->helperText('Texto neutro (obrigado + link). Promoções devem ir para reconquista, com aceite.')
+                            ->rows(5)
                             ->maxLength(4000)
                             ->columnSpanFull(),
                     ])

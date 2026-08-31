@@ -5,7 +5,9 @@ namespace App\Filament\App\Resources\WhatsAppCampaigns\Schemas;
 use App\Enums\WhatsAppCampaignAudience;
 use App\Enums\WhatsAppCampaignStatus;
 use App\Models\Client;
+use App\Models\Company;
 use App\Models\WhatsAppCampaign;
+use App\Services\WhatsApp\Automations\InactiveClientQuery;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Placeholder;
@@ -46,6 +48,15 @@ class WhatsAppCampaignForm
                             ->visible(fn (Get $get): bool => $get('audience_type') === WhatsAppCampaignAudience::SelectedClients->value)
                             ->live()
                             ->columnSpanFull(),
+                        TextInput::make('inactive_since_days')
+                            ->label('Dias sem visita')
+                            ->helperText('Clientes com aceite, última visita há pelo menos esses dias e sem horário futuro.')
+                            ->numeric()
+                            ->minValue(7)
+                            ->maxValue(365)
+                            ->default(30)
+                            ->required(fn (Get $get): bool => $get('audience_type') === WhatsAppCampaignAudience::InactiveSinceDays->value)
+                            ->visible(fn (Get $get): bool => $get('audience_type') === WhatsAppCampaignAudience::InactiveSinceDays->value),
                         Placeholder::make('audience_summary')
                             ->label('Destinatários')
                             ->content(fn (Get $get): string => self::audienceSummary($get)),
@@ -63,7 +74,7 @@ class WhatsAppCampaignForm
                             }),
                         Textarea::make('message_template')
                             ->label('O que você quer dizer?')
-                            ->helperText('Use {nome} e {empresa} para personalizar a mensagem.')
+                            ->helperText('Use {nome}, {empresa} e {placa} para personalizar a mensagem.')
                             ->rows(8)
                             ->maxLength(4000)
                             ->required()
@@ -198,13 +209,29 @@ class WhatsAppCampaignForm
             'promotion' => 'Promoção: confira uma condição especial preparada para você, {nome}!',
             'news' => 'Novidade na {empresa}! Olá, {nome}, temos algo novo para você conhecer.',
             'birthday' => 'Feliz aniversário, {nome}! A equipe da {empresa} deseja um dia especial para você.',
+            'winback' => 'Olá, {nome}. Faz um tempo. Que tal agendar de novo na {empresa}?',
         ];
     }
 
     protected static function audienceSummary(Get $get): string
     {
+        $company = Filament::getTenant();
+
+        if (! $company instanceof Company) {
+            return 'Nenhum destinatário.';
+        }
+
+        if ($get('audience_type') === WhatsAppCampaignAudience::InactiveSinceDays->value) {
+            $days = max(7, (int) ($get('inactive_since_days') ?: 30));
+            $count = app(InactiveClientQuery::class)->optedInInactive($company, $days)->count();
+
+            return $count === 1
+                ? '1 cliente inativo autorizado receberá esta mensagem.'
+                : "{$count} clientes inativos autorizados receberão esta mensagem.";
+        }
+
         $query = Client::query()
-            ->where('company_id', Filament::getTenant()?->getKey())
+            ->where('company_id', $company->getKey())
             ->active()
             ->whatsappMarketingOptedIn()
             ->whereNotNull('phone_normalized')
@@ -230,6 +257,7 @@ class WhatsAppCampaignForm
         return strtr($message, [
             '{nome}' => 'Maria',
             '{empresa}' => Filament::getTenant()?->name ?? 'sua empresa',
+            '{placa}' => 'ABC-1D23',
         ]);
     }
 }

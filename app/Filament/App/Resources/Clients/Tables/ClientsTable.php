@@ -5,6 +5,7 @@ namespace App\Filament\App\Resources\Clients\Tables;
 use App\Models\Client;
 use App\Models\Company;
 use App\Services\Client\ClientService;
+use App\Support\VehiclePlate;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
@@ -35,6 +36,11 @@ class ClientsTable
                     ->label('Telefone')
                     ->searchable(['phone', 'phone_normalized'])
                     ->sortable(),
+                TextColumn::make('vehicle_plate')
+                    ->label('Placa')
+                    ->formatStateUsing(fn (?string $state): ?string => VehiclePlate::format($state) ?? $state)
+                    ->toggleable()
+                    ->visible(fn (): bool => ($company = Filament::getTenant()) instanceof Company && $company->isCarWash()),
                 TextColumn::make('email')
                     ->label('E-mail')
                     ->searchable()

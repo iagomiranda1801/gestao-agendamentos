@@ -20,9 +20,21 @@ class CompanyTerminology
     public static function professional(?Company $company = null, bool $plural = false, bool $capitalized = true): string
     {
         $company ??= Filament::getTenant();
-        $word = $company instanceof Company && $company->isDentalClinic()
-            ? ($plural ? 'dentistas' : 'dentista')
-            : ($plural ? 'profissionais' : 'profissional');
+        $word = match (true) {
+            $company instanceof Company && $company->isDentalClinic() => $plural ? 'dentistas' : 'dentista',
+            $company instanceof Company && $company->isCarWash() => $plural ? 'lavadores' : 'lavador',
+            default => $plural ? 'profissionais' : 'profissional',
+        };
+
+        return $capitalized ? ucfirst($word) : $word;
+    }
+
+    public static function service(?Company $company = null, bool $plural = false, bool $capitalized = true): string
+    {
+        $company ??= Filament::getTenant();
+        $word = $company instanceof Company && $company->isCarWash()
+            ? ($plural ? 'tipos de lavagem' : 'tipo de lavagem')
+            : ($plural ? 'serviços' : 'serviço');
 
         return $capitalized ? ucfirst($word) : $word;
     }

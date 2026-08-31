@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\Company;
 use App\Models\DentalPatientProfile;
 use App\Support\PhoneNormalizer;
+use App\Support\VehiclePlate;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -92,6 +93,24 @@ class ClientService
 
         if (array_key_exists('phone', $data)) {
             $data['phone_normalized'] = PhoneNormalizer::normalize($data['phone']) ?? '';
+        }
+
+        if (array_key_exists('vehicle_plate', $data)) {
+            $normalizedPlate = VehiclePlate::normalize(
+                filled($data['vehicle_plate']) ? (string) $data['vehicle_plate'] : null,
+            );
+
+            if ($normalizedPlate !== null && ! VehiclePlate::isValid($normalizedPlate)) {
+                throw ValidationException::withMessages([
+                    'vehicle_plate' => 'Informe uma placa válida (ABC-1234 ou ABC1D23).',
+                ]);
+            }
+
+            $data['vehicle_plate'] = $normalizedPlate;
+        }
+
+        if (array_key_exists('vehicle_model', $data)) {
+            $data['vehicle_model'] = filled($data['vehicle_model']) ? trim((string) $data['vehicle_model']) : null;
         }
 
         return $data;

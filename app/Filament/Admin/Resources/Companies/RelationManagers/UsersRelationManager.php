@@ -2,8 +2,10 @@
 
 namespace App\Filament\Admin\Resources\Companies\RelationManagers;
 
+use App\Enums\AdminAuditAction;
 use App\Enums\CompanyRole;
 use App\Models\User;
+use App\Services\Admin\AdminAuditService;
 use App\Services\Company\CompanyMembershipGuard;
 use Filament\Actions\AttachAction;
 use Filament\Actions\BulkActionGroup;
@@ -29,6 +31,9 @@ class UsersRelationManager extends RelationManager
     protected static ?string $modelLabel = 'usuário';
 
     protected static ?string $pluralModelLabel = 'usuários';
+
+    /** @var array<int, array<string, mixed>> */
+    protected array $membershipAuditBefore = [];
 
     public function form(Schema $schema): Schema
     {
@@ -119,6 +124,22 @@ class UsersRelationManager extends RelationManager
                             $action->halt();
                         }
 
+                        $company = $this->getOwnerRecord();
+                        $user = User::query()->find($data['recordId']);
+                        $audit = app(AdminAuditService::class);
+                        $actor = auth()->user();
+
+                        if ($actor instanceof User && $user instanceof User) {
+                            $audit->record(
+                                $actor,
+                                AdminAuditAction::CompanyMembershipAttached,
+                                $user,
+                                after: $audit->membershipSnapshot($company, $user),
+                                company: $company,
+                                subjectLabel: $audit->membershipLabel($company, $user),
+                            );
+                        }
+
                         if ($arguments['another'] ?? false) {
                             $action->sendSuccessNotification();
                             $action->record(null);
@@ -132,16 +153,33 @@ class UsersRelationManager extends RelationManager
                 EditAction::make()
                     ->label('Editar vínculo')
                     ->before(function (User $record, array $data): void {
+                        $this->membershipAuditBefore[$record->getKey()] = app(AdminAuditService::class)
+                            ->membershipSnapshot($this->getOwnerRecord(), $record);
+
                         app(CompanyMembershipGuard::class)->ensureCanRemoveLastActiveAdmin(
                             $this->getOwnerRecord(),
                             $record,
                             CompanyRole::from($data['role']),
                             (bool) ($data['is_active'] ?? true),
                         );
+                    })
+                    ->after(function (User $record): void {
+                        $company = $this->getOwnerRecord();
+                        $audit = app(AdminAuditService::class);
+                        $before = $this->membershipAuditBefore[$record->getKey()] ?? [];
+                        $after = $audit->membershipSnapshot($company, $record);
+                        $actor = auth()->user();
+
+                        if ($actor instanceof User && $before !== $after) {
+                            $audit->record($actor, AdminAuditAction::CompanyMembershipUpdated, $record, $before, $after, $company, $audit->membershipLabel($company, $record));
+                        }
                     }),
                 DetachAction::make()
                     ->label('Desvincular')
                     ->before(function (User $record, DetachAction $action): void {
+                        $this->membershipAuditBefore[$record->getKey()] = app(AdminAuditService::class)
+                            ->membershipSnapshot($this->getOwnerRecord(), $record);
+
                         try {
                             app(CompanyMembershipGuard::class)->ensureCanRemoveLastActiveAdmin(
                                 $this->getOwnerRecord(),
@@ -157,6 +195,23 @@ class UsersRelationManager extends RelationManager
 
                             $action->halt();
                         }
+                    })
+                    ->after(function (User $record): void {
+                        $company = $this->getOwnerRecord();
+                        $audit = app(AdminAuditService::class);
+                        $actor = auth()->user();
+
+                        if ($actor instanceof User) {
+                            $audit->record(
+                                $actor,
+                                AdminAuditAction::CompanyMembershipDetached,
+                                $record,
+                                $this->membershipAuditBefore[$record->getKey()] ?? [],
+                                ['linked' => false],
+                                $company,
+                                $audit->membershipLabel($company, $record),
+                            );
+                        }
                     }),
             ])
             ->toolbarActions([
@@ -164,6 +219,12 @@ class UsersRelationManager extends RelationManager
                     DetachBulkAction::make()
                         ->label('Desvincular selecionados')
                         ->before(function (DetachBulkAction $action, $records): void {
+                            $audit = app(AdminAuditService::class);
+                            $company = $this->getOwnerRecord();
+                            $this->membershipAuditBefore = $records
+                                ->mapWithKeys(fn (User $record): array => [$record->getKey() => $audit->membershipSnapshot($company, $record)])
+                                ->all();
+
                             foreach ($records as $record) {
                                 try {
                                     app(CompanyMembershipGuard::class)->ensureCanRemoveLastActiveAdmin(
@@ -179,6 +240,23 @@ class UsersRelationManager extends RelationManager
                                         ->send();
 
                                     $action->halt();
+                                }
+                            }
+                        })
+                        ->after(function (): void {
+                            $company = $this->getOwnerRecord();
+                            $audit = app(AdminAuditService::class);
+                            $actor = auth()->user();
+
+                            if (! $actor instanceof User) {
+                                return;
+                            }
+
+                            foreach ($this->membershipAuditBefore as $before) {
+                                $user = User::query()->find($before['user_id']);
+
+                                if ($user instanceof User) {
+                                    $audit->record($actor, AdminAuditAction::CompanyMembershipDetached, $user, $before, ['linked' => false], $company, $audit->membershipLabel($company, $user));
                                 }
                             }
                         }),

@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\Clinical\DentalClinicSettingService;
 use App\Services\Scheduling\CompanyBusinessHoursService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
+use App\Services\WhatsApp\Automations\WhatsAppAutomationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -108,6 +109,10 @@ class CompanyProvisioningService
 
             if ($modules->contains(CompanyModule::Scheduling)) {
                 $this->provisionSchedulingDefaults($company);
+            }
+
+            if ($modules->contains(CompanyModule::WhatsApp) || $modules->contains(CompanyModule::Marketing)) {
+                app(WhatsAppAutomationService::class)->ensureDefaults($company);
             }
 
             if ($profile === CompanyProfile::DentalClinic) {

@@ -11,6 +11,9 @@ use App\Listeners\SendAppointmentCancelledNotifications;
 use App\Listeners\SendAppointmentRescheduledNotifications;
 use App\Listeners\SendOnlineBookingWhatsAppNotification;
 use App\Listeners\SendProfessionalAppointmentNotifications;
+use App\Models\Company;
+use App\Models\User;
+use App\Observers\AdminAuditObserver;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -30,6 +33,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Company::observe(AdminAuditObserver::class);
+        User::observe(AdminAuditObserver::class);
+
         Event::listen(
             OnlineAppointmentCreated::class,
             SendOnlineBookingWhatsAppNotification::class,

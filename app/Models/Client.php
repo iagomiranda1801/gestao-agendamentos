@@ -20,6 +20,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'document',
     'birth_date',
     'notes',
+    'vehicle_plate',
+    'vehicle_model',
     'is_active',
     'whatsapp_marketing_opt_in',
     'source',
@@ -142,6 +144,14 @@ class Client extends Model
     public function whatsappCampaignRecipients(): HasMany
     {
         return $this->hasMany(WhatsAppCampaignRecipient::class);
+    }
+
+    /**
+     * @return HasMany<WhatsAppAutomationSend, $this>
+     */
+    public function whatsappAutomationSends(): HasMany
+    {
+        return $this->hasMany(WhatsAppAutomationSend::class);
     }
 
     /**

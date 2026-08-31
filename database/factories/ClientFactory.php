@@ -27,6 +27,8 @@ class ClientFactory extends Factory
             'document' => fake()->optional()->numerify('###########'),
             'birth_date' => fake()->optional()->date(),
             'notes' => fake()->optional()->sentence(),
+            'vehicle_plate' => null,
+            'vehicle_model' => null,
             'is_active' => true,
             'whatsapp_marketing_opt_in' => false,
         ];

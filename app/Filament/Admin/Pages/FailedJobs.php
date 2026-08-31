@@ -2,6 +2,9 @@
 
 namespace App\Filament\Admin\Pages;
 
+use App\Enums\AdminAuditAction;
+use App\Models\User;
+use App\Services\Admin\AdminAuditService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -37,7 +40,16 @@ class FailedJobs extends Page
 
     public function retryJob(string $id): void
     {
-        Artisan::call('queue:retry', [$id, '--silent' => true]);
+        $snapshot = $this->failedJobSnapshot($id);
+        $exitCode = Artisan::call('queue:retry', [$id, '--silent' => true]);
+
+        if ($exitCode !== 0) {
+            Notification::make()->danger()->title('Não foi possível reenviar o job')->send();
+
+            return;
+        }
+
+        $this->audit(AdminAuditAction::FailedJobRetried, "Job falhado reenviado: {$id}", $snapshot);
 
         Notification::make()
             ->success()
@@ -47,7 +59,16 @@ class FailedJobs extends Page
 
     public function forgetJob(string $id): void
     {
-        Artisan::call('queue:forget', [$id, '--silent' => true]);
+        $snapshot = $this->failedJobSnapshot($id);
+        $exitCode = Artisan::call('queue:forget', [$id, '--silent' => true]);
+
+        if ($exitCode !== 0) {
+            Notification::make()->danger()->title('Não foi possível remover a falha')->send();
+
+            return;
+        }
+
+        $this->audit(AdminAuditAction::FailedJobForgotten, "Job falhado removido: {$id}", $snapshot);
 
         Notification::make()
             ->success()
@@ -57,9 +78,18 @@ class FailedJobs extends Page
 
     public function clearOldJobs(): void
     {
+        $cutoff = now()->subDays(7);
         $deleted = Schema::hasTable('failed_jobs')
-            ? DB::table('failed_jobs')->where('failed_at', '<', now()->subDays(7))->delete()
+            ? DB::table('failed_jobs')->where('failed_at', '<', $cutoff)->delete()
             : 0;
+
+        if (Schema::hasTable('failed_jobs')) {
+            $this->audit(
+                AdminAuditAction::FailedJobsCleaned,
+                'Limpeza de jobs falhados antigos',
+                ['deleted_count' => $deleted, 'cutoff_at' => $cutoff->utc()->toIso8601String()],
+            );
+        }
 
         Notification::make()
             ->success()
@@ -97,5 +127,51 @@ class FailedJobs extends Page
                 ];
             })
             ->all();
+    }
+
+    /** @return array<string, mixed> */
+    protected function failedJobSnapshot(string $id): array
+    {
+        if (! Schema::hasTable('failed_jobs')) {
+            return ['job_id' => $id];
+        }
+
+        $job = DB::table('failed_jobs')
+            ->where('uuid', $id)
+            ->orWhere('id', $id)
+            ->first(['id', 'uuid', 'queue', 'payload']);
+
+        if ($job === null) {
+            return ['job_id' => $id];
+        }
+
+        $payload = json_decode((string) $job->payload, true) ?: [];
+        $displayName = data_get($payload, 'displayName')
+            ?: data_get($payload, 'data.commandName')
+            ?: 'Job desconhecido';
+
+        return [
+            'job_id' => (string) ($job->uuid ?? $job->id),
+            'queue' => (string) $job->queue,
+            'job' => class_basename((string) $displayName),
+        ];
+    }
+
+    /** @param array<string, mixed> $after */
+    protected function audit(AdminAuditAction $action, string $subjectLabel, array $after): void
+    {
+        $actor = auth()->user();
+
+        if (! $actor instanceof User) {
+            return;
+        }
+
+        app(AdminAuditService::class)->record(
+            $actor,
+            $action,
+            null,
+            after: $after,
+            subjectLabel: $subjectLabel,
+        );
     }
 }

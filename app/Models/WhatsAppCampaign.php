@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'name',
     'audience_type',
     'selected_client_ids',
+    'inactive_since_days',
     'status',
     'message_template',
     'send_interval_seconds',
@@ -47,6 +48,7 @@ class WhatsAppCampaign extends Model
         return [
             'audience_type' => WhatsAppCampaignAudience::class,
             'selected_client_ids' => 'array',
+            'inactive_since_days' => 'integer',
             'status' => WhatsAppCampaignStatus::class,
             'send_interval_seconds' => 'integer',
             'total_recipients' => 'integer',

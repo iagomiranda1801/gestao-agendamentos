@@ -93,6 +93,11 @@ class Company extends Model
         return $this->business_profile === CompanyProfile::DentalClinic;
     }
 
+    public function isCarWash(): bool
+    {
+        return $this->business_profile === CompanyProfile::CarWash;
+    }
+
     public function hasActiveAdmin(): bool
     {
         return $this->users()
@@ -275,6 +280,14 @@ class Company extends Model
     public function whatsappCampaigns(): HasMany
     {
         return $this->hasMany(WhatsAppCampaign::class);
+    }
+
+    /**
+     * @return HasMany<WhatsAppAutomation, $this>
+     */
+    public function whatsappAutomations(): HasMany
+    {
+        return $this->hasMany(WhatsAppAutomation::class);
     }
 
     /**

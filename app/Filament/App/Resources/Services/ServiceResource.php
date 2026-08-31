@@ -10,6 +10,7 @@ use App\Filament\App\Resources\Services\RelationManagers\ProfessionalsRelationMa
 use App\Filament\App\Resources\Services\Schemas\ServiceForm;
 use App\Filament\App\Resources\Services\Tables\ServicesTable;
 use App\Models\Service;
+use App\Support\CompanyTerminology;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -42,6 +43,21 @@ class ServiceResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return ServiceForm::configure($schema);
+    }
+
+    public static function getModelLabel(): string
+    {
+        return CompanyTerminology::service(capitalized: false);
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return CompanyTerminology::service(plural: true, capitalized: false);
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return CompanyTerminology::service(plural: true);
     }
 
     public static function table(Table $table): Table
