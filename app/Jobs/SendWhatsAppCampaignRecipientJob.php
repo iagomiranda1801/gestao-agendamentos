@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Enums\WhatsAppCampaignRecipientStatus;
 use App\Enums\WhatsAppCampaignStatus;
+use App\Enums\WhatsAppOutboundKind;
+use App\Jobs\Concerns\DefersViaWhatsAppOutboundGate;
 use App\Models\WhatsAppCampaignRecipient;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\Campaigns\WhatsAppCampaignService;
@@ -16,9 +18,8 @@ use Throwable;
 
 class SendWhatsAppCampaignRecipientJob implements ShouldQueue
 {
+    use DefersViaWhatsAppOutboundGate;
     use Queueable;
-
-    public int $tries = 1;
 
     public function __construct(
         public int $recipientId,
@@ -60,6 +61,10 @@ class SendWhatsAppCampaignRecipientJob implements ShouldQueue
             return;
         }
 
+        if (! $this->deferUntilOutboundSlot($campaign->company, WhatsAppOutboundKind::Marketing)) {
+            return;
+        }
+
         try {
             $companySetting = $settings->getOrCreate($campaign->company);
             $defaultInstance = $instances->defaultForCompany($campaign->company);
@@ -74,6 +79,7 @@ class SendWhatsAppCampaignRecipientJob implements ShouldQueue
             ])->save();
 
             $response = $client->sendText($instance, $recipient->phone, $recipient->message_snapshot);
+            $this->rememberOutboundSuccess($campaign->company);
             $providerStatus = $this->providerStatus($response);
 
             $recipient->forceFill([
@@ -88,6 +94,7 @@ class SendWhatsAppCampaignRecipientJob implements ShouldQueue
                 SendWhatsAppCampaignEmailJob::dispatch($recipient->getKey());
             }
         } catch (Throwable $exception) {
+            $this->rememberOutboundFailure($campaign->company);
             $recipient->forceFill([
                 'status' => WhatsAppCampaignRecipientStatus::Failed,
                 'attempts' => $attempts ?? ($recipient->attempts + 1),

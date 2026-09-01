@@ -40,6 +40,14 @@ return [
         'key' => env('EVOLUTION_API_KEY'),
         'instance' => env('EVOLUTION_INSTANCE'),
         'webhook_token' => env('EVOLUTION_WEBHOOK_TOKEN'),
+        'outbound' => [
+            'min_interval_seconds' => (int) env('EVOLUTION_OUTBOUND_MIN_INTERVAL', 30),
+            'max_interval_seconds' => (int) env('EVOLUTION_OUTBOUND_MAX_INTERVAL', 45),
+            'jitter_seconds' => (int) env('EVOLUTION_OUTBOUND_JITTER', 10),
+            'daily_limit' => (int) env('EVOLUTION_OUTBOUND_DAILY_LIMIT', 80),
+            'circuit_failures' => (int) env('EVOLUTION_OUTBOUND_CIRCUIT_FAILURES', 5),
+            'circuit_pause_minutes' => (int) env('EVOLUTION_OUTBOUND_CIRCUIT_PAUSE', 120),
+        ],
     ],
 
 ];

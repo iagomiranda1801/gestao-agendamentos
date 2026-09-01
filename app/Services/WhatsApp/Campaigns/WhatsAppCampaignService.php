@@ -131,7 +131,7 @@ class WhatsAppCampaignService
             ])->save();
 
             $delay = 0;
-            $interval = max(10, (int) $campaign->send_interval_seconds);
+            $interval = max(30, (int) $campaign->send_interval_seconds);
 
             $campaign->recipients()
                 ->where('status', WhatsAppCampaignRecipientStatus::Pending)
@@ -321,8 +321,8 @@ class WhatsAppCampaignService
             $data['name'] = 'Campanha '.now()->format('d/m/Y H:i');
         }
 
-        $interval = (int) ($data['send_interval_seconds'] ?? 20);
-        $data['send_interval_seconds'] = max(10, min(300, $interval));
+        $interval = (int) ($data['send_interval_seconds'] ?? 40);
+        $data['send_interval_seconds'] = max(30, min(300, $interval));
         $data['selected_client_ids'] = $this->normalizeSelectedClientIds($data['selected_client_ids'] ?? []);
         $audienceType = $data['audience_type'] instanceof WhatsAppCampaignAudience
             ? $data['audience_type']->value

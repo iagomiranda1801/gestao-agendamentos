@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Enums\WhatsAppOutboundKind;
+use App\Jobs\Concerns\DefersViaWhatsAppOutboundGate;
 use App\Models\Appointment;
 use App\Models\Company;
 use App\Services\Scheduling\AppointmentNotificationRecipientService;
@@ -17,6 +19,7 @@ use Throwable;
 
 class SendAppointmentChangeWhatsAppJob implements ShouldQueue
 {
+    use DefersViaWhatsAppOutboundGate;
     use Queueable;
 
     public function __construct(
@@ -44,6 +47,10 @@ class SendAppointmentChangeWhatsAppJob implements ShouldQueue
         $companySetting = $settings->getOrCreate($company);
 
         if (! (bool) $companySetting->whatsapp_notifications_enabled) {
+            return;
+        }
+
+        if (! $this->deferUntilOutboundSlot($company, WhatsAppOutboundKind::Confirmation)) {
             return;
         }
 
@@ -106,7 +113,9 @@ class SendAppointmentChangeWhatsAppJob implements ShouldQueue
     ): void {
         try {
             $client->sendText($instance, $phone, $message);
+            $this->rememberOutboundSuccess($appointment->company);
         } catch (Throwable $exception) {
+            $this->rememberOutboundFailure($appointment->company);
             Log::warning('Appointment WhatsApp change notification failed.', [
                 'appointment_id' => $appointment->getKey(),
                 'change_type' => $this->changeType,

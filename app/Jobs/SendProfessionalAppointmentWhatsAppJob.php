@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Enums\WhatsAppOutboundKind;
+use App\Jobs\Concerns\DefersViaWhatsAppOutboundGate;
 use App\Models\Appointment;
 use App\Services\Scheduling\AppointmentNotificationRecipientService;
 use App\Services\WhatsApp\EvolutionApiClient;
@@ -15,11 +17,10 @@ use Throwable;
 
 class SendProfessionalAppointmentWhatsAppJob implements ShouldBeUnique, ShouldQueue
 {
+    use DefersViaWhatsAppOutboundGate;
     use Queueable;
 
     public int $timeout = 55;
-
-    public int $tries = 3;
 
     public int $uniqueFor = 3600;
 
@@ -60,6 +61,10 @@ class SendProfessionalAppointmentWhatsAppJob implements ShouldBeUnique, ShouldQu
             return;
         }
 
+        if (! $this->deferUntilOutboundSlot($appointment->company, WhatsAppOutboundKind::Confirmation)) {
+            return;
+        }
+
         $instance = $client->resolveInstance($settings?->whatsapp_instance);
         $phone = $recipients->professionalPhone($appointment);
 
@@ -82,7 +87,9 @@ class SendProfessionalAppointmentWhatsAppJob implements ShouldBeUnique, ShouldQu
 
         try {
             $client->sendText($instance, $phone, $message);
+            $this->rememberOutboundSuccess($appointment->company);
         } catch (Throwable $exception) {
+            $this->rememberOutboundFailure($appointment->company);
             Log::warning('Professional appointment WhatsApp failed.', [
                 'appointment_id' => $appointment->getKey(),
                 'notification_type' => $this->notificationType,

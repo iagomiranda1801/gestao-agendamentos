@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Enums\WhatsAppOutboundKind;
+use App\Jobs\Concerns\DefersViaWhatsAppOutboundGate;
 use App\Models\Appointment;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\WhatsAppConfirmationMessageBuilder;
@@ -13,6 +15,7 @@ use Throwable;
 
 class SendWhatsAppStaffBookingAlertJob implements ShouldQueue
 {
+    use DefersViaWhatsAppOutboundGate;
     use Queueable;
 
     public function __construct(
@@ -36,6 +39,10 @@ class SendWhatsAppStaffBookingAlertJob implements ShouldQueue
         $settings = $company?->schedulingSetting;
 
         if ($company === null || ! (bool) ($settings?->whatsapp_notifications_enabled ?? false)) {
+            return;
+        }
+
+        if (! $this->deferUntilOutboundSlot($company, WhatsAppOutboundKind::Confirmation)) {
             return;
         }
 
@@ -65,7 +72,9 @@ class SendWhatsAppStaffBookingAlertJob implements ShouldQueue
         foreach ($recipients as $label => $phone) {
             try {
                 $client->sendText($instance, $phone, $message);
+                $this->rememberOutboundSuccess($company);
             } catch (Throwable $exception) {
+                $this->rememberOutboundFailure($company);
                 Log::warning('WhatsApp staff alert failed.', [
                     'appointment_id' => $appointment->getKey(),
                     'recipient' => $label,

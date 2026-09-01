@@ -115,10 +115,11 @@ class WhatsAppCampaignForm
                             ->maxLength(255),
                         TextInput::make('send_interval_seconds')
                             ->label('Intervalo entre mensagens (segundos)')
+                            ->helperText('Mínimo 30s. O ritmo real da instância (Evolution) pode ser mais lento para não bloquear o WhatsApp.')
                             ->numeric()
-                            ->minValue(10)
+                            ->minValue(30)
                             ->maxValue(300)
-                            ->default(20)
+                            ->default(40)
                             ->required(),
                     ])
                     ->columns(2)

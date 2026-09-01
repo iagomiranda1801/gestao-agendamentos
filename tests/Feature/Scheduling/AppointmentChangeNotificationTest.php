@@ -14,6 +14,7 @@ use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\WhatsAppConfirmationMessageBuilder;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Tests\Concerns\CreatesSchedulingFixtures;
 use Tests\TestCase;
 
@@ -34,6 +35,8 @@ class AppointmentChangeNotificationTest extends TestCase
                 'status' => 'SENT',
             ], 201),
         ]);
+
+        Queue::fake();
 
         $setup = $this->createBookableSetup();
         $setup['company']->update(['phone' => '(11) 97777-0000']);

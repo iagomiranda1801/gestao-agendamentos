@@ -36,12 +36,25 @@ Campanha manual ganha audiência `inactive_since_days` (clientes ativos com acei
 - Sem telefone: não envia.
 - Log em `whatsapp_automation_sends`.
 
-## 5. LGPD
+## 5. Evolution / risco de bloqueio
+
+A Evolution API usa WhatsApp Web (não Cloud API oficial). Confirmação, automação e campanha saem do **mesmo número**. Um `WhatsAppOutboundGate` impõe:
+
+- intervalo de 30–45 s com jitter de ±10 s entre qualquer envio da instância
+- teto de 80 mensagens/dia (fuso da empresa); confirmação de agenda ainda sai depois do teto
+- reconquista: no máximo 3 por ciclo de 15 min; lembrete e pós-venda: 8 cada
+- campanha: intervalo mínimo 30 s (padrão 40 s), ainda limitada pelo portão
+- 5 falhas seguidas pausam marketing e automações por 2 h; confirmação tenta mesmo assim
+- reconquista e campanha não saem domingo
+
+Warm-up sugerido (ainda não automático): 20/dia na 1ª semana, 40 na 2ª, 80 depois.
+
+## 6. LGPD
 
 - Lembrete e pós-venda neutro: ligados ao serviço já contratado.
 - Reconquista e campanha de inativos: somente com aceite explícito. Origem WhatsApp **não** concede aceite.
 - Sem lista comprada.
 
-## 6. Fora de escopo (v1)
+## 7. Fora de escopo (v1)
 
 Inbox, fidelidade/pontos, boxes/fila/frota, SMS, outro provedor além da Evolution.

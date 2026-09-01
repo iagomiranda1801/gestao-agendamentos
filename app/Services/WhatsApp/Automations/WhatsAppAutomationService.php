@@ -18,6 +18,7 @@ use App\Services\Company\CompanyModuleService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Services\WhatsApp\EvolutionApiClient;
+use App\Services\WhatsApp\Outbound\WhatsAppOutboundGate;
 use App\Support\CompanyDateTime;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -31,6 +32,7 @@ class WhatsAppAutomationService
         protected CompanySchedulingSettingService $schedulingSettings,
         protected CompanyWhatsAppInstanceService $instances,
         protected EvolutionApiClient $evolution,
+        protected WhatsAppOutboundGate $outbound,
     ) {}
 
     /**
@@ -310,7 +312,7 @@ class WhatsAppAutomationService
                 $query->where('whatsapp_automation_id', $automation->getKey());
             })
             ->orderBy('start_at')
-            ->limit(100)
+            ->limit(8)
             ->get()
             ->each(function (Appointment $appointment) use ($automation, &$queued): void {
                 if ($this->queueCandidate($automation, $appointment->client, $appointment, null)) {
@@ -345,7 +347,7 @@ class WhatsAppAutomationService
                 $query->where('whatsapp_automation_id', $automation->getKey());
             })
             ->orderBy('completed_at')
-            ->limit(100)
+            ->limit(8)
             ->get()
             ->each(function (Attendance $attendance) use ($automation, &$queued): void {
                 if ($this->queueCandidate($automation, $attendance->client, $attendance->appointment, $attendance)) {
@@ -368,6 +370,10 @@ class WhatsAppAutomationService
             return 0;
         }
 
+        if (! $this->outbound->allowsMarketing($company)) {
+            return 0;
+        }
+
         $queued = 0;
         $cooldownFrom = now()->subDays(max(1, (int) $automation->cooldown_days));
 
@@ -384,7 +390,7 @@ class WhatsAppAutomationService
                     });
             })
             ->orderBy('id')
-            ->limit(50)
+            ->limit(3)
             ->get()
             ->each(function (Client $client) use ($automation, &$queued): void {
                 if ($this->queueCandidate($automation, $client, null, $client->attendances()->latest('completed_at')->first())) {
@@ -429,6 +435,10 @@ class WhatsAppAutomationService
         $phone = preg_replace('/\D+/', '', (string) $client->phone_normalized) ?? '';
 
         if ($phone === '') {
+            return false;
+        }
+
+        if ($type->requiresMarketingOptIn() && ! $this->outbound->allowsMarketing($company)) {
             return false;
         }
 
