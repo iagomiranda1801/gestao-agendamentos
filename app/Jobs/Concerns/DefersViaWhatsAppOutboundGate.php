@@ -5,6 +5,7 @@ namespace App\Jobs\Concerns;
 use App\Enums\WhatsAppOutboundKind;
 use App\Models\Company;
 use App\Services\WhatsApp\Outbound\WhatsAppOutboundGate;
+use Throwable;
 
 trait DefersViaWhatsAppOutboundGate
 {
@@ -51,5 +52,14 @@ trait DefersViaWhatsAppOutboundGate
     protected function rememberOutboundFailure(Company $company): void
     {
         app(WhatsAppOutboundGate::class)->recordFailure($company);
+    }
+
+    protected function rememberOutboundFailureAndMaybeRethrow(Company $company, Throwable $exception): void
+    {
+        $this->rememberOutboundFailure($company);
+
+        if (config('queue.default') !== 'sync') {
+            throw $exception;
+        }
     }
 }

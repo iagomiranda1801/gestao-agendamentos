@@ -2,6 +2,7 @@
 
 namespace App\Filament\App\Resources\Clients\Pages;
 
+use App\Enums\CompanyModule;
 use App\Enums\CompanyPermission;
 use App\Filament\App\Resources\Anamneses\AnamnesisResource;
 use App\Filament\App\Resources\Clients\ClientResource;
@@ -12,7 +13,9 @@ use App\Filament\App\Resources\TreatmentPlans\TreatmentPlanResource;
 use App\Models\Client;
 use App\Models\Company;
 use App\Services\Clinical\ClinicalAuditService;
+use App\Services\Company\CompanyModuleService;
 use App\Services\Company\CompanyPermissionService;
+use App\Support\CompanyTerminology;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
@@ -25,6 +28,19 @@ use Filament\Schemas\Schema;
 class ViewPatientRecord extends ViewRecord
 {
     protected static string $resource = ClientResource::class;
+
+    /**
+     * @param  array<string, mixed>  $parameters
+     */
+    public static function canAccess(array $parameters = []): bool
+    {
+        return parent::canAccess($parameters) && static::isDentalClinicTenant();
+    }
+
+    protected function authorizeAccess(): void
+    {
+        abort_unless(static::getResource()::canView($this->getRecord()) && static::isDentalClinicTenant(), 403);
+    }
 
     public function mount(int|string $record): void
     {
@@ -45,7 +61,7 @@ class ViewPatientRecord extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            EditAction::make()->label('Editar paciente'),
+            EditAction::make()->label('Editar '.CompanyTerminology::client(capitalized: false)),
             Action::make('new_anamnesis')->label('Nova anamnese')->url(fn (): string => AnamnesisResource::getUrl('create', ['client_id' => $this->record->getKey()]))->visible(fn (): bool => $this->canWriteClinical()),
             Action::make('new_entry')->label('Nova evolução')->url(fn (): string => ClinicalEntryResource::getUrl('create', ['client_id' => $this->record->getKey()]))->visible(fn (): bool => $this->canWriteClinical()),
             Action::make('new_plan')->label('Novo plano')->url(fn (): string => TreatmentPlanResource::getUrl('create', ['client_id' => $this->record->getKey()]))->visible(fn (): bool => $this->canManagePlans()),
@@ -59,8 +75,14 @@ class ViewPatientRecord extends ViewRecord
         return $schema->components([
             Section::make('Resumo do paciente')->schema([
                 TextEntry::make('name')->label('Nome'),
-                TextEntry::make('dentalProfile.social_name')->label('Nome social')->placeholder('—'),
-                TextEntry::make('dentalProfile.record_number')->label('Prontuário')->placeholder('—'),
+                TextEntry::make('dentalProfile.social_name')
+                    ->label('Nome social')
+                    ->placeholder('—')
+                    ->visible(fn (): bool => static::isDentalClinicTenant()),
+                TextEntry::make('dentalProfile.record_number')
+                    ->label('Prontuário')
+                    ->placeholder('—')
+                    ->visible(fn (): bool => static::isDentalClinicTenant()),
                 TextEntry::make('birth_date')->label('Nascimento')->date('d/m/Y')->placeholder('—'),
                 TextEntry::make('phone')->label('Telefone'),
                 TextEntry::make('email')->label('E-mail')->placeholder('—'),
@@ -122,17 +144,38 @@ class ViewPatientRecord extends ViewRecord
 
     protected function canViewClinical(): bool
     {
-        return $this->allows(CompanyPermission::ViewClinicalRecords);
+        return static::isDentalClinicTenant()
+            && $this->hasClinicalRecordsModule()
+            && $this->allows(CompanyPermission::ViewClinicalRecords);
     }
 
     protected function canWriteClinical(): bool
     {
-        return $this->allows(CompanyPermission::WriteClinicalRecords);
+        return static::isDentalClinicTenant()
+            && $this->hasClinicalRecordsModule()
+            && $this->allows(CompanyPermission::WriteClinicalRecords);
     }
 
     protected function canManagePlans(): bool
     {
-        return $this->allows(CompanyPermission::ManageTreatmentPlans);
+        return static::isDentalClinicTenant()
+            && $this->hasClinicalRecordsModule()
+            && $this->allows(CompanyPermission::ManageTreatmentPlans);
+    }
+
+    protected static function isDentalClinicTenant(): bool
+    {
+        $company = Filament::getTenant();
+
+        return $company instanceof Company && $company->isDentalClinic();
+    }
+
+    protected function hasClinicalRecordsModule(): bool
+    {
+        $company = Filament::getTenant();
+
+        return $company instanceof Company
+            && app(CompanyModuleService::class)->hasModule($company, CompanyModule::ClinicalRecords);
     }
 
     protected function allows(CompanyPermission $permission): bool

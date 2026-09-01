@@ -8,6 +8,7 @@ use App\Filament\App\Pages\ExpenseByCategoryReportPage;
 use App\Filament\App\Pages\FinancialDashboard;
 use App\Filament\App\Pages\FinancialOverviewPage;
 use App\Filament\App\Pages\FinancialSettingsPage;
+use App\Filament\App\Pages\IncomeExpenseReportPage;
 use App\Filament\App\Pages\InventoryPosition;
 use App\Filament\App\Pages\ManagerialDrePage;
 use App\Filament\App\Pages\RegisterExpensePage;
@@ -53,6 +54,7 @@ return [
         CashPage::class,
         ManagerialDrePage::class,
         ExpenseByCategoryReportPage::class,
+        IncomeExpenseReportPage::class,
         FinancialSettingsPage::class,
         ReceivableResource::class,
         PayableResource::class,

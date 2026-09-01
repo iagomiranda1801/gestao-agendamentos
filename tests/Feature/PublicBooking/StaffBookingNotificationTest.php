@@ -5,6 +5,8 @@ namespace Tests\Feature\PublicBooking;
 use App\Enums\CompanyRole;
 use App\Jobs\SendWhatsAppStaffBookingAlertJob;
 use App\Services\PublicBooking\OnlineBookingService;
+use App\Services\Scheduling\AppointmentNotificationRecipientService;
+use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\WhatsAppConfirmationMessageBuilder;
 use Illuminate\Support\Facades\Http;
@@ -57,6 +59,8 @@ class StaffBookingNotificationTest extends TestCase
         ))->handle(
             app(EvolutionApiClient::class),
             app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
+            app(AppointmentNotificationRecipientService::class),
         );
 
         Http::assertSentCount(1);
@@ -102,6 +106,8 @@ class StaffBookingNotificationTest extends TestCase
         (new SendWhatsAppStaffBookingAlertJob($result->appointment->getKey()))->handle(
             app(EvolutionApiClient::class),
             app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
+            app(AppointmentNotificationRecipientService::class),
         );
 
         Http::assertSentCount(1);
@@ -143,9 +149,60 @@ class StaffBookingNotificationTest extends TestCase
         (new SendWhatsAppStaffBookingAlertJob($result->appointment->getKey()))->handle(
             app(EvolutionApiClient::class),
             app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
+            app(AppointmentNotificationRecipientService::class),
         );
 
-        Http::assertNothingSent();
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request): bool => ($request['number'] ?? null) === '5511999998888');
+    }
+
+    public function test_staff_whatsapp_uses_professional_when_company_has_no_phone(): void
+    {
+        config([
+            'services.evolution.url' => 'https://evolution.test',
+            'services.evolution.key' => 'test-key',
+        ]);
+
+        Http::fake([
+            'evolution.test/*' => Http::response(['ok' => true], 200),
+        ]);
+
+        Queue::fake();
+
+        $setup = $this->createBookableSetup();
+        $setup['company']->update(['phone' => null]);
+        $setup['professional']->update(['phone' => '(11) 92222-3333']);
+
+        $this->enablePublicBooking($setup['company'], [
+            'whatsapp_notifications_enabled' => true,
+            'whatsapp_instance' => 'loja-1',
+            'whatsapp_sender_phone' => '11988887777',
+        ]);
+
+        $setup['company']->schedulingSetting()->first()?->forceFill([
+            'whatsapp_sender_phone' => null,
+        ])->save();
+        $setup['company']->unsetRelation('schedulingSetting');
+
+        $result = app(OnlineBookingService::class)->create(
+            $this->makeOnlineBookingData(
+                $setup['company'],
+                $setup['service']->getKey(),
+                $setup['professional']->getKey(),
+                $setup['localStart'],
+            ),
+        );
+
+        (new SendWhatsAppStaffBookingAlertJob($result->appointment->getKey()))->handle(
+            app(EvolutionApiClient::class),
+            app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
+            app(AppointmentNotificationRecipientService::class),
+        );
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request): bool => ($request['number'] ?? null) === '5511922223333');
     }
 
     public function test_panel_notification_reaches_admin_and_professional_user(): void

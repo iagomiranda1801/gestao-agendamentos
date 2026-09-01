@@ -7,6 +7,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\SaleItemType;
 use App\Filament\App\Pages\PointOfSalePage;
 use App\Filament\App\Resources\Sales\Pages\ListSales;
+use App\Filament\App\Support\QuickCreateFields;
 use App\Models\Sale;
 use Livewire\Livewire;
 use Tests\Support\CreatesFinanceFixtures;
@@ -106,6 +107,48 @@ class PointOfSalePageTest extends TestCase
             'company_id' => $company->getKey(),
             'client_id' => null,
             'final_amount' => '150.00',
+        ]);
+    }
+
+    public function test_admin_can_complete_a_sale_with_a_quickly_created_product(): void
+    {
+        $company = $this->createCompany([
+            'enabled_modules' => [
+                CompanyModule::Finance->value,
+                CompanyModule::Sales->value,
+            ],
+        ]);
+        $user = $this->createCompanyUser($company);
+        $account = $this->createFinancialAccount($company);
+
+        $this->authenticateForAppTenant($user, $company);
+
+        $productId = QuickCreateFields::createProduct([
+            'name' => 'Cera rápida',
+            'sale_price' => '45.00',
+        ]);
+
+        Livewire::test(PointOfSalePage::class)
+            ->set('data.items', [[
+                'item_type' => SaleItemType::Product->value,
+                'product_id' => $productId,
+                'quantity' => '1',
+                'unit_price' => '45.00',
+                'discount_amount' => '0.00',
+            ]])
+            ->set('data.payments', [[
+                'amount' => '45.00',
+                'fee_amount' => '0.00',
+                'method' => PaymentMethod::Pix->value,
+                'financial_account_id' => $account->getKey(),
+                'paid_at' => now()->toDateTimeString(),
+            ]])
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('sale_items', [
+            'product_id' => $productId,
+            'name_snapshot' => 'Cera rápida',
         ]);
     }
 }

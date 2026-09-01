@@ -10,8 +10,10 @@ use App\Jobs\SendWhatsAppStaffBookingAlertJob;
 use App\Listeners\SendOnlineBookingWhatsAppNotification;
 use App\Services\PublicBooking\OnlineBookingService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
+use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\WhatsAppConfirmationMessageBuilder;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
@@ -90,6 +92,7 @@ class WhatsAppConfirmationTest extends TestCase
         ))->handle(
             app(EvolutionApiClient::class),
             app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
         );
 
         Http::assertSent(function ($request) use ($result): bool {
@@ -143,6 +146,7 @@ class WhatsAppConfirmationTest extends TestCase
         ))->handle(
             app(EvolutionApiClient::class),
             app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
         );
 
         Http::assertSent(fn ($request): bool => $request->url() === 'https://evolution.test/message/sendText/default-global');
@@ -180,6 +184,7 @@ class WhatsAppConfirmationTest extends TestCase
         ))->handle(
             app(EvolutionApiClient::class),
             app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
         );
 
         Http::assertNothingSent();
@@ -219,9 +224,103 @@ class WhatsAppConfirmationTest extends TestCase
         ))->handle(
             app(EvolutionApiClient::class),
             app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
         );
 
         $this->assertTrue(true);
+    }
+
+    public function test_api_failure_rethrows_when_queue_is_not_sync(): void
+    {
+        config([
+            'queue.default' => 'database',
+            'services.evolution.url' => 'https://evolution.test',
+            'services.evolution.key' => 'test-key',
+            'services.evolution.instance' => 'default',
+        ]);
+
+        Http::fake([
+            'evolution.test/*' => Http::response(['error' => 'fail'], 500),
+        ]);
+
+        $setup = $this->createBookableSetup();
+        $this->enablePublicBooking($setup['company'], [
+            'whatsapp_notifications_enabled' => true,
+            'whatsapp_instance' => 'loja-1',
+            'whatsapp_sender_phone' => '11988887777',
+        ]);
+
+        $result = app(OnlineBookingService::class)->create(
+            $this->makeOnlineBookingData(
+                $setup['company'],
+                $setup['service']->getKey(),
+                $setup['professional']->getKey(),
+                $setup['localStart'],
+            ),
+        );
+
+        $this->expectException(RequestException::class);
+
+        (new SendWhatsAppAppointmentConfirmationJob(
+            $result->appointment->getKey(),
+            $result->manageUrl,
+        ))->handle(
+            app(EvolutionApiClient::class),
+            app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
+        );
+    }
+
+    public function test_job_uses_default_company_instance_when_settings_instance_is_blank(): void
+    {
+        config([
+            'services.evolution.url' => 'https://evolution.test',
+            'services.evolution.key' => 'test-key',
+            'services.evolution.instance' => null,
+        ]);
+
+        Http::fake([
+            'evolution.test/*' => Http::response(['key' => ['id' => 'ok']], 200),
+        ]);
+
+        $setup = $this->createBookableSetup();
+        $this->enablePublicBooking($setup['company'], [
+            'whatsapp_notifications_enabled' => true,
+            'whatsapp_instance' => 'loja-1',
+            'whatsapp_sender_phone' => '11988887777',
+        ]);
+
+        app(CompanyWhatsAppInstanceService::class)->create($setup['company'], [
+            'name' => 'Principal',
+            'instance_name' => 'conexao-padrao',
+            'sender_phone' => '11988887777',
+            'is_default' => true,
+        ]);
+
+        $setup['company']->schedulingSetting()->first()?->forceFill([
+            'whatsapp_instance' => null,
+        ])->save();
+        $setup['company']->unsetRelation('schedulingSetting');
+
+        $result = app(OnlineBookingService::class)->create(
+            $this->makeOnlineBookingData(
+                $setup['company'],
+                $setup['service']->getKey(),
+                $setup['professional']->getKey(),
+                $setup['localStart'],
+            ),
+        );
+
+        (new SendWhatsAppAppointmentConfirmationJob(
+            $result->appointment->getKey(),
+            $result->manageUrl,
+        ))->handle(
+            app(EvolutionApiClient::class),
+            app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
+        );
+
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://evolution.test/message/sendText/conexao-padrao');
     }
 
     public function test_listener_dispatches_job(): void

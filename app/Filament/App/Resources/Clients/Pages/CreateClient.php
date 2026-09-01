@@ -20,4 +20,25 @@ class CreateClient extends CreateRecord
 
         return app(ClientService::class)->create($company, $data);
     }
+
+    protected function getRedirectUrl(): string
+    {
+        $company = Filament::getTenant();
+        $resource = static::getResource();
+
+        if (
+            $company instanceof Company
+            && $company->isDentalClinic()
+            && $resource::hasPage('view')
+            && $resource::canView($this->getRecord())
+        ) {
+            return $this->getResourceUrl('view', $this->getRedirectUrlParameters());
+        }
+
+        if ($resource::hasPage('edit') && $resource::canEdit($this->getRecord())) {
+            return $this->getResourceUrl('edit', $this->getRedirectUrlParameters());
+        }
+
+        return $this->getResourceUrl(parameters: $this->getRedirectUrlParameters());
+    }
 }

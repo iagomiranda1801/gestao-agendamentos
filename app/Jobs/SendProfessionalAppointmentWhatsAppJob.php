@@ -6,6 +6,7 @@ use App\Enums\WhatsAppOutboundKind;
 use App\Jobs\Concerns\DefersViaWhatsAppOutboundGate;
 use App\Models\Appointment;
 use App\Services\Scheduling\AppointmentNotificationRecipientService;
+use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\WhatsAppConfirmationMessageBuilder;
 use Carbon\CarbonImmutable;
@@ -45,6 +46,7 @@ class SendProfessionalAppointmentWhatsAppJob implements ShouldBeUnique, ShouldQu
         EvolutionApiClient $client,
         WhatsAppConfirmationMessageBuilder $messageBuilder,
         AppointmentNotificationRecipientService $recipients,
+        CompanyWhatsAppInstanceService $instances,
     ): void {
         $appointment = Appointment::query()
             ->with(['company.schedulingSetting', 'client', 'professional.user'])
@@ -58,18 +60,41 @@ class SendProfessionalAppointmentWhatsAppJob implements ShouldBeUnique, ShouldQu
 
         if (! (bool) ($settings?->whatsapp_notifications_enabled ?? false)
             || ! (bool) ($settings?->notify_professional_by_whatsapp ?? true)) {
+            Log::info('Professional appointment WhatsApp skipped.', [
+                'reason' => 'disabled',
+                'appointment_id' => $appointment->getKey(),
+                'notification_type' => $this->notificationType,
+            ]);
+
+            return;
+        }
+
+        $instance = $instances->resolvedNameForCompany($appointment->company);
+        $phone = $recipients->professionalPhone($appointment);
+
+        if ($instance === '') {
+            Log::info('Professional appointment WhatsApp skipped.', [
+                'reason' => 'no_instance',
+                'appointment_id' => $appointment->getKey(),
+                'notification_type' => $this->notificationType,
+            ]);
+
+            return;
+        }
+
+        if ($phone === null) {
+            Log::info('Professional appointment WhatsApp skipped.', [
+                'reason' => 'no_phone',
+                'appointment_id' => $appointment->getKey(),
+                'notification_type' => $this->notificationType,
+            ]);
+
             return;
         }
 
         if (! $this->deferUntilOutboundSlot($appointment->company, WhatsAppOutboundKind::Confirmation)) {
-            return;
-        }
-
-        $instance = $client->resolveInstance($settings?->whatsapp_instance);
-        $phone = $recipients->professionalPhone($appointment);
-
-        if ($instance === '' || $phone === null) {
-            Log::info('Professional appointment WhatsApp skipped: missing configuration or recipient.', [
+            Log::info('Professional appointment WhatsApp skipped.', [
+                'reason' => 'deferred',
                 'appointment_id' => $appointment->getKey(),
                 'notification_type' => $this->notificationType,
             ]);
@@ -89,19 +114,12 @@ class SendProfessionalAppointmentWhatsAppJob implements ShouldBeUnique, ShouldQu
             $client->sendText($instance, $phone, $message);
             $this->rememberOutboundSuccess($appointment->company);
         } catch (Throwable $exception) {
-            $this->rememberOutboundFailure($appointment->company);
             Log::warning('Professional appointment WhatsApp failed.', [
                 'appointment_id' => $appointment->getKey(),
                 'notification_type' => $this->notificationType,
                 'error' => $exception->getMessage(),
             ]);
-
-            // The sync driver is used in local/tests and must not turn an already
-            // committed appointment into an error response. Real queue workers
-            // rethrow so Laravel can apply the configured retries/backoff.
-            if (config('queue.default') !== 'sync') {
-                throw $exception;
-            }
+            $this->rememberOutboundFailureAndMaybeRethrow($appointment->company, $exception);
         }
     }
 }

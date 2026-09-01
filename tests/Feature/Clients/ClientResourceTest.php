@@ -2,9 +2,13 @@
 
 namespace Tests\Feature\Clients;
 
+use App\Enums\CompanyModule;
+use App\Enums\CompanyProfile;
 use App\Enums\CompanyRole;
 use App\Filament\App\Resources\Clients\ClientResource;
+use App\Filament\App\Resources\Clients\Pages\CreateClient;
 use App\Filament\App\Resources\Clients\Pages\ListClients;
+use App\Filament\App\Resources\Clients\Pages\ViewPatientRecord;
 use App\Models\Client;
 use App\Policies\ClientPolicy;
 use App\Services\Client\ClientService;
@@ -237,5 +241,79 @@ class ClientResourceTest extends TestCase
                 ->where('name', 'like', '%Maria%')
                 ->exists()
         );
+    }
+
+    public function test_car_wash_cannot_open_dental_patient_record(): void
+    {
+        $company = $this->createCompany([
+            'slug' => 'lava-jato-ana',
+            'business_profile' => CompanyProfile::CarWash,
+        ]);
+        $admin = $this->createCompanyUser($company);
+        $client = Client::factory()->forCompany($company)->create(['name' => 'Joao']);
+
+        $this->authenticateForAppTenant($admin, $company);
+
+        Livewire::test(ViewPatientRecord::class, ['record' => $client->getKey()])
+            ->assertForbidden();
+
+        $this->get(ClientResource::getUrl('view', ['record' => $client], tenant: $company))
+            ->assertForbidden();
+    }
+
+    public function test_car_wash_create_client_redirects_to_edit_not_patient_record(): void
+    {
+        $company = $this->createCompany([
+            'slug' => 'lava-jato-create',
+            'business_profile' => CompanyProfile::CarWash,
+        ]);
+        $admin = $this->createCompanyUser($company);
+        $this->authenticateForAppTenant($admin, $company);
+
+        $component = Livewire::test(CreateClient::class)
+            ->fillForm([
+                'name' => 'Cliente Lava Jato',
+                'phone' => '(34) 99999-0001',
+                'is_active' => true,
+            ])
+            ->call('create');
+
+        $client = Client::query()->where('company_id', $company->id)->firstOrFail();
+
+        $component->assertRedirect(ClientResource::getUrl('edit', ['record' => $client], tenant: $company));
+        $component->assertDontSee('Nova anamnese');
+        $component->assertDontSee('Prontuário');
+    }
+
+    public function test_dental_clinic_can_open_patient_record_after_create(): void
+    {
+        $company = $this->createCompany([
+            'slug' => 'clinica-dental',
+            'business_profile' => CompanyProfile::DentalClinic,
+            'enabled_modules' => [
+                CompanyModule::Scheduling->value,
+                CompanyModule::ClinicalRecords->value,
+                CompanyModule::Finance->value,
+            ],
+        ]);
+        $admin = $this->createCompanyUser($company);
+        $this->authenticateForAppTenant($admin, $company);
+
+        $component = Livewire::test(CreateClient::class)
+            ->fillForm([
+                'name' => 'Maria Paciente',
+                'phone' => '(34) 99999-0001',
+                'is_active' => true,
+            ])
+            ->call('create');
+
+        $patient = Client::query()->where('company_id', $company->id)->firstOrFail();
+
+        $component->assertRedirect(ClientResource::getUrl('view', ['record' => $patient], tenant: $company));
+
+        Livewire::test(ViewPatientRecord::class, ['record' => $patient->getKey()])
+            ->assertSuccessful()
+            ->assertSee('Resumo do paciente')
+            ->assertSee('Prontuário');
     }
 }

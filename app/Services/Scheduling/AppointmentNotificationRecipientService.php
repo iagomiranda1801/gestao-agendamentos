@@ -85,7 +85,8 @@ class AppointmentNotificationRecipientService
         $professionalPhone = $this->professionalPhone($appointment);
 
         $candidates = [
-            'company' => $companyPhone === $professionalPhone ? null : $companyPhone,
+            'company' => ($companyPhone !== null && $companyPhone !== $professionalPhone) ? $companyPhone : null,
+            'professional' => ($companyPhone === null || $companyPhone === $professionalPhone) ? $professionalPhone : null,
         ];
 
         $seen = [];

@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Enums\WhatsAppOutboundKind;
 use App\Jobs\Concerns\DefersViaWhatsAppOutboundGate;
 use App\Models\Appointment;
+use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\WhatsAppConfirmationMessageBuilder;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -25,6 +26,7 @@ class SendWhatsAppAppointmentConfirmationJob implements ShouldQueue
     public function handle(
         EvolutionApiClient $client,
         WhatsAppConfirmationMessageBuilder $messageBuilder,
+        CompanyWhatsAppInstanceService $instances,
     ): void {
         $appointment = Appointment::query()
             ->with(['company.schedulingSetting', 'client'])
@@ -38,17 +40,19 @@ class SendWhatsAppAppointmentConfirmationJob implements ShouldQueue
         $settings = $company?->schedulingSetting;
 
         if ($company === null || ! (bool) ($settings?->whatsapp_notifications_enabled ?? false)) {
+            Log::info('WhatsApp confirmation skipped.', [
+                'reason' => 'disabled',
+                'appointment_id' => $appointment->getKey(),
+            ]);
+
             return;
         }
 
-        if (! $this->deferUntilOutboundSlot($company, WhatsAppOutboundKind::Confirmation)) {
-            return;
-        }
-
-        $instance = $client->resolveInstance($settings->whatsapp_instance ?? null);
+        $instance = $instances->resolvedNameForCompany($company);
 
         if ($instance === '') {
-            Log::warning('WhatsApp confirmation skipped: missing company instance.', [
+            Log::info('WhatsApp confirmation skipped.', [
+                'reason' => 'no_instance',
                 'appointment_id' => $appointment->getKey(),
                 'company_id' => $company->getKey(),
             ]);
@@ -56,10 +60,20 @@ class SendWhatsAppAppointmentConfirmationJob implements ShouldQueue
             return;
         }
 
-        $phone = (string) ($appointment->client_phone_snapshot ?? '');
+        $phone = (string) ($appointment->client_phone_snapshot ?: $appointment->client?->phone ?: '');
 
         if ($phone === '') {
-            Log::warning('WhatsApp confirmation skipped: missing phone snapshot.', [
+            Log::info('WhatsApp confirmation skipped.', [
+                'reason' => 'no_phone',
+                'appointment_id' => $appointment->getKey(),
+            ]);
+
+            return;
+        }
+
+        if (! $this->deferUntilOutboundSlot($company, WhatsAppOutboundKind::Confirmation)) {
+            Log::info('WhatsApp confirmation skipped.', [
+                'reason' => 'deferred',
                 'appointment_id' => $appointment->getKey(),
             ]);
 
@@ -72,11 +86,11 @@ class SendWhatsAppAppointmentConfirmationJob implements ShouldQueue
             $client->sendText($instance, $phone, $message);
             $this->rememberOutboundSuccess($company);
         } catch (Throwable $exception) {
-            $this->rememberOutboundFailure($company);
             Log::warning('WhatsApp confirmation failed.', [
                 'appointment_id' => $appointment->getKey(),
                 'error' => $exception->getMessage(),
             ]);
+            $this->rememberOutboundFailureAndMaybeRethrow($company, $exception);
         }
     }
 }

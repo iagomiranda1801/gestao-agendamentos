@@ -12,6 +12,7 @@ use App\Models\WhatsAppAutomationSend;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\Automations\WhatsAppAutomationService;
 use App\Services\WhatsApp\Campaigns\WhatsAppCampaignService;
+use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\Outbound\WhatsAppOutboundGate;
 use App\Services\WhatsApp\WhatsAppConfirmationMessageBuilder;
@@ -145,9 +146,46 @@ class WhatsAppOutboundGateTest extends TestCase
         (new SendWhatsAppAppointmentConfirmationJob($appointment->getKey()))->handle(
             app(EvolutionApiClient::class),
             app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
         );
 
         Http::assertSent(fn ($request): bool => str_contains($request->url(), '/message/sendText/'));
+    }
+
+    public function test_confirmation_skip_does_not_consume_outbound_slot(): void
+    {
+        Http::fake();
+        config(['services.evolution.instance' => null]);
+
+        $setup = $this->createBookableSetup();
+        $this->enablePublicWhatsApp($setup['company']);
+        $setup['company']->schedulingSetting()->first()?->forceFill([
+            'whatsapp_instance' => null,
+        ])->save();
+        $setup['company']->unsetRelation('schedulingSetting');
+
+        $appointment = Appointment::factory()
+            ->forCompany($setup['company'])
+            ->confirmed()
+            ->create([
+                'client_id' => $setup['client']->getKey(),
+                'professional_id' => $setup['professional']->getKey(),
+                'service_id' => $setup['service']->getKey(),
+                'client_phone_snapshot' => '11999990001',
+                'created_by' => $setup['admin']->getKey(),
+            ]);
+
+        (new SendWhatsAppAppointmentConfirmationJob($appointment->getKey()))->handle(
+            app(EvolutionApiClient::class),
+            app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
+        );
+
+        Http::assertNothingSent();
+
+        $first = app(WhatsAppOutboundGate::class)->reserve($setup['company'], WhatsAppOutboundKind::Confirmation);
+        $this->assertTrue($first->allowed);
+        $this->assertEqualsWithDelta(now()->getTimestamp(), $first->availableAt?->getTimestamp() ?? 0, 1);
     }
 
     public function test_circuit_breaker_pauses_marketing(): void

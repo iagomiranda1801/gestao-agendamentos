@@ -12,6 +12,7 @@ use App\Services\Scheduling\AppointmentNotificationRecipientService;
 use App\Services\Scheduling\AppointmentService;
 use App\Services\Scheduling\AppointmentStatusService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
+use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\WhatsAppConfirmationMessageBuilder;
 use Illuminate\Support\Facades\Http;
@@ -192,6 +193,7 @@ class ProfessionalAppointmentNotificationTest extends TestCase
             app(EvolutionApiClient::class),
             app(WhatsAppConfirmationMessageBuilder::class),
             app(AppointmentNotificationRecipientService::class),
+            app(CompanyWhatsAppInstanceService::class),
         );
 
         Http::assertSentCount(1);
@@ -257,6 +259,7 @@ class ProfessionalAppointmentNotificationTest extends TestCase
             app(EvolutionApiClient::class),
             app(WhatsAppConfirmationMessageBuilder::class),
             app(AppointmentNotificationRecipientService::class),
+            app(CompanyWhatsAppInstanceService::class),
         );
 
         Mail::assertNothingSent();

@@ -47,18 +47,20 @@ class SendAppointmentChangeWhatsAppJob implements ShouldQueue
         $companySetting = $settings->getOrCreate($company);
 
         if (! (bool) $companySetting->whatsapp_notifications_enabled) {
+            Log::info('Appointment WhatsApp change notification skipped.', [
+                'reason' => 'disabled',
+                'appointment_id' => $appointment->getKey(),
+                'change_type' => $this->changeType,
+            ]);
+
             return;
         }
 
-        if (! $this->deferUntilOutboundSlot($company, WhatsAppOutboundKind::Confirmation)) {
-            return;
-        }
-
-        $defaultInstance = $instances->defaultForCompany($company);
-        $instance = $client->resolveInstance($defaultInstance?->instance_name ?: $companySetting->whatsapp_instance);
+        $instance = $instances->resolvedNameForCompany($company);
 
         if ($instance === '') {
-            Log::warning('Appointment WhatsApp change notification skipped: missing instance.', [
+            Log::info('Appointment WhatsApp change notification skipped.', [
+                'reason' => 'no_instance',
                 'appointment_id' => $appointment->getKey(),
                 'change_type' => $this->changeType,
             ]);
@@ -71,12 +73,33 @@ class SendAppointmentChangeWhatsAppJob implements ShouldQueue
         $staffMessage = $this->staffMessage($messageBuilder, $company, $appointment, $oldStartAt);
 
         $clientPhone = (string) ($appointment->client_phone_snapshot ?: $appointment->client?->phone ?: '');
+        $staffPhones = $recipients->staffPhones($appointment, $companySetting->whatsapp_sender_phone);
+
+        if ($clientPhone === '' && $staffPhones === []) {
+            Log::info('Appointment WhatsApp change notification skipped.', [
+                'reason' => 'no_phone',
+                'appointment_id' => $appointment->getKey(),
+                'change_type' => $this->changeType,
+            ]);
+
+            return;
+        }
+
+        if (! $this->deferUntilOutboundSlot($company, WhatsAppOutboundKind::Confirmation)) {
+            Log::info('Appointment WhatsApp change notification skipped.', [
+                'reason' => 'deferred',
+                'appointment_id' => $appointment->getKey(),
+                'change_type' => $this->changeType,
+            ]);
+
+            return;
+        }
 
         if (filled($clientPhone)) {
             $this->send($client, $instance, $clientPhone, $clientMessage, 'client', $appointment);
         }
 
-        foreach ($recipients->staffPhones($appointment, $companySetting->whatsapp_sender_phone) as $label => $phone) {
+        foreach ($staffPhones as $label => $phone) {
             $this->send($client, $instance, $phone, $staffMessage, $label, $appointment);
         }
     }
@@ -115,13 +138,13 @@ class SendAppointmentChangeWhatsAppJob implements ShouldQueue
             $client->sendText($instance, $phone, $message);
             $this->rememberOutboundSuccess($appointment->company);
         } catch (Throwable $exception) {
-            $this->rememberOutboundFailure($appointment->company);
             Log::warning('Appointment WhatsApp change notification failed.', [
                 'appointment_id' => $appointment->getKey(),
                 'change_type' => $this->changeType,
                 'recipient' => $recipient,
                 'error' => $exception->getMessage(),
             ]);
+            $this->rememberOutboundFailureAndMaybeRethrow($appointment->company, $exception);
         }
     }
 }

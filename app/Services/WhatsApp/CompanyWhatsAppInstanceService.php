@@ -3,12 +3,12 @@
 namespace App\Services\WhatsApp;
 
 use App\Models\Company;
-use App\Models\CompanyWhatsAppInstance;
 use App\Models\CompanySchedulingSetting;
+use App\Models\CompanyWhatsAppInstance;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Support\PhoneNormalizer;
-use Illuminate\Support\Arr;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -209,6 +209,14 @@ class CompanyWhatsAppInstanceService
             ->where('company_id', $company->getKey())
             ->default()
             ->first();
+    }
+
+    public function resolvedNameForCompany(Company $company): string
+    {
+        $settings = $company->schedulingSetting ?? $this->settings->getOrCreate($company);
+        $default = $this->defaultForCompany($company);
+
+        return $this->client->resolveInstance($default?->instance_name ?: $settings?->whatsapp_instance);
     }
 
     protected function defaultInstanceName(Company $company): string

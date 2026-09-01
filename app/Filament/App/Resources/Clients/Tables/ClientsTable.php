@@ -2,6 +2,7 @@
 
 namespace App\Filament\App\Resources\Clients\Tables;
 
+use App\Filament\App\Resources\Clients\ClientResource;
 use App\Models\Client;
 use App\Models\Company;
 use App\Services\Client\ClientService;
@@ -92,6 +93,12 @@ class ClientsTable
                     })),
             ])
             ->defaultSort('name')
+            ->recordUrl(function (Client $record): string {
+                $company = Filament::getTenant();
+                $page = $company instanceof Company && $company->isDentalClinic() ? 'view' : 'edit';
+
+                return ClientResource::getUrl($page, ['record' => $record]);
+            })
             ->recordActions([
                 ViewAction::make()->visible(fn (): bool => ($company = Filament::getTenant()) instanceof Company && $company->isDentalClinic()),
                 EditAction::make(),

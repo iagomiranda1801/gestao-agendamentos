@@ -5,12 +5,12 @@ namespace App\Filament\App\Resources\Appointments\Schemas;
 use App\Enums\AppointmentOrigin;
 use App\Enums\CompanyPermission;
 use App\Enums\CompanyRole;
+use App\Filament\App\Support\QuickCreateFields;
 use App\Models\Appointment;
 use App\Models\Company;
 use App\Models\PatientClinicalAlert;
 use App\Models\Professional;
 use App\Models\Service;
-use App\Services\Client\ClientService;
 use App\Services\Company\CompanyPermissionService;
 use App\Support\CompanyDateTime;
 use App\Support\CompanyTerminology;
@@ -36,34 +36,23 @@ class AppointmentForm
             ->components([
                 Section::make('Agendamento')
                     ->schema([
-                        Select::make('client_id')
-                            ->label(CompanyTerminology::client())
-                            ->relationship(
-                                'client',
-                                'name',
-                                fn (Builder $query): Builder => $query
-                                    ->where('company_id', Filament::getTenant()?->getKey())
-                                    ->active(),
-                            )
-                            ->searchable(['name', 'phone', 'phone_normalized', 'email'])
-                            ->preload()
-                            ->required()
-                            ->native(false)
-                            ->live()
-                            ->disabled($readOnly)
-                            ->createOptionForm([
-                                TextInput::make('name')->label('Nome')->required(),
-                                TextInput::make('phone')->label('Telefone')->required(),
-                                TextInput::make('email')->label('E-mail')->email(),
-                            ])
-                            ->createOptionUsing(function (array $data): int {
-                                /** @var Company $company */
-                                $company = Filament::getTenant();
-
-                                return app(ClientService::class)
-                                    ->create($company, $data)
-                                    ->getKey();
-                            }),
+                        QuickCreateFields::applyClientCreate(
+                            Select::make('client_id')
+                                ->label(CompanyTerminology::client())
+                                ->relationship(
+                                    'client',
+                                    'name',
+                                    fn (Builder $query): Builder => $query
+                                        ->where('company_id', Filament::getTenant()?->getKey())
+                                        ->active(),
+                                )
+                                ->searchable(['name', 'phone', 'phone_normalized', 'email'])
+                                ->preload()
+                                ->required()
+                                ->native(false)
+                                ->live()
+                                ->disabled($readOnly),
+                        ),
                         Select::make('service_selection_mode')
                             ->label('Procedimento')
                             ->options([
@@ -80,26 +69,28 @@ class AppointmentForm
                                     $set('service_id', null);
                                 }
                             }),
-                        Select::make('service_id')
-                            ->label('Serviço')
-                            ->options(fn (): array => self::serviceOptions())
-                            ->searchable()
-                            ->nullable()
-                            ->helperText('Deixe em branco para definir o procedimento no atendimento.')
-                            ->native(false)
-                            ->live()
-                            ->visible(fn (Get $get): bool => $get('service_selection_mode') !== 'to_be_defined')
-                            ->disabled($readOnly)
-                            ->afterStateUpdated(function (?int $state, Set $set, Get $get): void {
-                                if ($state !== null) {
-                                    $set('service_selection_mode', 'defined');
-                                }
-                                self::syncPreviewFields($set, $get, $state, $get('professional_id'));
-                                $professionalId = $get('professional_id');
-                                if ($professionalId && ! self::professionalEligible($state, $professionalId)) {
-                                    $set('professional_id', null);
-                                }
-                            }),
+                        QuickCreateFields::applyServiceCreate(
+                            Select::make('service_id')
+                                ->label('Serviço')
+                                ->options(fn (): array => self::serviceOptions())
+                                ->searchable()
+                                ->nullable()
+                                ->helperText('Deixe em branco para definir o procedimento no atendimento.')
+                                ->native(false)
+                                ->live()
+                                ->visible(fn (Get $get): bool => $get('service_selection_mode') !== 'to_be_defined')
+                                ->disabled($readOnly)
+                                ->afterStateUpdated(function (?int $state, Set $set, Get $get): void {
+                                    if ($state !== null) {
+                                        $set('service_selection_mode', 'defined');
+                                    }
+                                    self::syncPreviewFields($set, $get, $state, $get('professional_id'));
+                                    $professionalId = $get('professional_id');
+                                    if ($professionalId && ! self::professionalEligible($state, $professionalId)) {
+                                        $set('professional_id', null);
+                                    }
+                                }),
+                        ),
                         Select::make('professional_id')
                             ->label(CompanyTerminology::professional())
                             ->options(fn (Get $get): array => self::isOpenServiceSelection($get)

@@ -8,6 +8,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\SaleItemType;
 use App\Enums\SaleOrigin;
 use App\Filament\App\Concerns\RequiresCompanyModule;
+use App\Filament\App\Support\QuickCreateFields;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\FinancialAccount;
@@ -20,6 +21,7 @@ use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -29,10 +31,9 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
-use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
-use Filament\Forms\Components\Placeholder;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use UnitEnum;
@@ -93,7 +94,7 @@ class PointOfSalePage extends Page
                 notes: $payment['notes'] ?? null,
             ))
             ->values()
-                ->all();
+            ->all();
 
         $sale = app(SaleService::class)->complete($company, auth()->user(), [
             'client_id' => $state['client_id'] ?? null,
@@ -135,16 +136,18 @@ class PointOfSalePage extends Page
             ->components([
                 Section::make('Venda')
                     ->schema([
-                        Select::make('client_id')
-                            ->label('Cliente')
-                            ->options(fn (): array => Client::query()
-                                ->where('company_id', Filament::getTenant()?->getKey())
-                                ->active()
-                                ->orderBy('name')
-                                ->pluck('name', 'id')
-                                ->all())
-                            ->searchable()
-                            ->native(false),
+                        QuickCreateFields::applyClientCreate(
+                            Select::make('client_id')
+                                ->label('Cliente')
+                                ->options(fn (): array => Client::query()
+                                    ->where('company_id', Filament::getTenant()?->getKey())
+                                    ->active()
+                                    ->orderBy('name')
+                                    ->pluck('name', 'id')
+                                    ->all())
+                                ->searchable()
+                                ->native(false),
+                        ),
                         DateTimePicker::make('sold_at')
                             ->label('Data da venda')
                             ->default(now())
@@ -178,48 +181,54 @@ class PointOfSalePage extends Page
                                         $set('unit_price', '0.00');
                                     })
                                     ->native(false),
-                                Select::make('product_id')
-                                    ->label('Produto')
-                                    ->options(fn (): array => self::productOptions())
-                                    ->searchable()
-                                    ->required(fn (Get $get): bool => $get('item_type') === SaleItemType::Product->value)
-                                    ->visible(fn (Get $get): bool => $get('item_type') === SaleItemType::Product->value)
-                                    ->live()
-                                    ->afterStateUpdated(function (?int $state, Set $set): void {
-                                        if ($state === null) {
-                                            return;
-                                        }
+                                QuickCreateFields::applyProductCreate(
+                                    Select::make('product_id')
+                                        ->label('Produto')
+                                        ->options(fn (): array => self::productOptions())
+                                        ->searchable()
+                                        ->required(fn (Get $get): bool => $get('item_type') === SaleItemType::Product->value)
+                                        ->visible(fn (Get $get): bool => $get('item_type') === SaleItemType::Product->value)
+                                        ->live()
+                                        ->afterStateUpdated(function (?int $state, Set $set): void {
+                                            if ($state === null) {
+                                                return;
+                                            }
 
-                                        $product = Product::query()
-                                            ->where('company_id', Filament::getTenant()?->getKey())
-                                            ->find($state);
+                                            $product = Product::query()
+                                                ->where('company_id', Filament::getTenant()?->getKey())
+                                                ->find($state);
 
-                                        if ($product !== null) {
-                                            $set('unit_price', (string) $product->sale_price);
-                                        }
-                                    })
-                                    ->native(false),
-                                Select::make('service_id')
-                                    ->label('Serviço')
-                                    ->options(fn (): array => self::serviceOptions())
-                                    ->searchable()
-                                    ->required(fn (Get $get): bool => $get('item_type') === SaleItemType::Service->value)
-                                    ->visible(fn (Get $get): bool => $get('item_type') === SaleItemType::Service->value)
-                                    ->live()
-                                    ->afterStateUpdated(function (?int $state, Set $set): void {
-                                        if ($state === null) {
-                                            return;
-                                        }
+                                            if ($product !== null) {
+                                                $set('unit_price', (string) $product->sale_price);
+                                            }
+                                        })
+                                        ->native(false),
+                                    fillUnitPrice: true,
+                                ),
+                                QuickCreateFields::applyServiceCreate(
+                                    Select::make('service_id')
+                                        ->label('Serviço')
+                                        ->options(fn (): array => self::serviceOptions())
+                                        ->searchable()
+                                        ->required(fn (Get $get): bool => $get('item_type') === SaleItemType::Service->value)
+                                        ->visible(fn (Get $get): bool => $get('item_type') === SaleItemType::Service->value)
+                                        ->live()
+                                        ->afterStateUpdated(function (?int $state, Set $set): void {
+                                            if ($state === null) {
+                                                return;
+                                            }
 
-                                        $service = Service::query()
-                                            ->where('company_id', Filament::getTenant()?->getKey())
-                                            ->find($state);
+                                            $service = Service::query()
+                                                ->where('company_id', Filament::getTenant()?->getKey())
+                                                ->find($state);
 
-                                        if ($service !== null) {
-                                            $set('unit_price', (string) $service->price);
-                                        }
-                                    })
-                                    ->native(false),
+                                            if ($service !== null) {
+                                                $set('unit_price', (string) $service->price);
+                                            }
+                                        })
+                                        ->native(false),
+                                    fillUnitPrice: true,
+                                ),
                                 TextInput::make('name')
                                     ->label('Descrição')
                                     ->required(fn (Get $get): bool => $get('item_type') === SaleItemType::Custom->value)

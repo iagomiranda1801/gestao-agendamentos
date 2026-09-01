@@ -8,6 +8,7 @@ use App\Enums\CompanyRole;
 use App\Enums\ScheduleBlockType;
 use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Filament\App\Resources\Appointments\AppointmentResource;
+use App\Filament\App\Support\QuickCreateFields;
 use App\Models\Appointment;
 use App\Models\Client;
 use App\Models\Company;
@@ -321,30 +322,34 @@ class CalendarPage extends Page
                 ->label('Novo agendamento')
                 ->icon('heroicon-o-plus')
                 ->schema([
-                    Select::make('client_id')
-                        ->label(CompanyTerminology::client())
-                        ->options(fn (): array => Client::query()
-                            ->where('company_id', Filament::getTenant()?->getKey())
-                            ->active()
-                            ->orderBy('name')
-                            ->pluck('name', 'id')
-                            ->all())
-                        ->searchable()
-                        ->required()
-                        ->native(false),
-                    Select::make('service_id')
-                        ->label('Serviço')
-                        ->options(fn (): array => Service::query()
-                            ->where('company_id', Filament::getTenant()?->getKey())
-                            ->active()
-                            ->bookable()
-                            ->orderBy('name')
-                            ->pluck('name', 'id')
-                            ->all())
-                        ->nullable()
-                        ->helperText('Opcional. Deixe em branco para definir o procedimento no atendimento.')
-                        ->live()
-                        ->native(false),
+                    QuickCreateFields::applyClientCreate(
+                        Select::make('client_id')
+                            ->label(CompanyTerminology::client())
+                            ->options(fn (): array => Client::query()
+                                ->where('company_id', Filament::getTenant()?->getKey())
+                                ->active()
+                                ->orderBy('name')
+                                ->pluck('name', 'id')
+                                ->all())
+                            ->searchable()
+                            ->required()
+                            ->native(false),
+                    ),
+                    QuickCreateFields::applyServiceCreate(
+                        Select::make('service_id')
+                            ->label('Serviço')
+                            ->options(fn (): array => Service::query()
+                                ->where('company_id', Filament::getTenant()?->getKey())
+                                ->active()
+                                ->bookable()
+                                ->orderBy('name')
+                                ->pluck('name', 'id')
+                                ->all())
+                            ->nullable()
+                            ->helperText('Opcional. Deixe em branco para definir o procedimento no atendimento.')
+                            ->live()
+                            ->native(false),
+                    ),
                     Select::make('professional_id')
                         ->label('Profissional')
                         ->options(function (callable $get): array {
