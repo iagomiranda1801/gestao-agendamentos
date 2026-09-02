@@ -2,6 +2,7 @@
 
 namespace App\Services\PublicBooking;
 
+use App\Enums\AppointmentOrigin;
 use App\Models\Appointment;
 use App\Models\AppointmentPublicAccessToken;
 use Carbon\CarbonImmutable;
@@ -24,6 +25,19 @@ class PublicAppointmentTokenService
         $token->save();
 
         return $plainToken;
+    }
+
+    public function resolveManageUrl(Appointment $appointment, ?string $existing = null): ?string
+    {
+        if (filled($existing)) {
+            return $existing;
+        }
+
+        if ($appointment->origin !== AppointmentOrigin::Online) {
+            return null;
+        }
+
+        return route('public.appointment.manage', ['token' => $this->issue($appointment)]);
     }
 
     public function resolve(string $plainToken): ?AppointmentPublicAccessToken

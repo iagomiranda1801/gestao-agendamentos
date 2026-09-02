@@ -2,6 +2,7 @@
 
 namespace App\Services\PublicBooking;
 
+use App\Enums\AppointmentOrigin;
 use App\Models\Appointment;
 use App\Models\Company;
 use Illuminate\Support\Str;
@@ -35,6 +36,28 @@ class PublicConfirmationCodeGenerator
         }
 
         return $prefix.'-'.strtoupper(Str::random(6));
+    }
+
+    public function ensureForOnlineAppointment(Appointment $appointment): string
+    {
+        if (filled($appointment->public_confirmation_code)) {
+            return (string) $appointment->public_confirmation_code;
+        }
+
+        if ($appointment->origin !== AppointmentOrigin::Online) {
+            return '';
+        }
+
+        $company = $appointment->company;
+
+        if ($company === null) {
+            return '';
+        }
+
+        $code = $this->generate($company);
+        $appointment->forceFill(['public_confirmation_code' => $code])->save();
+
+        return $code;
     }
 
     protected function resolvePrefix(Company $company): string

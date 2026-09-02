@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Mail\AppointmentChangeMail;
 use App\Models\Appointment;
+use App\Services\PublicBooking\PublicAppointmentTokenService;
+use App\Services\PublicBooking\PublicConfirmationCodeGenerator;
 use App\Services\Scheduling\AppointmentNotificationRecipientService;
 use App\Services\WhatsApp\WhatsAppConfirmationMessageBuilder;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -28,6 +30,8 @@ class SendAppointmentCreatedEmailJob implements ShouldQueue
     public function handle(
         WhatsAppConfirmationMessageBuilder $messageBuilder,
         AppointmentNotificationRecipientService $recipients,
+        ?PublicAppointmentTokenService $tokens = null,
+        ?PublicConfirmationCodeGenerator $codes = null,
     ): void {
         $appointment = Appointment::query()
             ->with(['company.schedulingSetting', 'client', 'professional.user'])
@@ -37,6 +41,11 @@ class SendAppointmentCreatedEmailJob implements ShouldQueue
             return;
         }
 
+        $tokens ??= app(PublicAppointmentTokenService::class);
+        $codes ??= app(PublicConfirmationCodeGenerator::class);
+        $codes->ensureForOnlineAppointment($appointment);
+        $manageUrl = $tokens->resolveManageUrl($appointment, $this->manageUrl);
+
         $company = $appointment->company;
         $clientEmail = (string) ($appointment->client_email_snapshot ?: $appointment->client?->email ?: '');
 
@@ -44,7 +53,7 @@ class SendAppointmentCreatedEmailJob implements ShouldQueue
             $this->sendMail(
                 $clientEmail,
                 "Agendamento registrado - {$company->name}",
-                $messageBuilder->build($company, $appointment, $this->manageUrl),
+                $messageBuilder->build($company, $appointment, $manageUrl),
                 $appointment,
             );
         }
@@ -57,7 +66,7 @@ class SendAppointmentCreatedEmailJob implements ShouldQueue
             $this->sendMail(
                 (string) $user->email,
                 "Novo agendamento online - {$company->name}",
-                $messageBuilder->buildForStaff($company, $appointment, $this->manageUrl),
+                $messageBuilder->buildForStaff($company, $appointment, $manageUrl),
                 $appointment,
             );
         }

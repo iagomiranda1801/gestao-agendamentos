@@ -8,13 +8,17 @@ use App\Jobs\SendAppointmentCreatedEmailJob;
 use App\Jobs\SendWhatsAppAppointmentConfirmationJob;
 use App\Jobs\SendWhatsAppStaffBookingAlertJob;
 use App\Listeners\SendOnlineBookingWhatsAppNotification;
+use App\Mail\AppointmentChangeMail;
+use App\Models\AppointmentPublicAccessToken;
 use App\Services\PublicBooking\OnlineBookingService;
+use App\Services\Scheduling\AppointmentNotificationRecipientService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\WhatsAppConfirmationMessageBuilder;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Tests\Concerns\CreatesPublicBookingFixtures;
@@ -397,5 +401,150 @@ class WhatsAppConfirmationTest extends TestCase
         $this->assertTrue($setting->whatsapp_notifications_enabled);
         $this->assertNull($setting->whatsapp_instance);
         $this->assertSame('11988887777', $setting->whatsapp_sender_phone);
+    }
+
+    public function test_custom_template_replaces_professional_code_and_link(): void
+    {
+        Queue::fake();
+        $setup = $this->createBookableSetup();
+        $setup['professional']->update(['name' => 'Dra. Ana']);
+        $this->enablePublicBooking($setup['company'], [
+            'whatsapp_confirmation_template' => implode("\n", [
+                'Olá, {nome}!',
+                'com {profissional}.',
+                'Procedimento: {servico}',
+                'Código de confirmação: {codigo}',
+                'Se precisar cancelar ou remarcar, acesse:',
+                '{link}',
+            ]),
+        ]);
+
+        $result = app(OnlineBookingService::class)->create(
+            $this->makeOnlineBookingData(
+                $setup['company'],
+                $setup['service']->getKey(),
+                $setup['professional']->getKey(),
+                $setup['localStart'],
+                ['clientName' => 'Iago Miranda'],
+            ),
+        );
+
+        $message = app(WhatsAppConfirmationMessageBuilder::class)->build(
+            $setup['company']->refresh()->unsetRelation('schedulingSetting')->load('schedulingSetting'),
+            $result->appointment->load(['professional', 'client']),
+            $result->manageUrl,
+        );
+
+        $this->assertStringContainsString('Iago Miranda', $message);
+        $this->assertStringContainsString('Dra. Ana', $message);
+        $this->assertStringContainsString((string) $result->confirmationCode, $message);
+        $this->assertStringContainsString((string) $result->manageUrl, $message);
+        $this->assertStringNotContainsString('{profissional}', $message);
+        $this->assertStringNotContainsString('{codigo}', $message);
+        $this->assertStringNotContainsString('{link}', $message);
+    }
+
+    public function test_job_fills_code_and_link_when_manage_url_is_missing(): void
+    {
+        config([
+            'services.evolution.url' => 'https://evolution.test',
+            'services.evolution.key' => 'test-key',
+            'services.evolution.instance' => 'default',
+        ]);
+
+        Http::fake([
+            'evolution.test/*' => Http::response(['key' => ['id' => 'ok']], 200),
+        ]);
+        Queue::fake();
+
+        $setup = $this->createBookableSetup();
+        $setup['professional']->update(['name' => 'Dra. Ana']);
+        $this->enablePublicBooking($setup['company'], [
+            'whatsapp_notifications_enabled' => true,
+            'whatsapp_instance' => 'loja-1',
+            'whatsapp_sender_phone' => '11988887777',
+            'whatsapp_confirmation_template' => 'Com {profissional}. Código: {codigo}. Link: {link}',
+        ]);
+
+        $result = app(OnlineBookingService::class)->create(
+            $this->makeOnlineBookingData(
+                $setup['company'],
+                $setup['service']->getKey(),
+                $setup['professional']->getKey(),
+                $setup['localStart'],
+            ),
+        );
+
+        $result->appointment->forceFill(['public_confirmation_code' => null])->save();
+
+        $tokensBefore = AppointmentPublicAccessToken::query()
+            ->where('appointment_id', $result->appointment->getKey())
+            ->count();
+
+        (new SendWhatsAppAppointmentConfirmationJob($result->appointment->getKey(), null))->handle(
+            app(EvolutionApiClient::class),
+            app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
+        );
+
+        $appointment = $result->appointment->fresh();
+        $this->assertNotNull($appointment->public_confirmation_code);
+        $this->assertGreaterThan($tokensBefore, AppointmentPublicAccessToken::query()
+            ->where('appointment_id', $appointment->getKey())
+            ->count());
+
+        Http::assertSent(function ($request) use ($appointment): bool {
+            $text = (string) ($request['text'] ?? '');
+
+            return str_contains($text, 'Dra. Ana')
+                && str_contains($text, (string) $appointment->public_confirmation_code)
+                && str_contains($text, '/agendamento/')
+                && ! str_contains($text, '{profissional}')
+                && ! str_contains($text, '{codigo}')
+                && ! str_contains($text, '{link}');
+        });
+    }
+
+    public function test_email_job_fills_placeholders_when_manage_url_is_missing(): void
+    {
+        Mail::fake();
+        Queue::fake();
+
+        $setup = $this->createBookableSetup();
+        $setup['professional']->update(['name' => 'Dra. Ana']);
+        $this->enablePublicBooking($setup['company'], [
+            'whatsapp_confirmation_template' => 'Com {profissional}. Código: {codigo}. Link: {link}',
+        ]);
+
+        $result = app(OnlineBookingService::class)->create(
+            $this->makeOnlineBookingData(
+                $setup['company'],
+                $setup['service']->getKey(),
+                $setup['professional']->getKey(),
+                $setup['localStart'],
+                [
+                    'clientName' => 'Iago Miranda',
+                    'clientEmail' => 'iago@example.test',
+                ],
+            ),
+        );
+
+        (new SendAppointmentCreatedEmailJob($result->appointment->getKey(), null))->handle(
+            app(WhatsAppConfirmationMessageBuilder::class),
+            app(AppointmentNotificationRecipientService::class),
+        );
+
+        Mail::assertSent(AppointmentChangeMail::class, function (AppointmentChangeMail $mail) use ($result): bool {
+            if (! $mail->hasTo('iago@example.test')) {
+                return false;
+            }
+
+            $appointment = $result->appointment->fresh();
+
+            return str_contains($mail->bodyText, 'Dra. Ana')
+                && str_contains($mail->bodyText, (string) $appointment->public_confirmation_code)
+                && str_contains($mail->bodyText, '/agendamento/')
+                && ! str_contains($mail->bodyText, '{profissional}');
+        });
     }
 }

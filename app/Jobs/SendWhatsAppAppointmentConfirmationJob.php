@@ -5,6 +5,8 @@ namespace App\Jobs;
 use App\Enums\WhatsAppOutboundKind;
 use App\Jobs\Concerns\DefersViaWhatsAppOutboundGate;
 use App\Models\Appointment;
+use App\Services\PublicBooking\PublicAppointmentTokenService;
+use App\Services\PublicBooking\PublicConfirmationCodeGenerator;
 use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\WhatsAppConfirmationMessageBuilder;
@@ -27,9 +29,11 @@ class SendWhatsAppAppointmentConfirmationJob implements ShouldQueue
         EvolutionApiClient $client,
         WhatsAppConfirmationMessageBuilder $messageBuilder,
         CompanyWhatsAppInstanceService $instances,
+        ?PublicAppointmentTokenService $tokens = null,
+        ?PublicConfirmationCodeGenerator $codes = null,
     ): void {
         $appointment = Appointment::query()
-            ->with(['company.schedulingSetting', 'client'])
+            ->with(['company.schedulingSetting', 'client', 'professional'])
             ->find($this->appointmentId);
 
         if ($appointment === null) {
@@ -80,7 +84,15 @@ class SendWhatsAppAppointmentConfirmationJob implements ShouldQueue
             return;
         }
 
-        $message = $messageBuilder->build($company, $appointment, $this->manageUrl);
+        $codes ??= app(PublicConfirmationCodeGenerator::class);
+        $tokens ??= app(PublicAppointmentTokenService::class);
+        $codes->ensureForOnlineAppointment($appointment);
+
+        $message = $messageBuilder->build(
+            $company,
+            $appointment,
+            $tokens->resolveManageUrl($appointment, $this->manageUrl),
+        );
 
         try {
             $client->sendText($instance, $phone, $message);

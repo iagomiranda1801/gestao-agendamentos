@@ -371,7 +371,7 @@ class SchedulingSettingsPage extends Page
                             ->maxLength(20),
                         Textarea::make('whatsapp_confirmation_template')
                             ->label('Modelo da mensagem')
-                            ->helperText('Placeholders: {nome}, {servico}, {data}, {hora}, {codigo}, {link}, {empresa}, {placa}')
+                            ->helperText('Placeholders: {nome}, {servico}, {profissional}, {data}, {hora}, {codigo}, {link}, {empresa}, {placa}')
                             ->rows(6)
                             ->maxLength(4000)
                             ->columnSpanFull(),
