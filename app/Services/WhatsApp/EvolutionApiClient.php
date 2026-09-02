@@ -42,6 +42,49 @@ class EvolutionApiClient
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    public function sendImage(
+        string $instance,
+        string $phoneDigits,
+        string $binary,
+        string $mimeType,
+        string $fileName,
+        string $caption,
+    ): array {
+        $instance = $this->resolveInstance($instance);
+
+        if ($instance === '') {
+            throw new RuntimeException('Instância Evolution não configurada.');
+        }
+
+        $number = $this->toWhatsAppNumber($phoneDigits);
+        $mimeType = strtolower(trim($mimeType));
+
+        if (! in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+            throw new RuntimeException('Tipo de imagem não suportado para campanha WhatsApp.');
+        }
+
+        $response = $this->http()
+            ->acceptJson()
+            ->timeout(45)
+            ->post($this->url("/message/sendMedia/{$instance}"), [
+                'number' => $number,
+                'mediatype' => 'image',
+                'mimetype' => $mimeType,
+                'caption' => $caption,
+                'media' => base64_encode($binary),
+                'fileName' => $fileName,
+            ]);
+
+        if ($response->failed()) {
+            throw new RequestException($response);
+        }
+
+        return $response->json() ?? [];
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     public function fetchInstances(): array

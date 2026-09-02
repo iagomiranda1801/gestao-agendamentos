@@ -6,6 +6,7 @@ use App\Enums\WhatsAppCampaignRecipientStatus;
 use App\Enums\WhatsAppCampaignStatus;
 use App\Enums\WhatsAppOutboundKind;
 use App\Jobs\Concerns\DefersViaWhatsAppOutboundGate;
+use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppCampaignRecipient;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\Campaigns\WhatsAppCampaignService;
@@ -14,6 +15,8 @@ use App\Services\WhatsApp\EvolutionApiClient;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 use Throwable;
 
 class SendWhatsAppCampaignRecipientJob implements ShouldQueue
@@ -78,7 +81,7 @@ class SendWhatsAppCampaignRecipientJob implements ShouldQueue
                 'error_message' => null,
             ])->save();
 
-            $response = $client->sendText($instance, $recipient->phone, $recipient->message_snapshot);
+            $response = $this->sendCampaignMessage($client, $instance, $campaign, $recipient);
             $this->rememberOutboundSuccess($campaign->company);
             $providerStatus = $this->providerStatus($response);
 
@@ -104,6 +107,46 @@ class SendWhatsAppCampaignRecipientJob implements ShouldQueue
         }
 
         $campaigns->refreshCounters($campaign);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function sendCampaignMessage(
+        EvolutionApiClient $client,
+        string $instance,
+        WhatsAppCampaign $campaign,
+        WhatsAppCampaignRecipient $recipient,
+    ): array {
+        if (! $campaign->hasImage()) {
+            return $client->sendText($instance, $recipient->phone, $recipient->message_snapshot);
+        }
+
+        $diskName = (string) ($campaign->image_disk ?: config('filesystems.company_logo_disk', 's3'));
+        $disk = Storage::disk($diskName);
+        $path = (string) $campaign->image_path;
+
+        if (! $disk->exists($path)) {
+            throw new RuntimeException('A imagem da campanha não foi encontrada.');
+        }
+
+        $binary = $disk->get($path);
+
+        if (! is_string($binary) || $binary === '') {
+            throw new RuntimeException('Não foi possível ler a imagem da campanha.');
+        }
+
+        $mime = (string) ($campaign->image_mime ?: $disk->mimeType($path) ?: 'image/jpeg');
+        $fileName = basename($path) ?: 'campanha.jpg';
+
+        return $client->sendImage(
+            $instance,
+            $recipient->phone,
+            $binary,
+            $mime,
+            $fileName,
+            $recipient->message_snapshot,
+        );
     }
 
     protected function recipientStatusFromProvider(?string $providerStatus): WhatsAppCampaignRecipientStatus

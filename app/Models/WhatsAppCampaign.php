@@ -17,6 +17,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'inactive_since_days',
     'status',
     'message_template',
+    'image_path',
+    'image_disk',
+    'image_mime',
     'send_interval_seconds',
     'total_recipients',
     'sent_count',
@@ -93,5 +96,10 @@ class WhatsAppCampaign extends Model
     public function recipients(): HasMany
     {
         return $this->hasMany(WhatsAppCampaignRecipient::class, 'whatsapp_campaign_id');
+    }
+
+    public function hasImage(): bool
+    {
+        return filled($this->image_path);
     }
 }

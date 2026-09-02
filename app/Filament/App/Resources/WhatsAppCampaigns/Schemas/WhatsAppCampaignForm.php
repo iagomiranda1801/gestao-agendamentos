@@ -10,6 +10,7 @@ use App\Models\WhatsAppCampaign;
 use App\Services\WhatsApp\Automations\InactiveClientQuery;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -74,11 +75,26 @@ class WhatsAppCampaignForm
                             }),
                         Textarea::make('message_template')
                             ->label('O que você quer dizer?')
-                            ->helperText('Use {nome}, {empresa} e {placa} para personalizar a mensagem.')
+                            ->helperText('Use {nome}, {empresa} e {placa} para personalizar a mensagem. Se houver imagem, este texto vira a legenda da foto.')
                             ->rows(8)
                             ->maxLength(4000)
                             ->required()
                             ->live(debounce: 500)
+                            ->columnSpanFull(),
+                        FileUpload::make('image_path')
+                            ->label('Imagem')
+                            ->helperText('Opcional. JPEG, PNG ou WebP até 2 MB. A mensagem acima é enviada como legenda.')
+                            ->disk((string) config('filesystems.company_logo_disk', 's3'))
+                            ->directory(function (): string {
+                                /** @var Company $company */
+                                $company = Filament::getTenant();
+
+                                return 'agendaqui/'.$company->slug.'/campanhas';
+                            })
+                            ->image()
+                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                            ->maxSize(2048)
+                            ->imagePreviewHeight('160')
                             ->columnSpanFull(),
                         Placeholder::make('message_preview')
                             ->label('Prévia')

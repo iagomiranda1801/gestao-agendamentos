@@ -17,6 +17,7 @@ use App\Support\VehiclePlate;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class WhatsAppCampaignService
@@ -189,6 +190,9 @@ class WhatsAppCampaignService
                 'selected_client_ids' => $campaign->selected_client_ids,
                 'inactive_since_days' => $campaign->inactive_since_days,
                 'message_template' => $campaign->message_template,
+                'image_path' => $campaign->image_path,
+                'image_disk' => $campaign->image_disk,
+                'image_mime' => $campaign->image_mime,
                 'send_interval_seconds' => $campaign->send_interval_seconds,
                 'scheduled_at' => null,
                 'status' => WhatsAppCampaignStatus::Draft->value,
@@ -357,6 +361,57 @@ class WhatsAppCampaignService
         if ($audienceType !== WhatsAppCampaignAudience::SelectedClients->value) {
             $data['selected_client_ids'] = [];
         }
+
+        $data = $this->normalizeImagePayload($data);
+
+        return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function normalizeImagePayload(array $data): array
+    {
+        $path = $data['image_path'] ?? null;
+
+        if (is_array($path)) {
+            $path = $path[0] ?? null;
+        }
+
+        $path = is_string($path) ? trim($path) : '';
+
+        if ($path === '') {
+            $data['image_path'] = null;
+            $data['image_disk'] = null;
+            $data['image_mime'] = null;
+
+            return $data;
+        }
+
+        $disk = (string) ($data['image_disk'] ?? config('filesystems.company_logo_disk', 's3'));
+        $mime = (string) (Storage::disk($disk)->mimeType($path) ?: '');
+        $allowed = ['image/jpeg', 'image/png', 'image/webp'];
+        $fromExtension = match (strtolower((string) pathinfo($path, PATHINFO_EXTENSION))) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            default => '',
+        };
+
+        if (! in_array($mime, $allowed, true)) {
+            $mime = $fromExtension;
+        }
+
+        if (! in_array($mime, $allowed, true)) {
+            throw ValidationException::withMessages([
+                'image_path' => 'Envie uma imagem JPEG, PNG ou WebP de até 2 MB.',
+            ]);
+        }
+
+        $data['image_path'] = $path;
+        $data['image_disk'] = $disk;
+        $data['image_mime'] = $mime;
 
         return $data;
     }
