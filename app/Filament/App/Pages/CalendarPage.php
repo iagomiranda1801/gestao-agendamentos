@@ -8,6 +8,7 @@ use App\Enums\CompanyRole;
 use App\Enums\ScheduleBlockType;
 use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Filament\App\Resources\Appointments\AppointmentResource;
+use App\Filament\App\Support\AppointmentSchedulingForm;
 use App\Filament\App\Support\QuickCreateFields;
 use App\Models\Appointment;
 use App\Models\Client;
@@ -38,6 +39,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\View as ViewComponent;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Validation\ValidationException;
 use UnitEnum;
 
 class CalendarPage extends Page
@@ -143,7 +145,14 @@ class CalendarPage extends Page
         /** @var Company $company */
         $company = Filament::getTenant();
 
-        app(AppointmentService::class)->createFromSelection($company, auth()->user(), $data);
+        try {
+            app(AppointmentService::class)->createFromSelection($company, auth()->user(), $data);
+        } catch (ValidationException $exception) {
+            AppointmentSchedulingForm::notifyAndRethrow(
+                $exception,
+                $this->getMountedActionSchema()?->getStatePath(),
+            );
+        }
 
         Notification::make()
             ->success()
@@ -390,10 +399,11 @@ class CalendarPage extends Page
                         ->label('Data')
                         ->required()
                         ->native(false),
-                    TimePicker::make('appointment_time')
-                        ->label('Hora inicial')
-                        ->seconds(false)
-                        ->required(),
+                    AppointmentSchedulingForm::timePicker(
+                        TimePicker::make('appointment_time')
+                            ->label('Hora inicial')
+                            ->required(),
+                    ),
                     Textarea::make('appointment_reason')
                         ->label('Motivo da consulta')
                         ->rows(2)

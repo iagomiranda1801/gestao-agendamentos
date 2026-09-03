@@ -423,13 +423,13 @@ class AppointmentService
 
         if (! $client->is_active || ! $professional->is_active || ($service !== null && ! $service->is_active)) {
             throw ValidationException::withMessages([
-                'status' => 'Cliente, profissional ou serviço inativo.',
+                'professional_id' => 'Cliente, profissional ou serviço inativo.',
             ]);
         }
 
         if (! $professional->is_bookable || ($service !== null && ! $service->is_bookable)) {
             throw ValidationException::withMessages([
-                'status' => 'Profissional ou serviço indisponível para agendamento.',
+                'professional_id' => 'Profissional ou serviço indisponível para agendamento.',
             ]);
         }
 

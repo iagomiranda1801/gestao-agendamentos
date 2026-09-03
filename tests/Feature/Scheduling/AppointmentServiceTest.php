@@ -140,6 +140,31 @@ class AppointmentServiceTest extends TestCase
         $this->assertSame($originalName, $appointment->service_name_snapshot);
     }
 
+    public function test_unaligned_slot_is_rejected_on_appointment_time(): void
+    {
+        $setup = $this->createBookableSetup();
+        $unalignedStart = $setup['localStart']->setTime(9, 10);
+
+        try {
+            app(AppointmentService::class)->createInternalAppointment(
+                $setup['company'],
+                $setup['admin'],
+                $setup['client'],
+                $setup['professional'],
+                $setup['service'],
+                $unalignedStart,
+            );
+            $this->fail('Expected ValidationException for unaligned slot.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('appointment_time', $exception->errors());
+            $this->assertArrayHasKey('start_at', $exception->errors());
+            $this->assertSame(
+                'Horário não alinhado ao intervalo da agenda.',
+                $exception->errors()['appointment_time'][0],
+            );
+        }
+    }
+
     public function test_overlapping_appointments_are_rejected(): void
     {
         $setup = $this->createBookableSetup();

@@ -5,6 +5,7 @@ namespace App\Filament\App\Resources\Appointments\Schemas;
 use App\Enums\AppointmentOrigin;
 use App\Enums\CompanyPermission;
 use App\Enums\CompanyRole;
+use App\Filament\App\Support\AppointmentSchedulingForm;
 use App\Filament\App\Support\QuickCreateFields;
 use App\Models\Appointment;
 use App\Models\Company;
@@ -125,13 +126,14 @@ class AppointmentForm
                             ->disabled($readOnly)
                             ->live()
                             ->afterStateUpdated(fn (Set $set, Get $get) => self::syncEndPreview($set, $get)),
-                        TimePicker::make('appointment_time')
-                            ->label('Hora inicial')
-                            ->seconds(false)
-                            ->required()
-                            ->disabled($readOnly)
-                            ->live()
-                            ->afterStateUpdated(fn (Set $set, Get $get) => self::syncEndPreview($set, $get)),
+                        AppointmentSchedulingForm::timePicker(
+                            TimePicker::make('appointment_time')
+                                ->label('Hora inicial')
+                                ->required()
+                                ->disabled($readOnly)
+                                ->live()
+                                ->afterStateUpdated(fn (Set $set, Get $get) => self::syncEndPreview($set, $get)),
+                        ),
                         TextInput::make('duration_preview')
                             ->label('Duração')
                             ->disabled()

@@ -4,6 +4,7 @@ namespace App\Filament\App\Resources\Appointments\Pages;
 
 use App\Filament\App\Resources\Appointments\AppointmentResource;
 use App\Filament\App\Resources\Appointments\Concerns\InteractsWithAppointmentActions;
+use App\Filament\App\Support\AppointmentSchedulingForm;
 use App\Models\Appointment;
 use App\Models\Company;
 use App\Services\Scheduling\AppointmentService;
@@ -11,6 +12,7 @@ use App\Support\CompanyDateTime;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\ValidationException;
 
 class EditAppointment extends EditRecord
 {
@@ -45,11 +47,15 @@ class EditAppointment extends EditRecord
         $company = Filament::getTenant();
 
         /** @var Appointment $record */
-        return app(AppointmentService::class)->updateAppointment(
-            $company,
-            auth()->user(),
-            $record,
-            $data,
-        );
+        try {
+            return app(AppointmentService::class)->updateAppointment(
+                $company,
+                auth()->user(),
+                $record,
+                $data,
+            );
+        } catch (ValidationException $exception) {
+            AppointmentSchedulingForm::notifyAndRethrow($exception, $this->form->getStatePath());
+        }
     }
 }

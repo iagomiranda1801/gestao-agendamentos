@@ -3,6 +3,7 @@
 namespace App\Filament\App\Resources\Appointments\Pages;
 
 use App\Filament\App\Resources\Appointments\AppointmentResource;
+use App\Filament\App\Support\AppointmentSchedulingForm;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\Professional;
@@ -12,6 +13,7 @@ use App\Support\CompanyDateTime;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\ValidationException;
 
 class CreateAppointment extends CreateRecord
 {
@@ -46,14 +48,18 @@ class CreateAppointment extends CreateRecord
             $data['appointment_time'],
         );
 
-        return app(AppointmentService::class)->createInternalAppointment(
-            $company,
-            auth()->user(),
-            $client,
-            $professional,
-            $service,
-            $localStart,
-            $data,
-        );
+        try {
+            return app(AppointmentService::class)->createInternalAppointment(
+                $company,
+                auth()->user(),
+                $client,
+                $professional,
+                $service,
+                $localStart,
+                $data,
+            );
+        } catch (ValidationException $exception) {
+            AppointmentSchedulingForm::notifyAndRethrow($exception, $this->form->getStatePath());
+        }
     }
 }

@@ -10,6 +10,7 @@ use App\Enums\AppointmentStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\ProductType;
 use App\Filament\App\Resources\Attendances\AttendanceResource;
+use App\Filament\App\Support\AppointmentSchedulingForm;
 use App\Models\Appointment;
 use App\Models\Company;
 use App\Models\FinancialAccount;
@@ -38,6 +39,7 @@ use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 trait InteractsWithAppointmentActions
 {
@@ -123,10 +125,11 @@ trait InteractsWithAppointmentActions
                         ->label('Nova data')
                         ->required()
                         ->native(false),
-                    TimePicker::make('appointment_time')
-                        ->label('Nova hora')
-                        ->seconds(false)
-                        ->required(),
+                    AppointmentSchedulingForm::timePicker(
+                        TimePicker::make('appointment_time')
+                            ->label('Nova hora')
+                            ->required(),
+                    ),
                 ])
                 ->action(function (array $data): void {
                     /** @var Company $company */
@@ -143,7 +146,14 @@ trait InteractsWithAppointmentActions
                         ? Professional::query()->findOrFail($data['professional_id'])
                         : null;
 
-                    app(AppointmentService::class)->reschedule($company, auth()->user(), $record, $localStart, $professional);
+                    try {
+                        app(AppointmentService::class)->reschedule($company, auth()->user(), $record, $localStart, $professional);
+                    } catch (ValidationException $exception) {
+                        AppointmentSchedulingForm::notifyAndRethrow(
+                            $exception,
+                            $this->getMountedActionSchema()?->getStatePath(),
+                        );
+                    }
 
                     Notification::make()->success()->title('Agendamento remarcado')->send();
                 }),

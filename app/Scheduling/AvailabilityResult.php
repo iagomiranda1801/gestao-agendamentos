@@ -24,8 +24,11 @@ readonly class AvailabilityResult
     public function assertAvailable(): void
     {
         if (! $this->available) {
+            $reason = $this->reason ?? 'Horário indisponível.';
+
             throw ValidationException::withMessages([
-                'start_at' => $this->reason ?? 'Horário indisponível.',
+                'appointment_time' => $reason,
+                'start_at' => $reason,
             ]);
         }
     }
