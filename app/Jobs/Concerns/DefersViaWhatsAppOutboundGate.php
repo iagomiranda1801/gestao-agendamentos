@@ -5,6 +5,7 @@ namespace App\Jobs\Concerns;
 use App\Enums\WhatsAppOutboundKind;
 use App\Models\Company;
 use App\Services\WhatsApp\Outbound\WhatsAppOutboundGate;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 trait DefersViaWhatsAppOutboundGate
@@ -23,8 +24,14 @@ trait DefersViaWhatsAppOutboundGate
             $reservation = $gate->reserve($company, $kind);
 
             if (! $reservation->allowed) {
-                if ($reservation->retryAt !== null && $reservation->retryAt->isFuture()) {
-                    $this->release(max(1, now()->diffInSeconds($reservation->retryAt)));
+                $wait = $reservation->retryAt !== null && $reservation->retryAt->isFuture()
+                    ? max(1, now()->diffInSeconds($reservation->retryAt))
+                    : 0;
+
+                $this->logOutboundDeferral($company, $kind, $reservation->reason ?? 'blocked', $wait);
+
+                if ($wait > 0) {
+                    $this->release($wait);
                 }
 
                 return false;
@@ -36,6 +43,7 @@ trait DefersViaWhatsAppOutboundGate
         $wait = $this->whatsappOutboundNotBefore - now()->getTimestamp();
 
         if ($wait > 0) {
+            $this->logOutboundDeferral($company, $kind, 'interval', $wait);
             $this->release($wait);
 
             return false;
@@ -61,5 +69,16 @@ trait DefersViaWhatsAppOutboundGate
         if (config('queue.default') !== 'sync') {
             throw $exception;
         }
+    }
+
+    protected function logOutboundDeferral(Company $company, WhatsAppOutboundKind $kind, string $reason, int $retryInSeconds): void
+    {
+        Log::info('WhatsApp outbound deferred.', [
+            'job' => static::class,
+            'kind' => $kind->value,
+            'company_id' => $company->getKey(),
+            'reason' => $reason,
+            'retry_in_seconds' => $retryInSeconds,
+        ]);
     }
 }

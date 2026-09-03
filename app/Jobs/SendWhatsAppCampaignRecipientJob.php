@@ -15,6 +15,7 @@ use App\Services\WhatsApp\EvolutionApiClient;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
@@ -38,11 +39,28 @@ class SendWhatsAppCampaignRecipientJob implements ShouldQueue
             ->with(['campaign.company', 'client'])
             ->find($this->recipientId);
 
-        if (! $recipient || $recipient->status !== WhatsAppCampaignRecipientStatus::Queued) {
+        if (! $recipient) {
             return;
         }
 
         $campaign = $recipient->campaign;
+
+        if ($this->shouldWaitForQueuedStatus($recipient, $campaign)) {
+            return;
+        }
+
+        if ($recipient->status !== WhatsAppCampaignRecipientStatus::Queued) {
+            Log::info('WhatsApp campaign recipient job skipped.', [
+                'recipient_id' => $recipient->getKey(),
+                'status' => $recipient->status->value,
+            ]);
+
+            return;
+        }
+
+        if ($campaign === null) {
+            return;
+        }
 
         if (! $recipient->client || ! $recipient->client->is_active || ! $recipient->client->whatsapp_marketing_opt_in) {
             $recipient->forceFill([
@@ -107,6 +125,62 @@ class SendWhatsAppCampaignRecipientJob implements ShouldQueue
         }
 
         $campaigns->refreshCounters($campaign);
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        $recipient = WhatsAppCampaignRecipient::query()
+            ->with('campaign')
+            ->find($this->recipientId);
+
+        if (! $recipient || ! in_array($recipient->status, [
+            WhatsAppCampaignRecipientStatus::Pending,
+            WhatsAppCampaignRecipientStatus::Queued,
+        ], true)) {
+            return;
+        }
+
+        $recipient->forceFill([
+            'status' => WhatsAppCampaignRecipientStatus::Failed,
+            'attempts' => $recipient->attempts + 1,
+            'attempted_at' => now(),
+            'error_message' => mb_substr(
+                $exception?->getMessage() ?: 'O job da campanha esgotou as tentativas na fila.',
+                0,
+                2000,
+            ),
+        ])->save();
+
+        if ($recipient->campaign) {
+            app(WhatsAppCampaignService::class)->refreshCounters($recipient->campaign);
+        }
+    }
+
+    protected function shouldWaitForQueuedStatus(
+        WhatsAppCampaignRecipient $recipient,
+        ?WhatsAppCampaign $campaign,
+    ): bool {
+        if ($campaign?->status !== WhatsAppCampaignStatus::Sending) {
+            return false;
+        }
+
+        if ($recipient->status !== WhatsAppCampaignRecipientStatus::Pending) {
+            return false;
+        }
+
+        $recipient->forceFill([
+            'status' => WhatsAppCampaignRecipientStatus::Queued,
+            'queued_at' => $recipient->queued_at ?? now(),
+        ])->save();
+
+        Log::info('WhatsApp campaign recipient job released until queued status is visible.', [
+            'recipient_id' => $recipient->getKey(),
+            'campaign_id' => $campaign->getKey(),
+        ]);
+
+        $this->release(5);
+
+        return true;
     }
 
     /**

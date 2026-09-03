@@ -16,11 +16,15 @@ use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\Campaigns\WhatsAppCampaignService;
 use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Services\WhatsApp\EvolutionApiClient;
+use App\Services\WhatsApp\Outbound\WhatsAppOutboundGate;
 use Filament\Facades\Filament;
+use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 use Tests\TestCase;
 
 class WhatsAppCampaignTest extends TestCase
@@ -507,6 +511,201 @@ class WhatsAppCampaignTest extends TestCase
         $this->assertSame($campaign->image_disk, $copy->image_disk);
         $this->assertSame($campaign->image_mime, $copy->image_mime);
         $this->assertSame('image/png', $copy->image_mime);
+    }
+
+    public function test_campaign_job_releases_when_recipient_is_still_pending_during_send(): void
+    {
+        Http::fake();
+        $logged = [];
+        Event::listen(MessageLogged::class, function (MessageLogged $event) use (&$logged): void {
+            $logged[] = $event;
+        });
+
+        $company = $this->createCompany();
+        $user = $this->createCompanyUser($company);
+        Client::factory()
+            ->forCompany($company)
+            ->optedInForWhatsAppMarketing()
+            ->create(['phone' => '(11) 99999-0001']);
+
+        $campaign = app(WhatsAppCampaignService::class)->create($company, $user, [
+            'name' => 'Campanha',
+            'audience_type' => WhatsAppCampaignAudience::OptedInActiveClients->value,
+            'message_template' => 'Mensagem',
+            'send_interval_seconds' => 30,
+        ]);
+        app(WhatsAppCampaignService::class)->prepareRecipients($company, $campaign);
+        $recipient = $campaign->recipients()->firstOrFail();
+        $campaign->forceFill(['status' => WhatsAppCampaignStatus::Sending])->save();
+
+        $this->assertSame(WhatsAppCampaignRecipientStatus::Pending, $recipient->status);
+
+        (new SendWhatsAppCampaignRecipientJob($recipient->getKey()))->handle(
+            app(EvolutionApiClient::class),
+            app(CompanySchedulingSettingService::class),
+            app(CompanyWhatsAppInstanceService::class),
+            app(WhatsAppCampaignService::class),
+        );
+
+        $this->assertSame(WhatsAppCampaignRecipientStatus::Queued, $recipient->refresh()->status);
+        $this->assertSame(WhatsAppCampaignStatus::Sending, $campaign->refresh()->status);
+        Http::assertNothingSent();
+        $this->assertTrue(collect($logged)->contains(
+            fn (MessageLogged $event): bool => $event->message === 'WhatsApp campaign recipient job released until queued status is visible.',
+        ));
+    }
+
+    public function test_campaign_job_failed_marks_recipient_failed_and_completes_campaign(): void
+    {
+        $company = $this->createCompany();
+        $user = $this->createCompanyUser($company);
+        Client::factory()
+            ->forCompany($company)
+            ->optedInForWhatsAppMarketing()
+            ->create(['phone' => '(11) 99999-0001']);
+
+        $campaign = app(WhatsAppCampaignService::class)->create($company, $user, [
+            'name' => 'Campanha',
+            'audience_type' => WhatsAppCampaignAudience::OptedInActiveClients->value,
+            'message_template' => 'Mensagem',
+            'send_interval_seconds' => 30,
+        ]);
+        app(WhatsAppCampaignService::class)->prepareRecipients($company, $campaign);
+        $recipient = $campaign->recipients()->firstOrFail();
+        $recipient->forceFill(['status' => WhatsAppCampaignRecipientStatus::Queued])->save();
+        $campaign->forceFill(['status' => WhatsAppCampaignStatus::Sending])->save();
+
+        (new SendWhatsAppCampaignRecipientJob($recipient->getKey()))
+            ->failed(new RuntimeException('Max attempts exceeded'));
+
+        $recipient->refresh();
+        $campaign->refresh();
+
+        $this->assertSame(WhatsAppCampaignRecipientStatus::Failed, $recipient->status);
+        $this->assertSame('Max attempts exceeded', $recipient->error_message);
+        $this->assertSame(1, $campaign->failed_count);
+        $this->assertSame(WhatsAppCampaignStatus::Completed, $campaign->status);
+    }
+
+    public function test_watchdog_requeues_stuck_queued_recipients(): void
+    {
+        Queue::fake();
+
+        $company = $this->createCompany();
+        $user = $this->createCompanyUser($company);
+        Client::factory()
+            ->forCompany($company)
+            ->optedInForWhatsAppMarketing()
+            ->create(['phone' => '(11) 99999-0001']);
+
+        $campaign = app(WhatsAppCampaignService::class)->create($company, $user, [
+            'name' => 'Campanha',
+            'audience_type' => WhatsAppCampaignAudience::OptedInActiveClients->value,
+            'message_template' => 'Mensagem',
+            'send_interval_seconds' => 30,
+        ]);
+        app(WhatsAppCampaignService::class)->prepareRecipients($company, $campaign);
+        $recipient = $campaign->recipients()->firstOrFail();
+        $recipient->forceFill([
+            'status' => WhatsAppCampaignRecipientStatus::Queued,
+            'queued_at' => now()->subMinutes(10),
+            'attempted_at' => null,
+        ])->save();
+        $campaign->forceFill(['status' => WhatsAppCampaignStatus::Sending])->save();
+
+        $this->artisan('whatsapp:requeue-stuck-campaigns', ['--minutes' => 5])
+            ->expectsOutput('Destinatários reenfileirados: 1')
+            ->assertSuccessful();
+
+        Queue::assertPushed(SendWhatsAppCampaignRecipientJob::class, fn ($job): bool => $job->recipientId === $recipient->getKey());
+    }
+
+    public function test_watchdog_skips_recent_queued_recipients(): void
+    {
+        Queue::fake();
+
+        $company = $this->createCompany();
+        $user = $this->createCompanyUser($company);
+        Client::factory()
+            ->forCompany($company)
+            ->optedInForWhatsAppMarketing()
+            ->create(['phone' => '(11) 99999-0001']);
+
+        $campaign = app(WhatsAppCampaignService::class)->create($company, $user, [
+            'name' => 'Campanha',
+            'audience_type' => WhatsAppCampaignAudience::OptedInActiveClients->value,
+            'message_template' => 'Mensagem',
+            'send_interval_seconds' => 30,
+        ]);
+        app(WhatsAppCampaignService::class)->prepareRecipients($company, $campaign);
+        $recipient = $campaign->recipients()->firstOrFail();
+        $recipient->forceFill([
+            'status' => WhatsAppCampaignRecipientStatus::Queued,
+            'queued_at' => now()->subMinute(),
+        ])->save();
+        $campaign->forceFill(['status' => WhatsAppCampaignStatus::Sending])->save();
+
+        $this->artisan('whatsapp:requeue-stuck-campaigns', ['--minutes' => 5])
+            ->expectsOutput('Destinatários reenfileirados: 0')
+            ->assertSuccessful();
+
+        Queue::assertNotPushed(SendWhatsAppCampaignRecipientJob::class);
+    }
+
+    public function test_campaign_job_logs_outbound_gate_deferral_without_calling_evolution(): void
+    {
+        Http::fake();
+        $logged = [];
+        Event::listen(MessageLogged::class, function (MessageLogged $event) use (&$logged): void {
+            $logged[] = $event;
+        });
+        config([
+            'services.evolution.url' => 'https://evolution.test',
+            'services.evolution.key' => 'secret',
+            'services.evolution.outbound.circuit_failures' => 5,
+        ]);
+
+        $company = $this->createCompany();
+        $user = $this->createCompanyUser($company);
+        CompanySchedulingSetting::factory()->for($company)->create([
+            'whatsapp_instance' => 'loja-1',
+        ]);
+        Client::factory()
+            ->forCompany($company)
+            ->optedInForWhatsAppMarketing()
+            ->create(['phone' => '(11) 99999-0001']);
+
+        $campaign = app(WhatsAppCampaignService::class)->create($company, $user, [
+            'name' => 'Campanha',
+            'audience_type' => WhatsAppCampaignAudience::OptedInActiveClients->value,
+            'message_template' => 'Mensagem',
+            'send_interval_seconds' => 30,
+        ]);
+        app(WhatsAppCampaignService::class)->prepareRecipients($company, $campaign);
+        $recipient = $campaign->recipients()->firstOrFail();
+        $recipient->forceFill(['status' => WhatsAppCampaignRecipientStatus::Queued])->save();
+        $campaign->forceFill(['status' => WhatsAppCampaignStatus::Sending])->save();
+
+        $gate = app(WhatsAppOutboundGate::class);
+        for ($i = 0; $i < 5; $i++) {
+            $gate->recordFailure($company);
+        }
+
+        (new SendWhatsAppCampaignRecipientJob($recipient->getKey()))->handle(
+            app(EvolutionApiClient::class),
+            app(CompanySchedulingSettingService::class),
+            app(CompanyWhatsAppInstanceService::class),
+            app(WhatsAppCampaignService::class),
+        );
+
+        $this->assertSame(WhatsAppCampaignRecipientStatus::Queued, $recipient->refresh()->status);
+        $this->assertSame(WhatsAppCampaignStatus::Sending, $campaign->refresh()->status);
+        Http::assertNothingSent();
+        $this->assertTrue(collect($logged)->contains(function (MessageLogged $event) use ($company): bool {
+            return $event->message === 'WhatsApp outbound deferred.'
+                && ($event->context['reason'] ?? null) === 'circuit_breaker'
+                && (int) ($event->context['company_id'] ?? 0) === (int) $company->getKey();
+        }));
     }
 
     protected function tinyJpeg(): string

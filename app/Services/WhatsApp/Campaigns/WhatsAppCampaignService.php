@@ -17,6 +17,7 @@ use App\Support\VehiclePlate;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -122,7 +123,9 @@ class WhatsAppCampaignService
             ]);
         }
 
-        return DB::transaction(function () use ($campaign): WhatsAppCampaign {
+        $dispatches = [];
+
+        $campaign = DB::transaction(function () use ($campaign, &$dispatches): WhatsAppCampaign {
             $campaign->forceFill([
                 'status' => WhatsAppCampaignStatus::Sending,
                 'started_at' => now(),
@@ -137,15 +140,17 @@ class WhatsAppCampaignService
             $campaign->recipients()
                 ->where('status', WhatsAppCampaignRecipientStatus::Pending)
                 ->orderBy('id')
-                ->chunkById(200, function ($recipients) use (&$delay, $interval): void {
+                ->chunkById(200, function ($recipients) use (&$delay, $interval, &$dispatches): void {
                     foreach ($recipients as $recipient) {
                         $recipient->forceFill([
                             'status' => WhatsAppCampaignRecipientStatus::Queued,
                             'queued_at' => now(),
                         ])->save();
 
-                        SendWhatsAppCampaignRecipientJob::dispatch($recipient->getKey())
-                            ->delay(now()->addSeconds($delay));
+                        $dispatches[] = [
+                            'id' => $recipient->getKey(),
+                            'delay' => $delay,
+                        ];
 
                         $delay += $interval;
                     }
@@ -153,6 +158,60 @@ class WhatsAppCampaignService
 
             return $campaign->refresh();
         });
+
+        $this->dispatchRecipientJobs($dispatches);
+
+        return $campaign;
+    }
+
+    /**
+     * @param  list<array{id: int, delay: int}>  $dispatches
+     */
+    public function dispatchRecipientJobs(array $dispatches): void
+    {
+        foreach ($dispatches as $dispatch) {
+            SendWhatsAppCampaignRecipientJob::dispatch($dispatch['id'])
+                ->delay(now()->addSeconds((int) $dispatch['delay']));
+        }
+    }
+
+    public function requeueStuckQueuedRecipients(int $stuckAfterMinutes = 5): int
+    {
+        $queued = 0;
+        $cutoff = now()->subMinutes(max(1, $stuckAfterMinutes));
+
+        WhatsAppCampaignRecipient::query()
+            ->where('status', WhatsAppCampaignRecipientStatus::Queued)
+            ->whereNull('attempted_at')
+            ->where('queued_at', '<=', $cutoff)
+            ->whereHas('campaign', function ($query): void {
+                $query->where('status', WhatsAppCampaignStatus::Sending);
+            })
+            ->orderBy('id')
+            ->chunkById(200, function ($recipients) use (&$queued): void {
+                foreach ($recipients as $recipient) {
+                    if ($this->recipientJobIsPending($recipient->getKey())) {
+                        continue;
+                    }
+
+                    SendWhatsAppCampaignRecipientJob::dispatch($recipient->getKey());
+                    $queued++;
+                }
+            });
+
+        return $queued;
+    }
+
+    protected function recipientJobIsPending(int $recipientId): bool
+    {
+        if (! Schema::hasTable('jobs')) {
+            return false;
+        }
+
+        return DB::table('jobs')
+            ->where('payload', 'like', '%SendWhatsAppCampaignRecipientJob%')
+            ->where('payload', 'like', '%recipientId";i:'.$recipientId.';%')
+            ->exists();
     }
 
     public function cancel(Company $company, WhatsAppCampaign $campaign, User $user): WhatsAppCampaign
