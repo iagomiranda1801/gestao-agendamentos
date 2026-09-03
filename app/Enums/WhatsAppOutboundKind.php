@@ -24,6 +24,11 @@ enum WhatsAppOutboundKind: string
         return $this === self::Marketing;
     }
 
+    public function outboundLane(): string
+    {
+        return $this === self::Confirmation ? 'operational' : 'paced';
+    }
+
     public static function forAutomation(WhatsAppAutomationType $type): self
     {
         return match ($type) {

@@ -5,6 +5,7 @@ namespace App\Jobs\Concerns;
 use App\Enums\WhatsAppOutboundKind;
 use App\Models\Company;
 use App\Services\WhatsApp\Outbound\WhatsAppOutboundGate;
+use App\Services\WhatsApp\Outbound\WhatsAppOutboundReservation;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -12,44 +13,61 @@ trait DefersViaWhatsAppOutboundGate
 {
     public ?int $whatsappOutboundNotBefore = null;
 
+    public int $whatsappOutboundRetrySeconds = 0;
+
     public int $tries = 200;
 
     public int $maxExceptions = 5;
 
     protected function deferUntilOutboundSlot(Company $company, WhatsAppOutboundKind $kind): bool
     {
+        $this->whatsappOutboundRetrySeconds = 0;
         $gate = app(WhatsAppOutboundGate::class);
+        $inspection = $gate->inspect($company, $kind);
 
-        if ($this->whatsappOutboundNotBefore === null) {
-            $reservation = $gate->reserve($company, $kind);
-
-            if (! $reservation->allowed) {
-                $wait = $reservation->retryAt !== null && $reservation->retryAt->isFuture()
-                    ? max(1, now()->diffInSeconds($reservation->retryAt))
-                    : 0;
-
-                $this->logOutboundDeferral($company, $kind, $reservation->reason ?? 'blocked', $wait);
-
-                if ($wait > 0) {
-                    $this->release($wait);
-                }
-
-                return false;
-            }
-
-            $this->whatsappOutboundNotBefore = $reservation->availableAt?->getTimestamp() ?? now()->getTimestamp();
+        if ($this->shouldDeferReservation($inspection)) {
+            return $this->deferReservation($company, $kind, $inspection);
         }
 
-        $wait = $this->whatsappOutboundNotBefore - now()->getTimestamp();
+        $reservation = $gate->reserve($company, $kind);
 
-        if ($wait > 0) {
-            $this->logOutboundDeferral($company, $kind, 'interval', $wait);
-            $this->release($wait);
-
-            return false;
+        if ($this->shouldDeferReservation($reservation)) {
+            return $this->deferReservation($company, $kind, $reservation);
         }
 
         return true;
+    }
+
+    protected function shouldDeferReservation(WhatsAppOutboundReservation $reservation): bool
+    {
+        if (! $reservation->allowed) {
+            return true;
+        }
+
+        $availableAt = $reservation->availableAt?->getTimestamp() ?? now()->getTimestamp();
+
+        return $availableAt > now()->getTimestamp();
+    }
+
+    protected function deferReservation(
+        Company $company,
+        WhatsAppOutboundKind $kind,
+        WhatsAppOutboundReservation $reservation,
+    ): bool {
+        $retryAt = $reservation->retryAt ?? $reservation->availableAt;
+        $wait = $retryAt !== null && $retryAt->getTimestamp() > now()->getTimestamp()
+            ? max(1, $retryAt->getTimestamp() - now()->getTimestamp())
+            : 0;
+        $reason = $reservation->reason ?? 'interval';
+
+        $this->whatsappOutboundRetrySeconds = $wait;
+        $this->logOutboundDeferral($company, $kind, $reason, $wait);
+
+        if ($wait > 0) {
+            $this->release($wait);
+        }
+
+        return false;
     }
 
     protected function rememberOutboundSuccess(Company $company): void

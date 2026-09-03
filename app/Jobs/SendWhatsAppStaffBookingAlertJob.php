@@ -77,9 +77,10 @@ class SendWhatsAppStaffBookingAlertJob implements ShouldQueue
         }
 
         if (! $this->deferUntilOutboundSlot($company, WhatsAppOutboundKind::Confirmation)) {
-            Log::info('WhatsApp staff alert skipped.', [
+            Log::info('WhatsApp staff alert waiting for outbound slot.', [
                 'reason' => 'deferred',
                 'appointment_id' => $appointment->getKey(),
+                'retry_in_seconds' => $this->whatsappOutboundRetrySeconds,
             ]);
 
             return;

@@ -86,10 +86,11 @@ class SendAppointmentChangeWhatsAppJob implements ShouldQueue
         }
 
         if (! $this->deferUntilOutboundSlot($company, WhatsAppOutboundKind::Confirmation)) {
-            Log::info('Appointment WhatsApp change notification skipped.', [
+            Log::info('Appointment WhatsApp change notification waiting for outbound slot.', [
                 'reason' => 'deferred',
                 'appointment_id' => $appointment->getKey(),
                 'change_type' => $this->changeType,
+                'retry_in_seconds' => $this->whatsappOutboundRetrySeconds,
             ]);
 
             return;

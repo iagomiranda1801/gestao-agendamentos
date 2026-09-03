@@ -202,6 +202,84 @@ class WhatsAppOutboundGateTest extends TestCase
         $this->assertTrue($gate->reserve($company, WhatsAppOutboundKind::Confirmation)->allowed);
     }
 
+    public function test_inspect_does_not_push_paced_slot_forward(): void
+    {
+        $company = $this->createCompany();
+        $gate = app(WhatsAppOutboundGate::class);
+
+        $gate->reserve($company, WhatsAppOutboundKind::Marketing);
+        $afterReserve = $gate->inspect($company, WhatsAppOutboundKind::Marketing)->availableAt?->getTimestamp();
+
+        for ($i = 0; $i < 10; $i++) {
+            $gate->inspect($company, WhatsAppOutboundKind::Marketing);
+        }
+
+        $afterInspects = $gate->inspect($company, WhatsAppOutboundKind::Marketing)->availableAt?->getTimestamp();
+
+        $this->assertNotNull($afterReserve);
+        $this->assertSame($afterReserve, $afterInspects);
+        $this->assertEqualsWithDelta(now()->getTimestamp() + 30, $afterReserve ?? 0, 1);
+    }
+
+    public function test_confirmation_slot_is_independent_from_marketing_pace(): void
+    {
+        $company = $this->createCompany();
+        $gate = app(WhatsAppOutboundGate::class);
+
+        $gate->reserve($company, WhatsAppOutboundKind::Marketing);
+        $gate->reserve($company, WhatsAppOutboundKind::Reminder);
+        $gate->reserve($company, WhatsAppOutboundKind::Marketing);
+
+        $confirmation = $gate->reserve($company, WhatsAppOutboundKind::Confirmation);
+        $marketing = $gate->inspect($company, WhatsAppOutboundKind::Marketing);
+
+        $this->assertTrue($confirmation->allowed);
+        $this->assertEqualsWithDelta(now()->getTimestamp(), $confirmation->availableAt?->getTimestamp() ?? 0, 1);
+        $this->assertEqualsWithDelta(now()->getTimestamp() + 90, $marketing->availableAt?->getTimestamp() ?? 0, 1);
+    }
+
+    public function test_deferred_jobs_do_not_stack_interval_before_sending(): void
+    {
+        Http::fake([
+            'evolution.test/*' => Http::response(['status' => 'SENT'], 200),
+        ]);
+
+        $setup = $this->createBookableSetup();
+        $this->enablePublicWhatsApp($setup['company']);
+        $gate = app(WhatsAppOutboundGate::class);
+
+        $gate->reserve($setup['company'], WhatsAppOutboundKind::Marketing);
+        $pacedAfterReserve = $gate->inspect($setup['company'], WhatsAppOutboundKind::Marketing)->availableAt?->getTimestamp();
+
+        $appointments = [];
+        for ($i = 0; $i < 5; $i++) {
+            $appointments[] = Appointment::factory()
+                ->forCompany($setup['company'])
+                ->confirmed()
+                ->create([
+                    'client_id' => $setup['client']->getKey(),
+                    'professional_id' => $setup['professional']->getKey(),
+                    'service_id' => $setup['service']->getKey(),
+                    'client_phone_snapshot' => '1199999000'.$i,
+                    'created_by' => $setup['admin']->getKey(),
+                ]);
+        }
+
+        foreach ($appointments as $appointment) {
+            (new SendWhatsAppAppointmentConfirmationJob($appointment->getKey()))->handle(
+                app(EvolutionApiClient::class),
+                app(WhatsAppConfirmationMessageBuilder::class),
+                app(CompanyWhatsAppInstanceService::class),
+            );
+        }
+
+        Http::assertSentCount(1);
+        $this->assertSame(
+            $pacedAfterReserve,
+            $gate->inspect($setup['company'], WhatsAppOutboundKind::Marketing)->availableAt?->getTimestamp(),
+        );
+    }
+
     protected function enablePublicWhatsApp(mixed $company): void
     {
         app(CompanySchedulingSettingService::class)->update($company, [

@@ -93,10 +93,11 @@ class SendProfessionalAppointmentWhatsAppJob implements ShouldBeUnique, ShouldQu
         }
 
         if (! $this->deferUntilOutboundSlot($appointment->company, WhatsAppOutboundKind::Confirmation)) {
-            Log::info('Professional appointment WhatsApp skipped.', [
+            Log::info('Professional appointment WhatsApp waiting for outbound slot.', [
                 'reason' => 'deferred',
                 'appointment_id' => $appointment->getKey(),
                 'notification_type' => $this->notificationType,
+                'retry_in_seconds' => $this->whatsappOutboundRetrySeconds,
             ]);
 
             return;
