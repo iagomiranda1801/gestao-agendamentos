@@ -7,7 +7,7 @@ use App\Filament\App\Resources\TeamMembers\TeamMemberResource;
 use App\Models\Company;
 use App\Services\Company\CompanyTeamService;
 use Filament\Facades\Filament;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\App\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class EditTeamMember extends EditRecord

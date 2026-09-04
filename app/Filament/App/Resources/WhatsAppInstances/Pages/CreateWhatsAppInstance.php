@@ -7,7 +7,7 @@ use App\Models\Company;
 use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\App\Resources\Pages\CreateRecord;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Database\Eloquent\Model;
 use Throwable;

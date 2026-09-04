@@ -8,7 +8,7 @@ use App\Models\Service;
 use App\Services\Service\ServiceCatalogService;
 use App\Services\Service\ServiceProfessionalSyncService;
 use Filament\Facades\Filament;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\App\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class EditService extends EditRecord

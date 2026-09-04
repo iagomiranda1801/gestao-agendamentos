@@ -6,7 +6,7 @@ use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\Company;
 use App\Services\Product\ProductService;
 use Filament\Facades\Filament;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\App\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class EditProduct extends EditRecord

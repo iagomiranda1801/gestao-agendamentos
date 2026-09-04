@@ -12,21 +12,29 @@ use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\WhatsAppConfirmationMessageBuilder;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-class SendAppointmentChangeWhatsAppJob implements ShouldQueue
+class SendAppointmentChangeWhatsAppJob implements ShouldBeUnique, ShouldQueue
 {
     use DefersViaWhatsAppOutboundGate;
     use Queueable;
+
+    public int $uniqueFor = 3600;
 
     public function __construct(
         public int $appointmentId,
         public string $changeType,
         public ?string $oldStartAt = null,
     ) {}
+
+    public function uniqueId(): string
+    {
+        return $this->appointmentId.':'.$this->changeType;
+    }
 
     public function handle(
         EvolutionApiClient $client,

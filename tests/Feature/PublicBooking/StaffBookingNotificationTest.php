@@ -3,6 +3,7 @@
 namespace Tests\Feature\PublicBooking;
 
 use App\Enums\CompanyRole;
+use App\Enums\AppointmentStatus;
 use App\Jobs\SendWhatsAppStaffBookingAlertJob;
 use App\Services\PublicBooking\OnlineBookingService;
 use App\Services\Scheduling\AppointmentNotificationRecipientService;
@@ -235,5 +236,52 @@ class StaffBookingNotificationTest extends TestCase
 
         $this->assertTrue($admin->fresh()->notifications()->exists());
         $this->assertTrue($professionalUser->fresh()->notifications()->exists());
+    }
+
+    public function test_staff_alert_does_not_send_when_appointment_was_cancelled(): void
+    {
+        config([
+            'services.evolution.url' => 'https://evolution.test',
+            'services.evolution.key' => 'test-key',
+        ]);
+
+        Http::fake([
+            'evolution.test/*' => Http::response(['key' => ['id' => 'ok']], 200),
+        ]);
+        Queue::fake();
+
+        $setup = $this->createBookableSetup();
+        $setup['company']->update(['phone' => '(11) 90000-1111']);
+
+        $this->enablePublicBooking($setup['company'], [
+            'whatsapp_notifications_enabled' => true,
+            'whatsapp_instance' => 'loja-1',
+            'whatsapp_sender_phone' => '11988887777',
+        ]);
+
+        $result = app(OnlineBookingService::class)->create(
+            $this->makeOnlineBookingData(
+                $setup['company'],
+                $setup['service']->getKey(),
+                $setup['professional']->getKey(),
+                $setup['localStart'],
+            ),
+        );
+
+        $result->appointment->forceFill([
+            'status' => AppointmentStatus::Cancelled,
+        ])->save();
+
+        (new SendWhatsAppStaffBookingAlertJob(
+            $result->appointment->getKey(),
+            $result->manageUrl,
+        ))->handle(
+            app(EvolutionApiClient::class),
+            app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
+            app(AppointmentNotificationRecipientService::class),
+        );
+
+        Http::assertNothingSent();
     }
 }

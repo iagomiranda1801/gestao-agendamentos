@@ -6,7 +6,7 @@ use App\Filament\App\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Models\Company;
 use App\Services\WhatsApp\Campaigns\WhatsAppCampaignService;
 use Filament\Facades\Filament;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\App\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class CreateWhatsAppCampaign extends CreateRecord

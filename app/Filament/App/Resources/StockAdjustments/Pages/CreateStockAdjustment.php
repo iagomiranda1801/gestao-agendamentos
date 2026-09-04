@@ -7,7 +7,7 @@ use App\Filament\App\Resources\StockAdjustments\StockAdjustmentResource;
 use App\Models\Company;
 use App\Services\Stock\StockDocumentService;
 use Filament\Facades\Filament;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\App\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class CreateStockAdjustment extends CreateRecord

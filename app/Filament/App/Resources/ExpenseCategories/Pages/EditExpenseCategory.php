@@ -6,7 +6,7 @@ use App\Filament\App\Resources\ExpenseCategories\ExpenseCategoryResource;
 use App\Models\Company;
 use App\Services\Financial\ExpenseCategoryService;
 use Filament\Facades\Filament;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\App\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class EditExpenseCategory extends EditRecord

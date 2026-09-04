@@ -7,7 +7,7 @@ use App\Models\Client;
 use App\Models\Company;
 use App\Services\Clinical\ClinicalAttachmentService;
 use Filament\Facades\Filament;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\App\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class CreateClinicalAttachment extends CreateRecord

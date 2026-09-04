@@ -7,7 +7,7 @@ use App\Models\Company;
 use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use Filament\Actions\DeleteAction;
 use Filament\Facades\Filament;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\App\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class EditWhatsAppInstance extends EditRecord

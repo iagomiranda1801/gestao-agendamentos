@@ -11,7 +11,7 @@ use App\Models\Service;
 use App\Services\Scheduling\AppointmentService;
 use App\Support\CompanyDateTime;
 use Filament\Facades\Filament;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\App\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 
@@ -59,6 +59,7 @@ class CreateAppointment extends CreateRecord
                 $data,
             );
         } catch (ValidationException $exception) {
+            $this->hasNotifiedValidationError = true;
             AppointmentSchedulingForm::notifyAndRethrow($exception, $this->form->getStatePath());
         }
     }

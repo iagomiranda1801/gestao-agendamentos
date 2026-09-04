@@ -189,6 +189,14 @@ class Appointment extends Model
         return $this->status === AppointmentStatus::Pending;
     }
 
+    public function isStaleForCreationWhatsApp(): bool
+    {
+        return in_array($this->status, [
+            AppointmentStatus::Cancelled,
+            AppointmentStatus::NoShow,
+        ], true);
+    }
+
     public function hasServiceToBeDefined(): bool
     {
         return $this->service_selection_mode === 'to_be_defined';

@@ -4,6 +4,7 @@ namespace Tests\Feature\Stock;
 
 use App\Enums\StockDocumentStatus;
 use App\Enums\StockDocumentType;
+use App\Filament\App\Resources\Purchases\Pages\CreatePurchase;
 use App\Filament\App\Resources\Purchases\Pages\EditPurchase;
 use App\Models\InventoryBalance;
 use App\Models\Payable;
@@ -210,5 +211,27 @@ class PurchaseAndReversalTest extends TestCase
         $this->expectException(ValidationException::class);
 
         app(StockDocumentPostingService::class)->post($company, $document, $user);
+    }
+
+    public function test_create_purchase_notifies_portuguese_validation_when_item_is_incomplete(): void
+    {
+        $company = $this->createCompany();
+        $user = $this->createCompanyUser($company);
+
+        $this->authenticateForAppTenant($user, $company);
+
+        Livewire::test(CreatePurchase::class)
+            ->fillForm([
+                'occurred_at' => now(),
+                'items' => [[
+                    'product_id' => null,
+                    'quantity' => null,
+                    'unit_cost' => null,
+                ]],
+            ])
+            ->call('create')
+            ->assertHasFormErrors()
+            ->assertNotified('Não foi possível salvar')
+            ->assertSee('obrigatório');
     }
 }

@@ -7,7 +7,7 @@ use App\Models\Company;
 use App\Services\Service\ServiceCatalogService;
 use App\Services\Service\ServiceProfessionalSyncService;
 use Filament\Facades\Filament;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\App\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class CreateService extends CreateRecord

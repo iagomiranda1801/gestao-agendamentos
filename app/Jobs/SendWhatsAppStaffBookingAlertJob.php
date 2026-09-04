@@ -10,20 +10,28 @@ use App\Services\Scheduling\AppointmentNotificationRecipientService;
 use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\WhatsAppConfirmationMessageBuilder;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-class SendWhatsAppStaffBookingAlertJob implements ShouldQueue
+class SendWhatsAppStaffBookingAlertJob implements ShouldBeUnique, ShouldQueue
 {
     use DefersViaWhatsAppOutboundGate;
     use Queueable;
+
+    public int $uniqueFor = 3600;
 
     public function __construct(
         public int $appointmentId,
         public ?string $manageUrl = null,
     ) {}
+
+    public function uniqueId(): string
+    {
+        return (string) $this->appointmentId;
+    }
 
     public function handle(
         EvolutionApiClient $client,
@@ -37,6 +45,10 @@ class SendWhatsAppStaffBookingAlertJob implements ShouldQueue
             ->find($this->appointmentId);
 
         if ($appointment === null) {
+            return;
+        }
+
+        if ($this->skipStaleCreation($appointment)) {
             return;
         }
 
@@ -86,6 +98,12 @@ class SendWhatsAppStaffBookingAlertJob implements ShouldQueue
             return;
         }
 
+        $appointment->refresh();
+
+        if ($this->skipStaleCreation($appointment)) {
+            return;
+        }
+
         $codes ??= app(PublicConfirmationCodeGenerator::class);
         $codes->ensureForOnlineAppointment($appointment);
 
@@ -104,5 +122,20 @@ class SendWhatsAppStaffBookingAlertJob implements ShouldQueue
                 $this->rememberOutboundFailureAndMaybeRethrow($company, $exception);
             }
         }
+    }
+
+    protected function skipStaleCreation(Appointment $appointment): bool
+    {
+        if (! $appointment->isStaleForCreationWhatsApp()) {
+            return false;
+        }
+
+        Log::info('WhatsApp staff alert skipped.', [
+            'reason' => 'stale',
+            'appointment_id' => $appointment->getKey(),
+            'status' => $appointment->status->value,
+        ]);
+
+        return true;
     }
 }

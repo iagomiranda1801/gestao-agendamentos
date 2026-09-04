@@ -8,7 +8,7 @@ use App\Models\Company;
 use App\Models\Professional;
 use App\Services\Clinical\DentalTreatmentPlanService;
 use Filament\Facades\Filament;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\App\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class CreateTreatmentPlan extends CreateRecord

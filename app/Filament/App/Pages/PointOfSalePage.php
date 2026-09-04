@@ -9,6 +9,7 @@ use App\Enums\SaleItemType;
 use App\Enums\SaleOrigin;
 use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Filament\App\Support\QuickCreateFields;
+use App\Filament\Concerns\NotifiesValidationErrors;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\FinancialAccount;
@@ -36,10 +37,12 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Validation\ValidationException;
 use UnitEnum;
 
 class PointOfSalePage extends Page
 {
+    use NotifiesValidationErrors;
     use RequiresCompanyModule;
 
     protected static ?string $slug = 'pdv';
@@ -79,42 +82,50 @@ class PointOfSalePage extends Page
 
     public function save(): void
     {
-        /** @var Company $company */
-        $company = Filament::getTenant();
-        $state = $this->form->getState();
+        $this->hasNotifiedValidationError = false;
 
-        $payments = collect($state['payments'] ?? [])
-            ->filter(fn (array $payment): bool => filled($payment['amount'] ?? null))
-            ->map(fn (array $payment): PaymentData => new PaymentData(
-                amount: (string) $payment['amount'],
-                feeAmount: (string) ($payment['fee_amount'] ?? '0.00'),
-                method: PaymentMethod::from($payment['method']),
-                paidAt: Carbon::parse($payment['paid_at'] ?? now()),
-                financialAccountId: (int) $payment['financial_account_id'],
-                notes: $payment['notes'] ?? null,
-            ))
-            ->values()
-            ->all();
+        try {
+            /** @var Company $company */
+            $company = Filament::getTenant();
+            $state = $this->form->getState();
 
-        $sale = app(SaleService::class)->complete($company, auth()->user(), [
-            'client_id' => $state['client_id'] ?? null,
-            'origin' => SaleOrigin::Pos->value,
-            'sold_at' => $state['sold_at'] ?? now(),
-            'discount_amount' => $state['discount_amount'] ?? '0.00',
-            'notes' => $state['notes'] ?? null,
-            'items' => collect($state['items'] ?? [])
-                ->map(fn (array $item): array => [
-                    'item_type' => $item['item_type'] ?? SaleItemType::Product->value,
-                    'product_id' => $item['product_id'] ?? null,
-                    'service_id' => $item['service_id'] ?? null,
-                    'name' => $item['name'] ?? null,
-                    'quantity' => $item['quantity'] ?? '1',
-                    'unit_price' => $item['unit_price'] ?? '0.00',
-                    'discount_amount' => $item['discount_amount'] ?? '0.00',
-                ])
-                ->all(),
-            'payments' => $payments,
-        ]);
+            $payments = collect($state['payments'] ?? [])
+                ->filter(fn (array $payment): bool => filled($payment['amount'] ?? null))
+                ->map(fn (array $payment): PaymentData => new PaymentData(
+                    amount: (string) $payment['amount'],
+                    feeAmount: (string) ($payment['fee_amount'] ?? '0.00'),
+                    method: PaymentMethod::from($payment['method']),
+                    paidAt: Carbon::parse($payment['paid_at'] ?? now()),
+                    financialAccountId: (int) $payment['financial_account_id'],
+                    notes: $payment['notes'] ?? null,
+                ))
+                ->values()
+                ->all();
+
+            $sale = app(SaleService::class)->complete($company, auth()->user(), [
+                'client_id' => $state['client_id'] ?? null,
+                'origin' => SaleOrigin::Pos->value,
+                'sold_at' => $state['sold_at'] ?? now(),
+                'discount_amount' => $state['discount_amount'] ?? '0.00',
+                'notes' => $state['notes'] ?? null,
+                'items' => collect($state['items'] ?? [])
+                    ->map(fn (array $item): array => [
+                        'item_type' => $item['item_type'] ?? SaleItemType::Product->value,
+                        'product_id' => $item['product_id'] ?? null,
+                        'service_id' => $item['service_id'] ?? null,
+                        'name' => $item['name'] ?? null,
+                        'quantity' => $item['quantity'] ?? '1',
+                        'unit_price' => $item['unit_price'] ?? '0.00',
+                        'discount_amount' => $item['discount_amount'] ?? '0.00',
+                    ])
+                    ->all(),
+                'payments' => $payments,
+            ]);
+        } catch (ValidationException $exception) {
+            $this->notifyValidationException($exception);
+
+            throw $exception;
+        }
 
         Notification::make()
             ->success()

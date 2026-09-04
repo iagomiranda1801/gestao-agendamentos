@@ -8,7 +8,7 @@ use App\Models\ScheduleBlock;
 use App\Services\Scheduling\ScheduleBlockService;
 use App\Support\CompanyDateTime;
 use Filament\Facades\Filament;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\App\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class EditScheduleBlock extends EditRecord

@@ -6,7 +6,7 @@ use App\Filament\App\Resources\FinancialAccounts\FinancialAccountResource;
 use App\Models\Company;
 use App\Services\Financial\FinancialAccountService;
 use Filament\Facades\Filament;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\App\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class EditFinancialAccount extends EditRecord

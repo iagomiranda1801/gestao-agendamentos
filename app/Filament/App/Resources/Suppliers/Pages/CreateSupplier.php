@@ -6,7 +6,7 @@ use App\Filament\App\Resources\Suppliers\SupplierResource;
 use App\Models\Company;
 use App\Services\Supplier\SupplierService;
 use Filament\Facades\Filament;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\App\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class CreateSupplier extends CreateRecord

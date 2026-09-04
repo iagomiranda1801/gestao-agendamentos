@@ -3,6 +3,7 @@
 namespace Tests\Feature\PublicBooking;
 
 use App\Events\OnlineAppointmentCreated;
+use App\Enums\AppointmentStatus;
 use App\Jobs\NotifyStaffOfOnlineBookingJob;
 use App\Jobs\SendAppointmentCreatedEmailJob;
 use App\Jobs\SendWhatsAppAppointmentConfirmationJob;
@@ -546,5 +547,60 @@ class WhatsAppConfirmationTest extends TestCase
                 && str_contains($mail->bodyText, '/agendamento/')
                 && ! str_contains($mail->bodyText, '{profissional}');
         });
+    }
+
+    public function test_confirmation_job_does_not_send_when_appointment_was_cancelled(): void
+    {
+        config([
+            'services.evolution.url' => 'https://evolution.test',
+            'services.evolution.key' => 'test-key',
+        ]);
+
+        Http::fake([
+            'evolution.test/*' => Http::response(['key' => ['id' => 'ok']], 200),
+        ]);
+        Queue::fake();
+
+        $setup = $this->createBookableSetup();
+        $this->enablePublicBooking($setup['company'], [
+            'whatsapp_notifications_enabled' => true,
+            'whatsapp_instance' => 'loja-1',
+            'whatsapp_sender_phone' => '11988887777',
+        ]);
+
+        $result = app(OnlineBookingService::class)->create(
+            $this->makeOnlineBookingData(
+                $setup['company'],
+                $setup['service']->getKey(),
+                $setup['professional']->getKey(),
+                $setup['localStart'],
+                ['clientName' => 'João', 'clientPhone' => '(11) 91234-5678'],
+            ),
+        );
+
+        $result->appointment->forceFill([
+            'status' => AppointmentStatus::Cancelled,
+        ])->save();
+
+        (new SendWhatsAppAppointmentConfirmationJob(
+            $result->appointment->getKey(),
+            $result->manageUrl,
+        ))->handle(
+            app(EvolutionApiClient::class),
+            app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
+        );
+
+        Http::assertNothingSent();
+    }
+
+    public function test_duplicate_confirmation_dispatch_is_unique_per_appointment(): void
+    {
+        Queue::fake();
+
+        SendWhatsAppAppointmentConfirmationJob::dispatch(44);
+        SendWhatsAppAppointmentConfirmationJob::dispatch(44);
+
+        Queue::assertPushed(SendWhatsAppAppointmentConfirmationJob::class, 1);
     }
 }

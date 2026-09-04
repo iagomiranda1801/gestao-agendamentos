@@ -7,7 +7,7 @@ use App\Models\Company;
 use App\Services\Client\ClientService;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\App\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class EditClient extends EditRecord

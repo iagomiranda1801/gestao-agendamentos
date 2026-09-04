@@ -84,6 +84,7 @@ class PurchaseForm
                             ])
                             ->columns(4)
                             ->defaultItems(1)
+                            ->minItems(1)
                             ->addActionLabel('Adicionar produto')
                             ->columnSpanFull(),
                     ]),

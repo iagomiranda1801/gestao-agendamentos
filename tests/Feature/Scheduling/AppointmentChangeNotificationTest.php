@@ -139,4 +139,17 @@ class AppointmentChangeNotificationTest extends TestCase
 
         Mail::assertSent(AppointmentChangeMail::class, 6);
     }
+
+    public function test_duplicate_cancelled_whatsapp_dispatch_is_unique_per_appointment(): void
+    {
+        Queue::fake();
+
+        SendAppointmentChangeWhatsAppJob::dispatch(44, 'cancelled');
+        SendAppointmentChangeWhatsAppJob::dispatch(44, 'cancelled');
+        SendAppointmentChangeWhatsAppJob::dispatch(44, 'rescheduled');
+
+        Queue::assertPushed(SendAppointmentChangeWhatsAppJob::class, 2);
+        Queue::assertPushed(SendAppointmentChangeWhatsAppJob::class, fn ($job): bool => $job->changeType === 'cancelled');
+        Queue::assertPushed(SendAppointmentChangeWhatsAppJob::class, fn ($job): bool => $job->changeType === 'rescheduled');
+    }
 }

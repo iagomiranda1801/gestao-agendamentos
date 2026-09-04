@@ -10,7 +10,7 @@ use App\Models\Company;
 use App\Services\Scheduling\AppointmentService;
 use App\Support\CompanyDateTime;
 use Filament\Facades\Filament;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\App\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 
@@ -55,6 +55,7 @@ class EditAppointment extends EditRecord
                 $data,
             );
         } catch (ValidationException $exception) {
+            $this->hasNotifiedValidationError = true;
             AppointmentSchedulingForm::notifyAndRethrow($exception, $this->form->getStatePath());
         }
     }

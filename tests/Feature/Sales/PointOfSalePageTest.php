@@ -151,4 +151,22 @@ class PointOfSalePageTest extends TestCase
             'name_snapshot' => 'Cera rápida',
         ]);
     }
+
+    public function test_point_of_sale_notifies_portuguese_validation_when_required_fields_are_missing(): void
+    {
+        $company = $this->createCompany([
+            'enabled_modules' => [
+                CompanyModule::Finance->value,
+                CompanyModule::Sales->value,
+            ],
+        ]);
+        $user = $this->createCompanyUser($company);
+
+        $this->authenticateForAppTenant($user, $company);
+
+        Livewire::test(PointOfSalePage::class)
+            ->call('save')
+            ->assertHasErrors()
+            ->assertNotified('Não foi possível salvar');
+    }
 }

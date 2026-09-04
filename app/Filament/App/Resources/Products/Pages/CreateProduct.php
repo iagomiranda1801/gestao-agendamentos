@@ -6,7 +6,7 @@ use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\Company;
 use App\Services\Product\ProductService;
 use Filament\Facades\Filament;
-use Filament\Resources\Pages\CreateRecord;
+use App\Filament\App\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class CreateProduct extends CreateRecord
