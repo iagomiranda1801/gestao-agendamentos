@@ -22,14 +22,7 @@ trait DefersViaWhatsAppOutboundGate
     protected function deferUntilOutboundSlot(Company $company, WhatsAppOutboundKind $kind): bool
     {
         $this->whatsappOutboundRetrySeconds = 0;
-        $gate = app(WhatsAppOutboundGate::class);
-        $inspection = $gate->inspect($company, $kind);
-
-        if ($this->shouldDeferReservation($inspection)) {
-            return $this->deferReservation($company, $kind, $inspection);
-        }
-
-        $reservation = $gate->reserve($company, $kind);
+        $reservation = app(WhatsAppOutboundGate::class)->reserve($company, $kind);
 
         if ($this->shouldDeferReservation($reservation)) {
             return $this->deferReservation($company, $kind, $reservation);

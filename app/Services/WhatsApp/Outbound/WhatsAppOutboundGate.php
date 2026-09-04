@@ -25,7 +25,9 @@ class WhatsAppOutboundGate
 
     public function allowsMarketing(Company $company): bool
     {
-        return $this->inspect($company, WhatsAppOutboundKind::Marketing)->allowed;
+        $reservation = $this->inspect($company, WhatsAppOutboundKind::Marketing);
+
+        return $reservation->allowed || $reservation->reason === 'interval';
     }
 
     public function inspect(Company $company, WhatsAppOutboundKind $kind): WhatsAppOutboundReservation
@@ -92,22 +94,33 @@ class WhatsAppOutboundGate
             return WhatsAppOutboundReservation::retryLater($this->nextLocalMorning($company), 'daily_cap');
         }
 
+        if (! $kind->usesSendInterval()) {
+            return WhatsAppOutboundReservation::ready(now());
+        }
+
         $availableAt = $this->nextSlot($company, $kind);
 
+        if ($availableAt->greaterThan(now())) {
+            return WhatsAppOutboundReservation::retryLater($availableAt, 'interval');
+        }
+
         if ($consume) {
-            $interval = $this->nextIntervalSeconds();
             Cache::put(
                 $this->key($company, $this->nextSuffix($kind)),
-                $availableAt->copy()->addSeconds($interval)->getTimestamp(),
+                now()->addSeconds($this->nextIntervalSeconds())->getTimestamp(),
                 now()->addDay(),
             );
         }
 
-        return WhatsAppOutboundReservation::ready($availableAt);
+        return WhatsAppOutboundReservation::ready(now());
     }
 
     protected function nextSlot(Company $company, WhatsAppOutboundKind $kind): Carbon
     {
+        if (! $kind->usesSendInterval()) {
+            return now();
+        }
+
         $stored = Cache::get($this->key($company, $this->nextSuffix($kind)));
         $next = is_numeric($stored) ? Carbon::createFromTimestamp((int) $stored) : now();
 

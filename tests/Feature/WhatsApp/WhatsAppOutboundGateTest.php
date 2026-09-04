@@ -7,8 +7,10 @@ use App\Enums\WhatsAppCampaignAudience;
 use App\Enums\WhatsAppOutboundKind;
 use App\Jobs\SendWhatsAppAppointmentConfirmationJob;
 use App\Jobs\SendWhatsAppAutomationJob;
+use App\Jobs\SendWhatsAppStaffBookingAlertJob;
 use App\Models\Appointment;
 use App\Models\WhatsAppAutomationSend;
+use App\Services\Scheduling\AppointmentNotificationRecipientService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\Automations\WhatsAppAutomationService;
 use App\Services\WhatsApp\Campaigns\WhatsAppCampaignService;
@@ -57,12 +59,31 @@ class WhatsAppOutboundGateTest extends TestCase
         $third = $gate->reserve($company, WhatsAppOutboundKind::Marketing);
 
         $this->assertTrue($first->allowed);
-        $this->assertTrue($second->allowed);
-        $this->assertTrue($third->allowed);
+        $this->assertFalse($second->allowed);
+        $this->assertFalse($third->allowed);
+        $this->assertSame('interval', $second->reason);
+        $this->assertSame('interval', $third->reason);
         $now = now()->getTimestamp();
         $this->assertEqualsWithDelta($now, $first->availableAt?->getTimestamp() ?? 0, 1);
-        $this->assertEqualsWithDelta($now + 30, $second->availableAt?->getTimestamp() ?? 0, 1);
-        $this->assertEqualsWithDelta($now + 60, $third->availableAt?->getTimestamp() ?? 0, 1);
+        $this->assertEqualsWithDelta($now + 30, $second->retryAt?->getTimestamp() ?? 0, 1);
+        $this->assertEqualsWithDelta($now + 30, $third->retryAt?->getTimestamp() ?? 0, 1);
+    }
+
+    public function test_future_paced_reserve_does_not_push_slot_forward(): void
+    {
+        $company = $this->createCompany();
+        $gate = app(WhatsAppOutboundGate::class);
+
+        $gate->reserve($company, WhatsAppOutboundKind::Marketing);
+        $afterFirst = $gate->inspect($company, WhatsAppOutboundKind::Marketing)->retryAt?->getTimestamp();
+
+        $gate->reserve($company, WhatsAppOutboundKind::Marketing);
+        $gate->reserve($company, WhatsAppOutboundKind::Reminder);
+        $afterStacked = $gate->inspect($company, WhatsAppOutboundKind::Marketing)->retryAt?->getTimestamp();
+
+        $this->assertNotNull($afterFirst);
+        $this->assertSame($afterFirst, $afterStacked);
+        $this->assertEqualsWithDelta(now()->getTimestamp() + 30, $afterFirst ?? 0, 1);
     }
 
     public function test_ten_inline_jobs_do_not_hit_evolution_in_a_burst(): void
@@ -208,13 +229,13 @@ class WhatsAppOutboundGateTest extends TestCase
         $gate = app(WhatsAppOutboundGate::class);
 
         $gate->reserve($company, WhatsAppOutboundKind::Marketing);
-        $afterReserve = $gate->inspect($company, WhatsAppOutboundKind::Marketing)->availableAt?->getTimestamp();
+        $afterReserve = $gate->inspect($company, WhatsAppOutboundKind::Marketing)->retryAt?->getTimestamp();
 
         for ($i = 0; $i < 10; $i++) {
             $gate->inspect($company, WhatsAppOutboundKind::Marketing);
         }
 
-        $afterInspects = $gate->inspect($company, WhatsAppOutboundKind::Marketing)->availableAt?->getTimestamp();
+        $afterInspects = $gate->inspect($company, WhatsAppOutboundKind::Marketing)->retryAt?->getTimestamp();
 
         $this->assertNotNull($afterReserve);
         $this->assertSame($afterReserve, $afterInspects);
@@ -230,15 +251,56 @@ class WhatsAppOutboundGateTest extends TestCase
         $gate->reserve($company, WhatsAppOutboundKind::Reminder);
         $gate->reserve($company, WhatsAppOutboundKind::Marketing);
 
-        $confirmation = $gate->reserve($company, WhatsAppOutboundKind::Confirmation);
+        $firstConfirmation = $gate->reserve($company, WhatsAppOutboundKind::Confirmation);
+        $secondConfirmation = $gate->reserve($company, WhatsAppOutboundKind::Confirmation);
         $marketing = $gate->inspect($company, WhatsAppOutboundKind::Marketing);
 
-        $this->assertTrue($confirmation->allowed);
-        $this->assertEqualsWithDelta(now()->getTimestamp(), $confirmation->availableAt?->getTimestamp() ?? 0, 1);
-        $this->assertEqualsWithDelta(now()->getTimestamp() + 90, $marketing->availableAt?->getTimestamp() ?? 0, 1);
+        $this->assertTrue($firstConfirmation->allowed);
+        $this->assertTrue($secondConfirmation->allowed);
+        $this->assertEqualsWithDelta(now()->getTimestamp(), $firstConfirmation->availableAt?->getTimestamp() ?? 0, 1);
+        $this->assertEqualsWithDelta(now()->getTimestamp(), $secondConfirmation->availableAt?->getTimestamp() ?? 0, 1);
+        $this->assertFalse($marketing->allowed);
+        $this->assertEqualsWithDelta(now()->getTimestamp() + 30, $marketing->retryAt?->getTimestamp() ?? 0, 1);
     }
 
-    public function test_deferred_jobs_do_not_stack_interval_before_sending(): void
+    public function test_appointment_confirmation_and_staff_alert_both_hit_evolution(): void
+    {
+        Http::fake([
+            'evolution.test/*' => Http::response(['status' => 'SENT'], 200),
+        ]);
+
+        $setup = $this->createBookableSetup();
+        $setup['company']->update(['phone' => '(11) 90000-1111']);
+        $this->enablePublicWhatsApp($setup['company']);
+
+        $appointment = Appointment::factory()
+            ->forCompany($setup['company'])
+            ->confirmed()
+            ->create([
+                'client_id' => $setup['client']->getKey(),
+                'professional_id' => $setup['professional']->getKey(),
+                'service_id' => $setup['service']->getKey(),
+                'client_phone_snapshot' => '11999990001',
+                'created_by' => $setup['admin']->getKey(),
+            ]);
+
+        (new SendWhatsAppAppointmentConfirmationJob($appointment->getKey()))->handle(
+            app(EvolutionApiClient::class),
+            app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
+        );
+
+        (new SendWhatsAppStaffBookingAlertJob($appointment->getKey()))->handle(
+            app(EvolutionApiClient::class),
+            app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
+            app(AppointmentNotificationRecipientService::class),
+        );
+
+        Http::assertSentCount(2);
+    }
+
+    public function test_confirmation_jobs_send_immediately_without_waiting_for_marketing_pace(): void
     {
         Http::fake([
             'evolution.test/*' => Http::response(['status' => 'SENT'], 200),
@@ -249,7 +311,7 @@ class WhatsAppOutboundGateTest extends TestCase
         $gate = app(WhatsAppOutboundGate::class);
 
         $gate->reserve($setup['company'], WhatsAppOutboundKind::Marketing);
-        $pacedAfterReserve = $gate->inspect($setup['company'], WhatsAppOutboundKind::Marketing)->availableAt?->getTimestamp();
+        $pacedAfterReserve = $gate->inspect($setup['company'], WhatsAppOutboundKind::Marketing)->retryAt?->getTimestamp();
 
         $appointments = [];
         for ($i = 0; $i < 5; $i++) {
@@ -273,10 +335,10 @@ class WhatsAppOutboundGateTest extends TestCase
             );
         }
 
-        Http::assertSentCount(1);
+        Http::assertSentCount(5);
         $this->assertSame(
             $pacedAfterReserve,
-            $gate->inspect($setup['company'], WhatsAppOutboundKind::Marketing)->availableAt?->getTimestamp(),
+            $gate->inspect($setup['company'], WhatsAppOutboundKind::Marketing)->retryAt?->getTimestamp(),
         );
     }
 

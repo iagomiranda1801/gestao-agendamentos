@@ -29,6 +29,11 @@ enum WhatsAppOutboundKind: string
         return $this === self::Confirmation ? 'operational' : 'paced';
     }
 
+    public function usesSendInterval(): bool
+    {
+        return $this !== self::Confirmation;
+    }
+
     public static function forAutomation(WhatsAppAutomationType $type): self
     {
         return match ($type) {
