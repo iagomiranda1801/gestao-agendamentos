@@ -2,15 +2,20 @@
 
 namespace App\Filament\Admin\Resources\Companies\Schemas;
 
+use App\Enums\BillingInterval;
 use App\Enums\CompanyModule;
 use App\Enums\CompanyProfile;
 use App\Enums\SubscriptionStatus;
 use App\Models\Company;
+use App\Services\Company\CompanySubscriptionService;
+use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -85,6 +90,20 @@ class CompanyForm
                     ->columns(2),
                 Section::make('Módulos')
                     ->schema([
+                        Actions::make([
+                            Action::make('presetEssential')
+                                ->label('Essencial')
+                                ->color('gray')
+                                ->action(fn (Set $set) => self::applyPreset($set, 'essential')),
+                            Action::make('presetProfessional')
+                                ->label('Profissional')
+                                ->color('gray')
+                                ->action(fn (Set $set) => self::applyPreset($set, 'professional')),
+                            Action::make('presetComplete')
+                                ->label('Completo')
+                                ->color('gray')
+                                ->action(fn (Set $set) => self::applyPreset($set, 'complete')),
+                        ]),
                         CheckboxList::make('enabled_modules')
                             ->label('Recursos ativados')
                             ->options(CompanyModule::options())
@@ -93,8 +112,9 @@ class CompanyForm
                                 ->all())
                             ->columns(1)
                             ->required()
+                            ->live()
                             ->default([CompanyModule::Scheduling->value])
-                            ->helperText('O perfil preenche uma sugestão. Você pode ajustar os recursos antes de salvar.')
+                            ->helperText('O perfil ou os atalhos preenchem uma sugestão. O valor é a soma dos módulos no ciclo.')
                             ->bulkToggleable(),
                     ]),
                 Section::make('Assinatura')
@@ -110,9 +130,54 @@ class CompanyForm
                             ->label('Trial até')
                             ->native(false)
                             ->default(fn (): ?\Illuminate\Support\Carbon => now()->addDays(7))
-                            ->visible(fn (callable $get): bool => $get('subscription_status') === SubscriptionStatus::Trial->value),
+                            ->visible(fn (Get $get): bool => $get('subscription_status') === SubscriptionStatus::Trial->value),
+                        Select::make('billing_interval')
+                            ->label('Ciclo')
+                            ->options(BillingInterval::options())
+                            ->native(false)
+                            ->live()
+                            ->helperText('Obrigatório para registrar pagamento.'),
+                        Placeholder::make('catalog_total')
+                            ->label('Total do ciclo (catálogo)')
+                            ->content(function (Get $get): string {
+                                $interval = BillingInterval::tryFrom((string) ($get('billing_interval') ?? ''));
+
+                                if ($interval === null) {
+                                    return 'Escolha o ciclo para ver o valor.';
+                                }
+
+                                $cents = app(CompanySubscriptionService::class)->quoteCents(
+                                    $get('enabled_modules') ?? [],
+                                    $interval,
+                                );
+
+                                return app(CompanySubscriptionService::class)->formatReais($cents);
+                            }),
+                        DateTimePicker::make('current_period_end')
+                            ->label('Vigente até')
+                            ->native(false)
+                            ->visible(fn (Get $get): bool => $get('subscription_status') === SubscriptionStatus::Active->value),
+                        Placeholder::make('quoted_snapshot')
+                            ->label('Valor vigente (snapshot)')
+                            ->content(function (?Company $record): string {
+                                if ($record === null) {
+                                    return '—';
+                                }
+
+                                return app(CompanySubscriptionService::class)->formatReais($record->quoted_price_cents);
+                            }),
                     ])
                     ->columns(2),
             ]);
+    }
+
+    protected static function applyPreset(Set $set, string $preset): void
+    {
+        $set(
+            'enabled_modules',
+            collect(CompanyModule::billingPreset($preset))
+                ->map(fn (CompanyModule $module) => $module->value)
+                ->all(),
+        );
     }
 }

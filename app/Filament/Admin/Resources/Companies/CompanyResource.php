@@ -5,6 +5,7 @@ namespace App\Filament\Admin\Resources\Companies;
 use App\Filament\Admin\Resources\Companies\Pages\CreateCompany;
 use App\Filament\Admin\Resources\Companies\Pages\EditCompany;
 use App\Filament\Admin\Resources\Companies\Pages\ListCompanies;
+use App\Filament\Admin\Resources\Companies\RelationManagers\PlatformInvoicesRelationManager;
 use App\Filament\Admin\Resources\Companies\RelationManagers\UsersRelationManager;
 use App\Filament\Admin\Resources\Companies\Schemas\CompanyForm;
 use App\Filament\Admin\Resources\Companies\Tables\CompaniesTable;
@@ -45,6 +46,7 @@ class CompanyResource extends Resource
     {
         return [
             UsersRelationManager::class,
+            PlatformInvoicesRelationManager::class,
         ];
     }
 

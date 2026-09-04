@@ -2,9 +2,11 @@
 
 namespace App\Filament\Admin\Resources\Companies\Tables;
 
+use App\Enums\BillingInterval;
 use App\Enums\CompanyModule;
 use App\Enums\CompanyProfile;
 use App\Enums\SubscriptionStatus;
+use App\Services\Company\CompanySubscriptionService;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -48,6 +50,30 @@ class CompaniesTable
                     ->label('Assinatura')
                     ->badge()
                     ->formatStateUsing(fn (?SubscriptionStatus $state): string => $state?->label() ?? '-'),
+                TextColumn::make('billing_interval')
+                    ->label('Ciclo')
+                    ->formatStateUsing(fn (?BillingInterval $state): string => $state?->label() ?? '—')
+                    ->toggleable(),
+                TextColumn::make('quoted_price_cents')
+                    ->label('Valor')
+                    ->formatStateUsing(fn (?int $state): string => app(CompanySubscriptionService::class)->formatReais($state))
+                    ->toggleable(),
+                TextColumn::make('current_period_end')
+                    ->label('Vigente até')
+                    ->dateTime('d/m/Y H:i')
+                    ->placeholder('Sem vencimento')
+                    ->color(function ($state): ?string {
+                        if ($state === null) {
+                            return 'warning';
+                        }
+
+                        if ($state->lte(now()->addDays(7))) {
+                            return 'danger';
+                        }
+
+                        return null;
+                    })
+                    ->sortable(),
                 TextColumn::make('trial_ends_at')
                     ->label('Trial até')
                     ->dateTime('d/m/Y H:i')

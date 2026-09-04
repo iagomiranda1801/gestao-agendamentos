@@ -18,6 +18,7 @@ class AdminAuditService
         Company::class => [
             'name', 'slug', 'business_profile', 'document', 'phone', 'email', 'timezone',
             'is_active', 'enabled_modules', 'subscription_status', 'trial_ends_at',
+            'billing_interval', 'current_period_end', 'quoted_price_cents',
         ],
         User::class => ['name', 'email', 'is_super_admin', 'is_active'],
     ];
@@ -126,6 +127,9 @@ class AdminAuditService
             'enabled_modules' => 'Módulos habilitados',
             'subscription_status' => 'Status da assinatura',
             'trial_ends_at' => 'Trial até',
+            'billing_interval' => 'Ciclo de cobrança',
+            'current_period_end' => 'Vigente até',
+            'quoted_price_cents' => 'Valor da assinatura',
             'role' => 'Papel',
             'permissions' => 'Permissões',
             'company_id' => 'Empresa (ID)',

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\BillingInterval;
 use App\Enums\CompanyProfile;
 use App\Enums\CompanyRole;
 use App\Enums\SubscriptionStatus;
@@ -29,6 +30,9 @@ use Illuminate\Support\Str;
     'enabled_modules',
     'trial_ends_at',
     'subscription_status',
+    'billing_interval',
+    'current_period_end',
+    'quoted_price_cents',
 ])]
 class Company extends Model
 {
@@ -74,6 +78,9 @@ class Company extends Model
             'business_profile' => CompanyProfile::class,
             'trial_ends_at' => 'datetime',
             'subscription_status' => SubscriptionStatus::class,
+            'billing_interval' => BillingInterval::class,
+            'current_period_end' => 'datetime',
+            'quoted_price_cents' => 'integer',
         ];
     }
 
@@ -328,6 +335,14 @@ class Company extends Model
     public function financialAccountBalances(): HasMany
     {
         return $this->hasMany(FinancialAccountBalance::class);
+    }
+
+    /**
+     * @return HasMany<PlatformInvoice, $this>
+     */
+    public function platformInvoices(): HasMany
+    {
+        return $this->hasMany(PlatformInvoice::class);
     }
 
     /**

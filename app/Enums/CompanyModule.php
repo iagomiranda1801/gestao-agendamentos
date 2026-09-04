@@ -51,6 +51,19 @@ enum CompanyModule: string
     /**
      * @return list<self>
      */
+    public static function billingPreset(string $preset): array
+    {
+        return match ($preset) {
+            'essential' => [self::Scheduling, self::WhatsApp],
+            'professional' => [self::Scheduling, self::WhatsApp, self::Finance, self::Sales, self::Stock],
+            'complete' => self::cases(),
+            default => [self::Scheduling],
+        };
+    }
+
+    /**
+     * @return list<self>
+     */
     public static function trialDefaults(): array
     {
         return [self::Scheduling];

@@ -4,6 +4,8 @@ namespace App\Filament\Admin\Resources\Companies\Pages;
 
 use App\Enums\SubscriptionStatus;
 use App\Filament\Admin\Resources\Companies\CompanyResource;
+use App\Filament\Admin\Resources\PlatformInvoices\PlatformInvoiceActions;
+use App\Models\Company;
 use App\Services\Company\CompanyModuleService;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
@@ -15,7 +17,11 @@ class EditCompany extends EditRecord
 
     protected function getHeaderActions(): array
     {
+        /** @var Company $company */
+        $company = $this->getRecord();
+
         return [
+            PlatformInvoiceActions::issue($company),
             DeleteAction::make(),
         ];
     }

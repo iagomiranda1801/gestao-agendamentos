@@ -102,17 +102,21 @@ class CompanyModuleService
             return false;
         }
 
-        return $company->trial_ends_at->isFuture();
+        $now ??= Date::now();
+
+        return $company->trial_ends_at->greaterThan($now);
     }
 
     public function isAccessAllowed(Company $company, ?CarbonInterface $now = null): bool
     {
+        $now ??= Date::now();
+
         if (! $company->is_active) {
             return false;
         }
 
         if ($company->subscription_status === SubscriptionStatus::Active) {
-            return true;
+            return app(CompanySubscriptionService::class)->isPaidPeriodActive($company, $now);
         }
 
         if ($company->subscription_status === SubscriptionStatus::Trial) {

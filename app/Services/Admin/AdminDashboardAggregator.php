@@ -29,12 +29,13 @@ class AdminDashboardAggregator
         $todayEnd = $todayStart->addDay();
         $weekStart = $todayStart->subDays(6);
         $trialLimit = $todayStart->addDays(3);
+        $renewalLimit = $todayStart->addDays((int) config('subscriptions.renewal_warning_days', 7));
 
         return [
             'dateLabel' => $today->translatedFormat('d/m/Y'),
             'cards' => $this->cards($todayStart, $todayEnd),
-            'alerts' => $this->alerts($todayStart, $todayEnd, $trialLimit),
-            'companiesAttention' => $this->companiesAttention($todayStart, $trialLimit),
+            'alerts' => $this->alerts($todayStart, $todayEnd, $trialLimit, $renewalLimit),
+            'companiesAttention' => $this->companiesAttention($todayStart, $trialLimit, $renewalLimit),
             'usage' => $this->usage($weekStart, $todayEnd),
             'whatsapp' => $this->whatsAppHealth($todayStart, $todayEnd),
             'latestFailures' => $this->latestFailures(),
@@ -66,7 +67,7 @@ class AdminDashboardAggregator
     /**
      * @return list<array<string, string|int>>
      */
-    protected function alerts(CarbonImmutable $todayStart, CarbonImmutable $todayEnd, CarbonImmutable $trialLimit): array
+    protected function alerts(CarbonImmutable $todayStart, CarbonImmutable $todayEnd, CarbonImmutable $trialLimit, CarbonImmutable $renewalLimit): array
     {
         $alerts = [
             $this->alert(
@@ -78,6 +79,28 @@ class AdminDashboardAggregator
                     ->where('trial_ends_at', '<=', $trialLimit)
                     ->count(),
                 'Bom momento para contato comercial.',
+                $this->companiesUrl(),
+                'warning',
+            ),
+            $this->alert(
+                'Assinaturas vencendo em até 7 dias',
+                Company::query()
+                    ->where('subscription_status', SubscriptionStatus::Active->value)
+                    ->whereNotNull('current_period_end')
+                    ->where('current_period_end', '>=', $todayStart)
+                    ->where('current_period_end', '<=', $renewalLimit)
+                    ->count(),
+                'Registre o PIX para renovar o período.',
+                $this->companiesUrl(),
+                'warning',
+            ),
+            $this->alert(
+                'Ativas sem vencimento',
+                Company::query()
+                    ->where('subscription_status', SubscriptionStatus::Active->value)
+                    ->whereNull('current_period_end')
+                    ->count(),
+                'Empresas legado: atribua ciclo e registre o pagamento.',
                 $this->companiesUrl(),
                 'warning',
             ),
@@ -134,7 +157,7 @@ class AdminDashboardAggregator
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    protected function companiesAttention(CarbonImmutable $todayStart, CarbonImmutable $trialLimit): Collection
+    protected function companiesAttention(CarbonImmutable $todayStart, CarbonImmutable $trialLimit, CarbonImmutable $renewalLimit): Collection
     {
         return Company::query()
             ->withCount([
@@ -149,7 +172,7 @@ class AdminDashboardAggregator
                     $query->where('failed_count', '>', 0);
                 },
             ])
-            ->where(function ($query) use ($todayStart, $trialLimit): void {
+            ->where(function ($query) use ($todayStart, $trialLimit, $renewalLimit): void {
                 $query->where('is_active', false)
                     ->orWhere('subscription_status', SubscriptionStatus::Expired->value)
                     ->orWhere(function ($query) use ($todayStart, $trialLimit): void {
@@ -157,6 +180,16 @@ class AdminDashboardAggregator
                             ->whereNotNull('trial_ends_at')
                             ->where('trial_ends_at', '>=', $todayStart)
                             ->where('trial_ends_at', '<=', $trialLimit);
+                    })
+                    ->orWhere(function ($query) use ($todayStart, $renewalLimit): void {
+                        $query->where('subscription_status', SubscriptionStatus::Active->value)
+                            ->whereNotNull('current_period_end')
+                            ->where('current_period_end', '>=', $todayStart)
+                            ->where('current_period_end', '<=', $renewalLimit);
+                    })
+                    ->orWhere(function ($query): void {
+                        $query->where('subscription_status', SubscriptionStatus::Active->value)
+                            ->whereNull('current_period_end');
                     })
                     ->orWhereDoesntHave('users', function ($query): void {
                         $query->where('company_user.role', 'company_admin')
@@ -166,7 +199,7 @@ class AdminDashboardAggregator
                         $query->where('failed_count', '>', 0);
                     });
             })
-            ->orderByRaw("case when subscription_status = ? then 0 when is_active = 0 then 1 else 2 end", [SubscriptionStatus::Expired->value])
+            ->orderByRaw('case when subscription_status = ? then 0 when is_active = 0 then 1 else 2 end', [SubscriptionStatus::Expired->value])
             ->latest()
             ->limit(8)
             ->get()
