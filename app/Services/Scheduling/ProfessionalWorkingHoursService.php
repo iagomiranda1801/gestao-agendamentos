@@ -2,6 +2,7 @@
 
 namespace App\Services\Scheduling;
 
+use App\Enums\Weekday;
 use App\Models\Company;
 use App\Models\Professional;
 use App\Models\ProfessionalWorkingHour;
@@ -20,15 +21,36 @@ class ProfessionalWorkingHoursService
         return DB::transaction(function () use ($company, $professional, $data): ProfessionalWorkingHour {
             $this->ensureBelongsToCompany($company, $professional);
 
-            $payload = $this->preparePayload($data);
-            $this->validatePayload($company, $professional, $payload);
+            return $this->persistHour($company, $professional, $data);
+        });
+    }
 
-            $hour = new ProfessionalWorkingHour($payload);
-            $hour->company()->associate($company);
-            $hour->professional()->associate($professional);
-            $hour->save();
+    /**
+     * @param  list<array<string, mixed>>  $hours
+     * @return list<ProfessionalWorkingHour>
+     */
+    public function createMany(Company $company, Professional $professional, array $hours): array
+    {
+        if ($hours === []) {
+            throw ValidationException::withMessages([
+                'hours' => 'Informe pelo menos uma faixa de horário.',
+            ]);
+        }
 
-            return $hour->refresh();
+        return DB::transaction(function () use ($company, $professional, $hours): array {
+            $this->ensureBelongsToCompany($company, $professional);
+
+            $created = [];
+
+            foreach ($hours as $index => $data) {
+                try {
+                    $created[] = $this->persistHour($company, $professional, $data);
+                } catch (ValidationException $exception) {
+                    throw $this->withWeekdayContext($exception, $data, $index);
+                }
+            }
+
+            return $created;
         });
     }
 
@@ -110,6 +132,45 @@ class ProfessionalWorkingHoursService
         if ((int) $hour->company_id !== (int) $company->getKey()) {
             abort(404);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function persistHour(Company $company, Professional $professional, array $data): ProfessionalWorkingHour
+    {
+        $payload = $this->preparePayload($data);
+        $this->validatePayload($company, $professional, $payload);
+
+        $hour = new ProfessionalWorkingHour($payload);
+        $hour->company()->associate($company);
+        $hour->professional()->associate($professional);
+        $hour->save();
+
+        return $hour->refresh();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function withWeekdayContext(ValidationException $exception, array $data, int $index): ValidationException
+    {
+        $weekday = Weekday::tryFrom((int) ($data['weekday'] ?? -1));
+        $label = $weekday?->label() ?? 'Faixa';
+
+        $messages = [];
+
+        foreach ($exception->errors() as $key => $errors) {
+            $prefixed = array_map(
+                fn (string $message): string => "{$label}: {$message}",
+                $errors,
+            );
+
+            $messages[$key] = $prefixed;
+            $messages["hours.{$index}.{$key}"] = $prefixed;
+        }
+
+        return ValidationException::withMessages($messages);
     }
 
     /**

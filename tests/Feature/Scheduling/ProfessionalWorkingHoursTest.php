@@ -107,4 +107,83 @@ class ProfessionalWorkingHoursTest extends TestCase
 
         $this->assertTrue($slots->isEmpty());
     }
+
+    public function test_create_many_adds_weekdays_without_removing_existing_hours(): void
+    {
+        $setup = $this->createBookableSetup();
+        $company = $setup['company'];
+        $professional = Professional::factory()->forCompany($company)->bookable()->active()->create();
+        $service = app(ProfessionalWorkingHoursService::class);
+
+        $saturday = $service->create($company, $professional, [
+            'weekday' => Weekday::Saturday->value,
+            'start_time' => '09:00:00',
+            'end_time' => '12:00:00',
+        ]);
+
+        $created = $service->createMany($company, $professional, $this->weekdayHours());
+
+        $this->assertCount(5, $created);
+        $this->assertDatabaseHas('professional_working_hours', [
+            'id' => $saturday->getKey(),
+            'professional_id' => $professional->getKey(),
+            'weekday' => Weekday::Saturday->value,
+        ]);
+        $this->assertSame(6, $professional->workingHours()->count());
+        $this->assertEqualsCanonicalizing(
+            [
+                Weekday::Monday->value,
+                Weekday::Tuesday->value,
+                Weekday::Wednesday->value,
+                Weekday::Thursday->value,
+                Weekday::Friday->value,
+                Weekday::Saturday->value,
+            ],
+            $professional->workingHours()->pluck('weekday')->all(),
+        );
+    }
+
+    public function test_create_many_rejects_overlapping_hours_on_the_same_day(): void
+    {
+        $setup = $this->createBookableSetup();
+
+        try {
+            app(ProfessionalWorkingHoursService::class)->createMany(
+                $setup['company'],
+                $setup['professional'],
+                [
+                    [
+                        'weekday' => Weekday::Monday->value,
+                        'start_time' => '10:00:00',
+                        'end_time' => '14:00:00',
+                    ],
+                ],
+            );
+
+            $this->fail('Expected overlapping hours to be rejected.');
+        } catch (ValidationException $exception) {
+            $messages = collect($exception->errors())->flatten()->implode(' ');
+
+            $this->assertStringContainsString('Segunda-feira', $messages);
+            $this->assertStringContainsString('sobrepostas', $messages);
+        }
+    }
+
+    /**
+     * @return list<array{weekday: int, start_time: string, end_time: string}>
+     */
+    protected function weekdayHours(string $start = '09:00:00', string $end = '18:00:00'): array
+    {
+        return collect([
+            Weekday::Monday,
+            Weekday::Tuesday,
+            Weekday::Wednesday,
+            Weekday::Thursday,
+            Weekday::Friday,
+        ])->map(fn (Weekday $day): array => [
+            'weekday' => $day->value,
+            'start_time' => $start,
+            'end_time' => $end,
+        ])->all();
+    }
 }
