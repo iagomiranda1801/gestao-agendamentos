@@ -5,6 +5,7 @@ namespace App\Filament\App\Pages;
 use App\Enums\CompanyRole;
 use App\Enums\SubscriptionStatus;
 use App\Models\Company;
+use App\Models\PlatformInvoice;
 use App\Models\User;
 use App\Services\Company\CompanyModuleService;
 use App\Services\Company\CompanySubscriptionService;
@@ -100,10 +101,18 @@ class SubscriptionExpiredPage extends Page
         $invoices = $canSeeInvoices
             ? $tenant->platformInvoices()->latest('due_at')->limit(20)->get()
             : collect();
+        $accessAllowed = $modules->isAccessAllowed($tenant);
+        $billingDaysRemaining = $subscriptions->billingDaysRemaining($tenant);
+        [$statusTone, $statusLabel, $statusHint] = $this->statusPresentation(
+            $tenant,
+            $accessAllowed,
+            $billingDaysRemaining,
+            $outstanding,
+        );
 
         return [
             'company' => $tenant,
-            'accessAllowed' => $modules->isAccessAllowed($tenant),
+            'accessAllowed' => $accessAllowed,
             'canSeeInvoices' => $canSeeInvoices,
             'moduleLabels' => collect($modules->enabledModules($tenant))
                 ->map(fn ($module) => $module->label())
@@ -115,6 +124,52 @@ class SubscriptionExpiredPage extends Page
             'invoices' => $invoices,
             'pixInstructions' => (string) config('subscriptions.pix_instructions'),
             'formatReais' => fn (?int $cents): string => $subscriptions->formatReais($cents),
+            'statusTone' => $statusTone,
+            'statusLabel' => $statusLabel,
+            'statusHint' => $statusHint,
+            'billingDaysRemaining' => $billingDaysRemaining,
         ];
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: string}
+     */
+    protected function statusPresentation(
+        Company $company,
+        bool $accessAllowed,
+        ?int $billingDays,
+        ?PlatformInvoice $outstanding,
+    ): array {
+        if (! $accessAllowed) {
+            if ($company->subscription_status === SubscriptionStatus::Trial) {
+                return ['danger', 'Teste encerrado', 'Pague a fatura para renovar'];
+            }
+
+            return ['danger', 'Assinatura pendente', 'Pague a fatura para renovar'];
+        }
+
+        if ($company->subscription_status === SubscriptionStatus::Trial) {
+            return ['warning', 'Período de teste', 'Aproveite o teste. Depois, a fatura aparece aqui.'];
+        }
+
+        if ($company->current_period_end === null) {
+            return ['gray', 'Sem vencimento', 'Sem ciclo definido ainda'];
+        }
+
+        if ($outstanding !== null) {
+            return ['warning', 'Fatura em aberto', 'Pague a fatura para renovar'];
+        }
+
+        $warningDays = max(1, (int) config('subscriptions.renewal_warning_days', 7));
+
+        if ($billingDays !== null && $billingDays <= $warningDays) {
+            $hint = $billingDays === 0
+                ? 'Sua assinatura vence hoje.'
+                : 'Sua assinatura vence em '.$billingDays.' '.($billingDays === 1 ? 'dia' : 'dias').'.';
+
+            return ['warning', 'Renovar em breve', $hint];
+        }
+
+        return ['success', 'Assinatura ativa', 'Tudo em dia'];
     }
 }
