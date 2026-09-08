@@ -111,7 +111,8 @@ Geração (`issueInvoice`):
 - Exige ciclo + pelo menos um módulo
 - Recusa se já existir aberta/vencida
 - Número `AQ-{ano}-0001` (sequencial por ano)
-- Itens: uma linha por módulo com preço do catálogo no ciclo (snapshot JSON). Total = soma
+- Itens: uma linha por módulo com preço do catálogo no ciclo (snapshot JSON). Total = soma, salvo override manual
+- Geração **manual** (Gerar fatura) aceita um valor em reais diferente do catálogo. Se diferir, grava item `Ajuste` com a diferença. O job `subscriptions:issue-due-invoices` **não** aplica override
 - `due_at`: se ainda está no trial ou `current_period_end` futuro, vence nesse dia; senão, hoje + 3 dias
 - `period_start` / `period_end`: intervalo que o pagamento vai cobrir
 
@@ -125,7 +126,7 @@ Job diário `subscriptions:issue-due-invoices`: empresas ativas com `current_per
 
 - Resource **Preços dos módulos**
 - Resource **Faturas** (lista de todas as empresas): filtros de status, empresa, vencimento; ações gerar / marcar paga / marcar vencida / cancelar
-- Ficha da empresa: módulos + ciclo + total ao vivo + vigente até + snapshot + atalhos; relation **Faturas**; ação **Gerar fatura** (não há mais Registrar pagamento)
+- Ficha da empresa: módulos + ciclo + total ao vivo + vigente até + snapshot + atalhos; relation **Faturas**; ação **Gerar fatura** (valor editável, padrão catálogo; não há mais Registrar pagamento)
 - Tabela e dashboard com vencimentos e ativas sem vencimento
 
 ## 9. Empresa (`/app`)

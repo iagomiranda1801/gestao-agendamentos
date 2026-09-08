@@ -145,6 +145,69 @@ class CompanySubscriptionServiceTest extends TestCase
         $this->assertTrue($invoice->period_end?->equalTo(now()->addMonth()));
     }
 
+    public function test_issue_invoice_with_custom_amount_adds_adjustment_item(): void
+    {
+        $company = Company::factory()->create([
+            'enabled_modules' => [CompanyModule::Sales->value],
+            'subscription_status' => SubscriptionStatus::Expired,
+            'billing_interval' => BillingInterval::Monthly,
+            'current_period_end' => now()->subMonth(),
+        ]);
+
+        $invoice = app(CompanySubscriptionService::class)->issueInvoice($company, amountCents: 9900);
+
+        $this->assertSame(9900, $invoice->amount_cents);
+        $this->assertCount(2, $invoice->items);
+        $this->assertSame(CompanyModule::Sales->value, $invoice->items[0]['module']);
+        $this->assertSame(3900, $invoice->items[0]['price_cents']);
+        $this->assertSame('adjustment', $invoice->items[1]['module']);
+        $this->assertSame('Ajuste', $invoice->items[1]['label']);
+        $this->assertSame(6000, $invoice->items[1]['price_cents']);
+    }
+
+    public function test_issue_invoice_with_same_catalog_amount_has_no_adjustment(): void
+    {
+        $company = Company::factory()->create([
+            'enabled_modules' => [CompanyModule::Sales->value],
+            'billing_interval' => BillingInterval::Monthly,
+        ]);
+
+        $invoice = app(CompanySubscriptionService::class)->issueInvoice($company, amountCents: 3900);
+
+        $this->assertSame(3900, $invoice->amount_cents);
+        $this->assertCount(1, $invoice->items);
+    }
+
+    public function test_admin_can_issue_invoice_with_negotiated_amount(): void
+    {
+        $admin = $this->createSuperAdmin();
+        $company = Company::factory()->create([
+            'enabled_modules' => [CompanyModule::Sales->value],
+            'subscription_status' => SubscriptionStatus::Expired,
+            'billing_interval' => BillingInterval::Monthly,
+            'current_period_end' => now()->subMonth(),
+        ]);
+
+        $this->actingAs($admin);
+        Filament::setCurrentPanel('admin');
+
+        Livewire::test(EditCompany::class, ['record' => $company->getKey()])
+            ->callAction('issueInvoice', [
+                'amount' => '99.00',
+            ])
+            ->assertHasNoActionErrors();
+
+        $invoice = $company->platformInvoices()->first();
+        $this->assertNotNull($invoice);
+        $this->assertSame(9900, $invoice->amount_cents);
+
+        Livewire::test(ViewPlatformInvoice::class, ['record' => $invoice->getKey()])
+            ->callAction('pay')
+            ->assertHasNoActionErrors();
+
+        $this->assertSame(9900, $company->fresh()->quoted_price_cents);
+    }
+
     public function test_issue_invoice_refuses_second_outstanding_invoice(): void
     {
         $company = Company::factory()->create([
@@ -176,7 +239,9 @@ class CompanySubscriptionServiceTest extends TestCase
         Filament::setCurrentPanel('admin');
 
         Livewire::test(EditCompany::class, ['record' => $company->getKey()])
-            ->callAction('issueInvoice')
+            ->callAction('issueInvoice', [
+                'amount' => '39.00',
+            ])
             ->assertHasNoActionErrors();
 
         $invoice = $company->platformInvoices()->first();

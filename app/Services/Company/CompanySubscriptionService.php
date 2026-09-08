@@ -90,7 +90,7 @@ class CompanySubscriptionService
             ->first();
     }
 
-    public function issueInvoice(Company $company, ?BillingInterval $interval = null): PlatformInvoice
+    public function issueInvoice(Company $company, ?BillingInterval $interval = null, ?int $amountCents = null): PlatformInvoice
     {
         $interval ??= $company->billing_interval;
 
@@ -114,8 +114,24 @@ class CompanySubscriptionService
             ]);
         }
 
+        if ($amountCents !== null && $amountCents < 0) {
+            throw ValidationException::withMessages([
+                'amount_cents' => 'O valor da fatura não pode ser negativo.',
+            ]);
+        }
+
         $items = $this->quoteItems($modules, $interval);
-        $amount = (int) collect($items)->sum('price_cents');
+        $catalogAmount = (int) collect($items)->sum('price_cents');
+        $amount = $amountCents ?? $catalogAmount;
+
+        if ($amount !== $catalogAmount) {
+            $items[] = [
+                'module' => 'adjustment',
+                'label' => 'Ajuste',
+                'price_cents' => $amount - $catalogAmount,
+            ];
+        }
+
         $now = Date::now();
         $periodStart = $company->current_period_end instanceof CarbonInterface
             && $company->current_period_end->greaterThan($now)
