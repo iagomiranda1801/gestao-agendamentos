@@ -16,7 +16,7 @@ O módulo deve permitir identificar com segurança quem realizou uma alteração
 ## 2. Decisões de produto
 
 1. A auditoria pertence exclusivamente ao painel global `/admin` e só poderá ser consultada por superadministradores de plataforma.
-2. Apenas operações que alteram estado ou disparam uma ação operacional serão registradas. Navegações, visualizações de dashboard, consultas, rotas, webhooks e Telescope não gerarão registros.
+2. Apenas operações que alteram estado ou disparam uma ação operacional serão registradas. Navegações, visualizações de dashboard, consultas, rotas, webhooks e Horizon não gerarão registros.
 3. A auditoria é independente de `clinical_audit_events`, que permanece dedicada ao prontuário odontológico e às exigências clínicas.
 4. Os logs serão preservados mesmo quando o usuário, a empresa ou o registro afetado forem excluídos.
 5. Senhas, tokens, cookies, cabeçalhos de autorização e outros segredos nunca serão gravados nos detalhes do log.
@@ -31,7 +31,7 @@ O sistema já possui:
 - acesso restrito a `User::isPlatformAdmin()`;
 - recursos administrativos de Empresas e Usuários;
 - gerenciamento de vínculos entre usuário e empresa;
-- páginas operacionais para jobs falhados, webhooks, catálogo de rotas e Telescope;
+- páginas operacionais para webhooks, catálogo de rotas e atalho Horizon; fila e jobs falhados ficam no Horizon;
 - armazenamento de datas em UTC e exibição administrativa já orientada ao fuso `America/Sao_Paulo`;
 - auditoria clínica separada em `clinical_audit_events`.
 
@@ -40,7 +40,7 @@ Lacunas atuais:
 - não há tabela de auditoria administrativa;
 - não há página de pesquisa ou detalhes de logs no `/admin`;
 - edições de empresa, usuário e vínculo não preservam valores anterior e posterior;
-- ações nos jobs falhados não possuem rastreabilidade de negócio.
+- retry, remoção e limpeza de jobs falhados no Horizon ficam fora da auditoria Filament.
 
 ## 4. Escopo funcional
 
@@ -51,7 +51,7 @@ Lacunas atuais:
 | Empresas | criação, edição, exclusão individual e em massa, ativação/inativação, alteração de módulos, perfil, assinatura e período de trial |
 | Usuários | criação, edição, exclusão individual e em massa, ativação/inativação, concessão ou remoção de superadministrador e redefinição de senha |
 | Vínculo usuário–empresa | criação do vínculo, alteração de papel ou status e desvinculação individual ou em massa |
-| Jobs falhados | reenvio, remoção individual e limpeza das falhas com mais de sete dias |
+| Jobs falhados (histórico) | chaves `failed_job.*` permanecem para logs antigos gerados pela página Filament removida; retry e forget atuais acontecem só no Horizon e não geram auditoria |
 
 Os tipos serão persistidos com chaves estáveis, por exemplo:
 
@@ -66,7 +66,8 @@ O rótulo em português será resolvido pela aplicação. Assim, a chave pode ev
 
 - login e logout de superadministradores;
 - simples abertura de páginas, pesquisa e exportação;
-- visualização de webhooks, rotas, dashboard e Telescope;
+- visualização de webhooks, rotas, dashboard e Horizon;
+- retry, remoção e limpeza de jobs falhados feitos no Horizon;
 - operações realizadas em `/app`, inclusive por administradores de uma empresa;
 - cadastro público em `/cadastro`;
 - comando `users:ensure-super-admin` e demais comandos Artisan;
@@ -113,7 +114,7 @@ Os valores gravados devem ser limitados aos campos pertinentes à mudança.
 - Usuário: nome, e-mail, status e indicador de superadministrador.
 - Senha: registrar somente a ação `user.password_changed`; nunca incluir hash, valor antigo ou valor novo.
 - Vínculo: empresa, usuário, papel, status e permissões quando existirem.
-- Job falhado: UUID/ID, fila, nome resumido do job, total removido e data de corte; nunca registrar o payload completo ou a exceção completa.
+- Job falhado (registros históricos): UUID/ID, fila, nome resumido do job, total removido e data de corte; nunca registrar o payload completo ou a exceção completa. Novas ações de fila no Horizon não geram snapshot.
 
 `metadata` poderá guardar origem `admin_panel`, rota e IP, desde que o IP seja aprovado como dado operacional pela política de privacidade. O módulo não depende desses campos para atender ao objetivo principal.
 
@@ -124,7 +125,6 @@ Um serviço central, por exemplo `AdminAuditService`, será responsável por cri
 O registro será chamado explicitamente nos pontos de alteração do painel, pois há operações que não disparam eventos convencionais de modelo:
 
 - ações de anexar, editar e desvincular registros da tabela pivô `company_user`;
-- reenviar, esquecer e limpar jobs falhados;
 - exclusões em massa.
 
 Para criação e edição de `Company` e `User`, os ciclos das páginas Filament devem capturar o snapshot antes da alteração e registrar o resultado depois de persistido. Quando uma edição não gerar diferença efetiva, nenhum novo log deve ser criado.
@@ -186,7 +186,7 @@ Valores de enum devem ser exibidos com rótulos de negócio, como “Empresa ati
 2. Criar enum ou catálogo de ações, normalizador de snapshots e `AdminAuditService` com mascaramento de dados sensíveis.
 3. Integrar o registro às páginas administrativas de Empresas e Usuários, incluindo exclusões individuais e em massa.
 4. Centralizar as alterações de vínculo usuário–empresa em um fluxo auditável e integrar os dois Relation Managers existentes.
-5. Integrar `FailedJobs` aos eventos de retry, forget e limpeza.
+5. ~~Integrar `FailedJobs` aos eventos de retry, forget e limpeza.~~ Página Filament removida; retry/forget ficam no Horizon, fora da auditoria. As chaves `failed_job.*` permanecem só para registros históricos.
 6. Criar `AdminAuditLogResource` somente leitura no painel `/admin`, com listagem, filtros, busca e detalhes.
 7. Criar testes de autorização, persistência, comparação, retenção pós-exclusão e filtros.
 
@@ -197,9 +197,9 @@ Valores de enum devem ser exibidos com rótulos de negócio, como “Empresa ati
 3. Alterações de módulos, assinatura, status e trial de uma empresa aparecem nos detalhes com valores anterior e posterior.
 4. Criar, editar, desativar, elevar/remover superadmin ou excluir usuário gera log sem expor senha ou hash.
 5. Criar, editar ou remover vínculo usuário–empresa informa os dois envolvidos, o papel e o status anterior/novo quando aplicável.
-6. Reenviar, remover ou limpar jobs falhados gera log com o identificador ou total correspondente, sem payload sensível.
+6. Logs históricos `failed_job.*` continuam visíveis na Auditoria; retry, remoção ou limpeza feitos no Horizon não geram novos registros neste módulo.
 7. A exclusão posterior de empresa ou usuário não apaga nem torna ilegível o registro de auditoria.
 8. Busca e filtros por período, usuário e tipo de ação retornam somente os registros esperados.
 9. A lista apresenta data e hora no fuso de São Paulo, ainda que os dados sejam persistidos em UTC.
-10. Abertura de dashboard, webhooks, rotas, Telescope e páginas de operação somente leitura não gera registros de auditoria.
+10. Abertura de dashboard, webhooks, rotas, Horizon e páginas de operação somente leitura não gera registros de auditoria.
 11. Ações realizadas fora do `/admin`, como cadastro público e operações do painel da empresa, não aparecem neste módulo.

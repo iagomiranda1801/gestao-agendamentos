@@ -38,7 +38,6 @@ class AdminDashboardAggregator
             'companiesAttention' => $this->companiesAttention($todayStart, $trialLimit, $renewalLimit),
             'usage' => $this->usage($weekStart, $todayEnd),
             'whatsapp' => $this->whatsAppHealth($todayStart, $todayEnd),
-            'latestFailures' => $this->latestFailures(),
         ];
     }
 
@@ -60,7 +59,7 @@ class AdminDashboardAggregator
             $this->card('Usuários ativos', (string) User::query()->where('is_active', true)->count(), 'Contas habilitadas', 'primary', $this->usersUrl()),
             $this->card('Agenda hoje', (string) (clone $appointmentsToday)->count(), 'Agendamentos no dia', 'primary', $this->companiesUrl()),
             $this->card('Cancelados hoje', (string) (clone $appointmentsToday)->where('status', AppointmentStatus::Cancelled->value)->count(), 'Possível ruído operacional', 'warning', $this->companiesUrl()),
-            $this->card('Jobs falhados', (string) $this->failedJobsSince($todayStart), 'Falhas nas últimas 24h', 'danger', '/admin/operacao/jobs-falhos'),
+            $this->card('Jobs falhados', (string) $this->failedJobsSince($todayStart), 'Falhas nas últimas 24h', 'danger', '/horizon'),
         ];
     }
 
@@ -127,7 +126,7 @@ class AdminDashboardAggregator
                 'Jobs falhados hoje',
                 $this->failedJobsSince($todayStart),
                 'Investigue fila, SMTP, WhatsApp e jobs longos.',
-                '/admin/operacao/jobs-falhos',
+                '/horizon',
                 'danger',
             ),
             $this->alert(
@@ -273,27 +272,6 @@ class AdminDashboardAggregator
                 ->count(),
             'webhooksToday' => $this->evolutionWebhooksToday($todayStart, $todayEnd),
         ];
-    }
-
-    /**
-     * @return Collection<int, array<string, string|null>>
-     */
-    protected function latestFailures(): Collection
-    {
-        if (! Schema::hasTable('failed_jobs')) {
-            return collect();
-        }
-
-        return DB::table('failed_jobs')
-            ->latest('failed_at')
-            ->limit(5)
-            ->get(['uuid', 'queue', 'exception', 'failed_at'])
-            ->map(fn ($failure): array => [
-                'uuid' => (string) $failure->uuid,
-                'queue' => (string) $failure->queue,
-                'failedAt' => (string) $failure->failed_at,
-                'error' => mb_substr(preg_replace('/\s+/', ' ', (string) $failure->exception) ?? '', 0, 220),
-            ]);
     }
 
     protected function failedJobsSince(CarbonImmutable $since): int

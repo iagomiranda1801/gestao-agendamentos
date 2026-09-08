@@ -114,19 +114,14 @@
 
         <div class="admin-dashboard-panel">
             <div class="admin-dashboard-panel__header">
-                <h2 class="admin-dashboard-panel__title">Últimos jobs falhados</h2>
+                <h2 class="admin-dashboard-panel__title">Fila de jobs</h2>
             </div>
-            <div class="admin-dashboard-failures">
-                @forelse ($dashboard['latestFailures'] as $failure)
-                    <div class="admin-dashboard-failure">
-                        <b>{{ $failure['queue'] }}</b>
-                        <small>{{ $failure['failedAt'] }}</small>
-                        <p>{{ $failure['error'] }}</p>
-                    </div>
-                @empty
-                    <p class="admin-dashboard-empty">Nenhum job falhado registrado.</p>
-                @endforelse
-            </div>
+            <a href="/horizon" target="_blank" rel="noopener noreferrer" class="admin-dashboard-alert">
+                <span>
+                    <b>Ver no Horizon</b>
+                    <small>Retries, falhas e processamento da fila.</small>
+                </span>
+            </a>
         </div>
     </section>
 </div>

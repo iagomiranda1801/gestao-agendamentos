@@ -1,10 +1,21 @@
 <?php
 
+use App\Providers\AppServiceProvider;
+use App\Providers\Filament\AdminPanelProvider;
+use App\Providers\Filament\AppPanelProvider;
+use App\Providers\HorizonServiceProvider;
+use App\Providers\TelescopeServiceProvider;
+use Laravel\Horizon\HorizonApplicationServiceProvider;
+use Laravel\Telescope\TelescopeApplicationServiceProvider;
+
 return [
-    App\Providers\AppServiceProvider::class,
-    App\Providers\Filament\AdminPanelProvider::class,
-    App\Providers\Filament\AppPanelProvider::class,
-    ...(class_exists(\Laravel\Telescope\TelescopeApplicationServiceProvider::class) ? [
-        App\Providers\TelescopeServiceProvider::class,
+    AppServiceProvider::class,
+    AdminPanelProvider::class,
+    AppPanelProvider::class,
+    ...(class_exists(HorizonApplicationServiceProvider::class) ? [
+        HorizonServiceProvider::class,
+    ] : []),
+    ...(class_exists(TelescopeApplicationServiceProvider::class) ? [
+        TelescopeServiceProvider::class,
     ] : []),
 ];

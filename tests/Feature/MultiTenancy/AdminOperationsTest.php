@@ -11,9 +11,9 @@ class AdminOperationsTest extends TestCase
         $admin = $this->createSuperAdmin();
 
         $this->actingAs($admin)
-            ->get('/admin/operacao/jobs-falhos')
+            ->get('/admin')
             ->assertOk()
-            ->assertSee('Jobs falhados');
+            ->assertSee('Ver no Horizon');
 
         $this->actingAs($admin)
             ->get('/admin/operacao/rotas')

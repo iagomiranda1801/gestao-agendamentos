@@ -2,8 +2,8 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Admin\Pages\Dashboard;
 use App\Filament\Admin\Pages\Auth\Login;
+use App\Filament\Admin\Pages\Dashboard;
 use App\Support\Branding;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -73,12 +73,12 @@ class AdminPanelProvider extends PanelProvider
                 'Operação',
             ])
             ->navigationItems([
-                NavigationItem::make('Telescope')
+                NavigationItem::make('Horizon')
                     ->group('Operação')
-                    ->icon('heroicon-o-chart-bar-square')
-                    ->url('/telescope')
+                    ->icon('heroicon-o-queue-list')
+                    ->url('/horizon')
                     ->openUrlInNewTab()
-                    ->sort(10),
+                    ->sort(9),
             ]);
     }
 }
