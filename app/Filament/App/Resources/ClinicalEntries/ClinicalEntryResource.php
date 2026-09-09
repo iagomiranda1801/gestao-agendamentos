@@ -4,6 +4,7 @@ namespace App\Filament\App\Resources\ClinicalEntries;
 
 use App\Enums\CompanyModule;
 use App\Filament\App\Concerns\RequiresCompanyModuleResource;
+use App\Support\CompanyTerminology;
 use App\Filament\App\Resources\ClinicalEntries\Pages\CreateClinicalEntry;
 use App\Filament\App\Resources\ClinicalEntries\Pages\EditClinicalEntry;
 use App\Filament\App\Resources\ClinicalEntries\Pages\ListClinicalEntries;
@@ -52,7 +53,7 @@ class ClinicalEntryResource extends Resource
         return $table->columns([
             TextColumn::make('occurred_at')->label('Data')->dateTime('d/m/Y H:i')->sortable(),
             TextColumn::make('client.name')->label('Paciente')->searchable()->sortable(),
-            TextColumn::make('professional.name')->label('Dentista')->searchable(),
+            TextColumn::make('professional.name')->label(CompanyTerminology::professional())->searchable(),
             TextColumn::make('procedure_performed')->label('Procedimento')->limit(50)->placeholder('—'),
             TextColumn::make('status')->label('Status')->badge()->formatStateUsing(fn (string $state): string => $state === 'finalized' ? 'Finalizada' : 'Rascunho'),
         ])->defaultSort('occurred_at', 'desc');

@@ -2,7 +2,8 @@
 
 namespace App\Filament\App\Resources\Anamneses\Schemas;
 
-use App\Support\DentalAnamnesisQuestionnaire;
+use App\Models\Company;
+use App\Support\ClinicalAnamnesisQuestionnaire;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -15,9 +16,20 @@ class AnamnesisForm
     public static function configure(Schema $schema): Schema
     {
         $disabled = fn ($record): bool => $record !== null && $record->status !== 'draft';
+        $company = Filament::getTenant();
+        $record = method_exists($schema, 'getRecord') ? $schema->getRecord() : null;
+        $snapshot = is_object($record) ? ($record->questionnaire_snapshot ?? null) : null;
+        $questions = is_array($snapshot)
+            ? $snapshot
+            : ClinicalAnamnesisQuestionnaire::questions(
+                $company instanceof Company
+                    ? ClinicalAnamnesisQuestionnaire::resolve($company, auth()->user())
+                    : null,
+            );
+
         $fields = [];
-        foreach (DentalAnamnesisQuestionnaire::questions() as $question) {
-            if ($question['kind'] === 'text') {
+        foreach ($questions as $question) {
+            if (($question['kind'] ?? 'text') === 'text') {
                 $fields[] = Textarea::make('answers.'.$question['key'])->label($question['label'])->rows(2)->disabled($disabled)->columnSpanFull();
 
                 continue;

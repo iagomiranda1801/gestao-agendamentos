@@ -17,55 +17,58 @@ class PlatformInvoiceActions
 {
     public static function issue(?Company $company = null): Action
     {
-        $fields = [];
-
-        if ($company === null) {
-            $fields[] = Select::make('company_id')
-                ->label('Empresa')
-                ->options(fn (): array => Company::query()->orderBy('name')->pluck('name', 'id')->all())
-                ->searchable()
-                ->required()
-                ->native(false)
-                ->live()
-                ->afterStateUpdated(function (mixed $state, Set $set): void {
-                    $target = Company::query()->find($state);
-
-                    if (! $target instanceof Company) {
-                        $set('amount', null);
-
-                        return;
-                    }
-
-                    $set('amount', self::reaisFromCents(
-                        app(CompanySubscriptionService::class)->quoteForCompany($target),
-                    ));
-                });
-        }
-
-        $fields[] = TextInput::make('amount')
-            ->label('Valor da fatura (R$)')
-            ->numeric()
-            ->required()
-            ->minValue(0)
-            ->step(0.01)
-            ->helperText('Padrão: total do catálogo. Altere para negociar.')
-            ->default(function () use ($company): ?string {
-                if (! $company instanceof Company) {
-                    return null;
-                }
-
-                return self::reaisFromCents(
-                    app(CompanySubscriptionService::class)->quoteForCompany($company),
-                );
-            });
-
         return Action::make('issueInvoice')
             ->label('Gerar fatura')
             ->icon('heroicon-o-document-plus')
             ->color('primary')
             ->modalHeading('Gerar fatura')
             ->modalDescription('A fatura usa os módulos e o ciclo atuais da empresa. Só pode haver uma fatura aberta ou vencida por vez.')
-            ->schema($fields)
+            ->form(function () use ($company): array {
+                $fields = [];
+
+                if ($company === null) {
+                    $fields[] = Select::make('company_id')
+                        ->label('Empresa')
+                        ->options(fn (): array => Company::query()->orderBy('name')->pluck('name', 'id')->all())
+                        ->searchable()
+                        ->required()
+                        ->native(false)
+                        ->live()
+                        ->afterStateUpdated(function (mixed $state, Set $set): void {
+                            $target = Company::query()->find($state);
+
+                            if (! $target instanceof Company) {
+                                $set('amount', null);
+
+                                return;
+                            }
+
+                            $set('amount', self::reaisFromCents(
+                                app(CompanySubscriptionService::class)->quoteForCompany($target),
+                            ));
+                        });
+                }
+
+                $fields[] = TextInput::make('amount')
+                    ->label('Valor da fatura')
+                    ->prefix('R$')
+                    ->numeric()
+                    ->required()
+                    ->minValue(0)
+                    ->step(0.01)
+                    ->helperText('Padrão: total do catálogo. Altere para negociar.')
+                    ->default(function () use ($company): ?string {
+                        if (! $company instanceof Company) {
+                            return null;
+                        }
+
+                        return self::reaisFromCents(
+                            app(CompanySubscriptionService::class)->quoteForCompany($company),
+                        );
+                    });
+
+                return $fields;
+            })
             ->action(function (array $data) use ($company): void {
                 $target = $company ?? Company::query()->find($data['company_id'] ?? null);
 

@@ -4,6 +4,7 @@ namespace App\Filament\App\Resources\ClinicalEntries\Schemas;
 
 use App\Models\Company;
 use App\Models\Professional;
+use App\Support\CompanyTerminology;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
@@ -23,16 +24,16 @@ class ClinicalEntryForm
         return $schema->components([
             Section::make('Identificação')->schema([
                 Select::make('client_id')->label('Paciente')->relationship('client', 'name', fn (Builder $query): Builder => $query->where('company_id', Filament::getTenant()?->getKey())->active())->searchable()->preload()->required()->disabled($disabled),
-                Select::make('professional_id')->label('Dentista')->options(fn (): array => self::professionalOptions())->required()->searchable()->disabled($disabled),
+                Select::make('professional_id')->label(CompanyTerminology::professional())->options(fn (): array => self::professionalOptions())->required()->searchable()->disabled($disabled),
                 DateTimePicker::make('occurred_at')->label('Data e hora')->seconds(false)->default(now())->required()->disabled($disabled),
-                TagsInput::make('teeth')->label('Dentes envolvidos')->placeholder('Ex.: 11')->disabled($disabled),
+                TagsInput::make('teeth')->label('Dentes envolvidos')->placeholder('Ex.: 11')->disabled($disabled)->visible(fn (): bool => self::isDentalTenant()),
             ])->columns(2),
             Section::make('Registro clínico')->schema([
                 Textarea::make('chief_complaint')->label('Queixa / relato')->rows(2)->disabled($disabled),
                 Textarea::make('clinical_assessment')->label('Avaliação clínica')->rows(3)->disabled($disabled),
-                Textarea::make('procedure_performed')->label('Procedimento executado')->rows(3)->disabled($disabled),
+                Textarea::make('procedure_performed')->label('Procedimento / conduta')->rows(3)->disabled($disabled),
                 Textarea::make('materials_medications')->label('Materiais e medicamentos')->rows(2)->disabled($disabled),
-                Textarea::make('anesthetic')->label('Anestésico e quantidade')->rows(2)->disabled($disabled),
+                Textarea::make('anesthetic')->label('Anestésico e quantidade')->rows(2)->disabled($disabled)->visible(fn (): bool => self::isDentalTenant()),
                 Textarea::make('complications')->label('Intercorrências')->rows(2)->disabled($disabled),
                 Textarea::make('guidance')->label('Orientações fornecidas')->rows(2)->disabled($disabled),
                 Textarea::make('next_steps')->label('Conduta e próximos passos')->rows(2)->disabled($disabled),
@@ -53,5 +54,12 @@ class ClinicalEntryForm
         }
 
         return $query->pluck('name', 'id')->all();
+    }
+
+    protected static function isDentalTenant(): bool
+    {
+        $company = Filament::getTenant();
+
+        return $company instanceof Company && $company->isDentalClinic();
     }
 }

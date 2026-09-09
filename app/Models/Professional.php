@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ClinicalSpecialty;
 use App\Support\PhoneNormalizer;
 use Database\Factories\ProfessionalFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -20,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'email',
     'document',
     'specialty',
+    'clinical_specialty',
     'color',
     'notes',
     'is_bookable',
@@ -60,6 +62,7 @@ class Professional extends Model
             'is_bookable' => 'boolean',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
+            'clinical_specialty' => ClinicalSpecialty::class,
         ];
     }
 

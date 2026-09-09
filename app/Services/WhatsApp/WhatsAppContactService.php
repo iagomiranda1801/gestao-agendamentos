@@ -110,7 +110,7 @@ class WhatsAppContactService
                     ]);
                     $created++;
                 } else {
-                    if ($company->isDentalClinic()) {
+                    if ($company->usesClinicalChart()) {
                         $this->clientService->ensureDentalProfile($company, $client);
                     }
                     $linked++;

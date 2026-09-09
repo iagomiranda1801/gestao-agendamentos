@@ -20,7 +20,7 @@ class ClinicalAuthorizationService
 
     public function authorize(User $user, Company $company, CompanyPermission $permission, ?Client $client = null): void
     {
-        abort_unless($company->isDentalClinic() && $this->modules->hasModule($company, CompanyModule::ClinicalRecords), 403);
+        abort_unless($this->modules->hasModule($company, CompanyModule::ClinicalRecords), 403);
         abort_unless($this->permissions->allows($user, $company, $permission), 403);
 
         if ($client !== null) {

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\BillingInterval;
+use App\Enums\CompanyModule;
 use App\Enums\CompanyProfile;
 use App\Enums\CompanyRole;
 use App\Enums\SubscriptionStatus;
@@ -98,6 +99,17 @@ class Company extends Model
     public function isDentalClinic(): bool
     {
         return $this->business_profile === CompanyProfile::DentalClinic;
+    }
+
+    public function usesClinicalChart(): bool
+    {
+        if ($this->isDentalClinic()) {
+            return true;
+        }
+
+        $modules = $this->enabled_modules;
+
+        return is_array($modules) && in_array(CompanyModule::ClinicalRecords->value, $modules, true);
     }
 
     public function isCarWash(): bool

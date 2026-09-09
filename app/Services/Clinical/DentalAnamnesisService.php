@@ -2,15 +2,10 @@
 
 namespace App\Services\Clinical;
 
+use App\Enums\ClinicalSpecialty;
 use App\Enums\CompanyPermission;
 use App\Enums\CompanyRole;
-use App\Models\Client;
-use App\Models\Company;
-use App\Models\DentalAnamnesis;
-use App\Models\PatientClinicalAlert;
-use App\Models\Professional;
-use App\Models\User;
-use App\Support\DentalAnamnesisQuestionnaire;
+use App\Support\ClinicalAnamnesisQuestionnaire;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -22,11 +17,13 @@ class DentalAnamnesisService
     ) {}
 
     /** @param array<string, mixed> $answers */
-    public function createDraft(Company $company, Client $client, User $user, array $answers = []): DentalAnamnesis
+    public function createDraft(Company $company, Client $client, User $user, array $answers = [], ?ClinicalSpecialty $specialty = null): DentalAnamnesis
     {
         $this->authorization->authorize($user, $company, CompanyPermission::WriteClinicalRecords, $client);
 
-        return DB::transaction(function () use ($company, $client, $user, $answers): DentalAnamnesis {
+        $specialty ??= ClinicalAnamnesisQuestionnaire::resolve($company, $user);
+
+        return DB::transaction(function () use ($company, $client, $user, $answers, $specialty): DentalAnamnesis {
             $version = (int) DentalAnamnesis::query()
                 ->where('company_id', $company->getKey())
                 ->where('client_id', $client->getKey())
@@ -36,7 +33,7 @@ class DentalAnamnesisService
             $anamnesis = new DentalAnamnesis([
                 'version' => $version,
                 'status' => 'draft',
-                'questionnaire_snapshot' => DentalAnamnesisQuestionnaire::questions(),
+                'questionnaire_snapshot' => ClinicalAnamnesisQuestionnaire::questions($specialty),
                 'answers' => $answers,
             ]);
             $anamnesis->company_id = $company->getKey();

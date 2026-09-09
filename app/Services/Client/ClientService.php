@@ -27,7 +27,7 @@ class ClientService
             $client->company()->associate($company);
             $client->save();
 
-            if ($company->isDentalClinic()) {
+            if ($company->usesClinicalChart()) {
                 $profileData = is_array($data['dental_profile'] ?? null) ? $data['dental_profile'] : [];
                 $this->ensureDentalProfile($company, $client, $profileData);
                 $this->syncDentalRelations($company, $client, $data);
@@ -56,7 +56,7 @@ class ClientService
             $client->fill($payload);
             $client->save();
 
-            if ($company->isDentalClinic()) {
+            if ($company->usesClinicalChart()) {
                 $profileData = is_array($data['dental_profile'] ?? null) ? $data['dental_profile'] : [];
                 $this->ensureDentalProfile($company, $client, $profileData);
                 $this->syncDentalRelations($company, $client, $data);
@@ -121,8 +121,8 @@ class ClientService
     {
         $this->ensureBelongsToCompany($company, $client);
 
-        if (! $company->isDentalClinic()) {
-            throw ValidationException::withMessages(['company' => 'O perfil odontológico só pode ser criado em clínica odontológica.']);
+        if (! $company->usesClinicalChart()) {
+            throw ValidationException::withMessages(['company' => 'O prontuário só pode ser criado quando o módulo clínico está ativo.']);
         }
 
         unset($data['company_id'], $data['client_id'], $data['record_number']);

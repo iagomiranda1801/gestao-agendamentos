@@ -14,8 +14,8 @@ class DentalPatientMigrationService
     /** @return array{analyzed: int, converted: int, already_prepared: int} */
     public function prepareExistingClients(Company $company): array
     {
-        if (! $company->isDentalClinic()) {
-            throw ValidationException::withMessages(['company' => 'Esta empresa não utiliza o perfil de clínica odontológica.']);
+        if (! $company->usesClinicalChart()) {
+            throw ValidationException::withMessages(['company' => 'Esta empresa não utiliza o prontuário clínico.']);
         }
 
         $result = ['analyzed' => 0, 'converted' => 0, 'already_prepared' => 0];

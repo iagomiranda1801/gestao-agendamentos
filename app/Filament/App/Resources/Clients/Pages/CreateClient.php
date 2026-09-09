@@ -28,7 +28,7 @@ class CreateClient extends CreateRecord
 
         if (
             $company instanceof Company
-            && $company->isDentalClinic()
+            && $company->usesClinicalChart()
             && $resource::hasPage('view')
             && $resource::canView($this->getRecord())
         ) {

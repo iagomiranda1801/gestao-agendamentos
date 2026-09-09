@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use App\Models\Company;
+
 enum CompanyRole: string
 {
     case CompanyAdmin = 'company_admin';
@@ -10,24 +12,26 @@ enum CompanyRole: string
     case Receptionist = 'receptionist';
     case Dentist = 'dentist';
 
-    public function label(): string
+    public function label(?Company $company = null): string
     {
         return match ($this) {
             self::CompanyAdmin => 'Administrador',
             self::Manager => 'Gerente',
             self::Employee => 'Colaborador',
             self::Receptionist => 'Recepção / Secretária',
-            self::Dentist => 'Dentista',
+            self::Dentist => $company instanceof Company && ! $company->isDentalClinic()
+                ? 'Profissional clínico'
+                : 'Dentista',
         };
     }
 
     /**
      * @return array<string, string>
      */
-    public static function options(): array
+    public static function options(?Company $company = null): array
     {
         return collect(self::cases())
-            ->mapWithKeys(fn (self $role) => [$role->value => $role->label()])
+            ->mapWithKeys(fn (self $role) => [$role->value => $role->label($company)])
             ->all();
     }
 }

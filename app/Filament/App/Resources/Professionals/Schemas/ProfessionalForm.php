@@ -2,6 +2,7 @@
 
 namespace App\Filament\App\Resources\Professionals\Schemas;
 
+use App\Enums\ClinicalSpecialty;
 use App\Models\Company;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -26,8 +27,18 @@ class ProfessionalForm
                             ->required()
                             ->maxLength(255),
                         TextInput::make('specialty')
-                            ->label('Especialidade')
+                            ->label('Especialidade (livre)')
                             ->maxLength(255),
+                        Select::make('clinical_specialty')
+                            ->label('Especialidade clínica')
+                            ->options(ClinicalSpecialty::options())
+                            ->native(false)
+                            ->nullable()
+                            ->visible(fn (): bool => ($company = Filament::getTenant()) instanceof Company && $company->usesClinicalChart())
+                            ->default(fn (): ?string => ($company = Filament::getTenant()) instanceof Company && $company->isDentalClinic()
+                                ? ClinicalSpecialty::Dentistry->value
+                                : null)
+                            ->helperText('Define o questionário de anamnese deste profissional.'),
                         TextInput::make('phone')
                             ->label('Telefone')
                             ->tel()

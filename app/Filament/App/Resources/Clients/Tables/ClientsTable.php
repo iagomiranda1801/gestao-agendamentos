@@ -32,7 +32,7 @@ class ClientsTable
                     ->label('Prontuário')
                     ->searchable()
                     ->toggleable()
-                    ->visible(fn (): bool => ($company = Filament::getTenant()) instanceof Company && $company->isDentalClinic()),
+                    ->visible(fn (): bool => ($company = Filament::getTenant()) instanceof Company && $company->usesClinicalChart()),
                 TextColumn::make('phone')
                     ->label('Telefone')
                     ->searchable(['phone', 'phone_normalized'])
@@ -85,7 +85,7 @@ class ClientsTable
                     ->placeholder('Todos'),
                 Filter::make('incomplete_dental_registration')
                     ->label('Cadastro incompleto')
-                    ->visible(fn (): bool => ($company = Filament::getTenant()) instanceof Company && $company->isDentalClinic())
+                    ->visible(fn (): bool => ($company = Filament::getTenant()) instanceof Company && $company->usesClinicalChart())
                     ->query(fn (Builder $query): Builder => $query->where(function (Builder $query): void {
                         $query->whereNull('birth_date')
                             ->orWhereNull('document')
@@ -95,12 +95,12 @@ class ClientsTable
             ->defaultSort('name')
             ->recordUrl(function (Client $record): string {
                 $company = Filament::getTenant();
-                $page = $company instanceof Company && $company->isDentalClinic() ? 'view' : 'edit';
+                $page = $company instanceof Company && $company->usesClinicalChart() ? 'view' : 'edit';
 
                 return ClientResource::getUrl($page, ['record' => $record]);
             })
             ->recordActions([
-                ViewAction::make()->visible(fn (): bool => ($company = Filament::getTenant()) instanceof Company && $company->isDentalClinic()),
+                ViewAction::make()->visible(fn (): bool => ($company = Filament::getTenant()) instanceof Company && $company->usesClinicalChart()),
                 EditAction::make(),
                 Action::make('activate')
                     ->label('Ativar')

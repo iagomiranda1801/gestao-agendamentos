@@ -9,6 +9,7 @@ use App\Filament\App\Resources\ClinicalAttachments\Pages\ListClinicalAttachments
 use App\Models\ClinicalAttachment;
 use App\Models\Company;
 use App\Services\Clinical\ClinicalAttachmentService;
+use App\Support\ClinicalAttachmentTypes;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -55,7 +56,7 @@ class ClinicalAttachmentResource extends Resource
     {
         return $schema->components([Section::make('Documento')->schema([
             Select::make('client_id')->label('Paciente')->relationship('client', 'name', fn (Builder $query): Builder => $query->where('company_id', Filament::getTenant()?->getKey())->active())->searchable()->preload()->required(),
-            Select::make('type')->label('Tipo')->options(['radiograph' => 'Radiografia', 'photo' => 'Fotografia', 'exam' => 'Exame', 'prescription' => 'Receita', 'certificate' => 'Atestado', 'consent' => 'Termo / consentimento', 'general' => 'Documento geral'])->required(),
+            Select::make('type')->label('Tipo')->options(ClinicalAttachmentTypes::options())->required(),
             TextInput::make('title')->label('Título')->required()->maxLength(255),
             DatePicker::make('document_date')->label('Data do documento')->native(false),
             Textarea::make('description')->label('Descrição')->rows(2)->columnSpanFull(),
@@ -68,10 +69,7 @@ class ClinicalAttachmentResource extends Resource
         return $table->columns([
             TextColumn::make('client.name')->label('Paciente')->searchable(),
             TextColumn::make('title')->label('Documento')->searchable(),
-            TextColumn::make('type')->label('Tipo')->badge()->formatStateUsing(fn (string $state): string => match ($state) {
-                'radiograph' => 'Radiografia', 'photo' => 'Fotografia', 'exam' => 'Exame', 'prescription' => 'Receita',
-                'certificate' => 'Atestado', 'consent' => 'Termo / consentimento', default => 'Documento geral',
-            }),
+            TextColumn::make('type')->label('Tipo')->badge()->formatStateUsing(fn (string $state): string => ClinicalAttachmentTypes::label($state)),
             TextColumn::make('document_date')->label('Data')->date('d/m/Y')->placeholder('—'),
             TextColumn::make('original_name')->label('Arquivo')->limit(40),
             TextColumn::make('created_at')->label('Enviado em')->dateTime('d/m/Y H:i'),

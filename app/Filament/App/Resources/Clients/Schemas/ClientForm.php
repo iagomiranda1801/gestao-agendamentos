@@ -82,7 +82,7 @@ class ClientForm
                     ->columns(2)
                     ->visible(fn (): bool => self::isCarWashTenant()),
                 Section::make('Dados do paciente')
-                    ->description('Informações específicas do prontuário odontológico.')
+                    ->description('Informações específicas do prontuário.')
                     ->schema([
                         TextInput::make('dental_profile.record_number')
                             ->label('Número do prontuário')
@@ -108,7 +108,7 @@ class ClientForm
                         TextInput::make('dental_profile.state')->label('UF')->maxLength(2),
                     ])
                     ->columns(2)
-                    ->visible(fn (): bool => self::isDentalTenant()),
+                    ->visible(fn (): bool => self::isClinicalTenant()),
                 Section::make('Responsáveis')
                     ->schema([
                         Repeater::make('guardians')
@@ -127,7 +127,7 @@ class ClientForm
                             ->defaultItems(0)
                             ->columnSpanFull(),
                     ])
-                    ->visible(fn (): bool => self::isDentalTenant()),
+                    ->visible(fn (): bool => self::isClinicalTenant()),
                 Section::make('Convênios')
                     ->schema([
                         Repeater::make('insurances')
@@ -145,15 +145,15 @@ class ClientForm
                             ->defaultItems(0)
                             ->columnSpanFull(),
                     ])
-                    ->visible(fn (): bool => self::isDentalTenant()),
+                    ->visible(fn (): bool => self::isClinicalTenant()),
             ]);
     }
 
-    protected static function isDentalTenant(): bool
+    protected static function isClinicalTenant(): bool
     {
         $company = Filament::getTenant();
 
-        return $company instanceof Company && $company->isDentalClinic();
+        return $company instanceof Company && $company->usesClinicalChart();
     }
 
     protected static function isCarWashTenant(): bool

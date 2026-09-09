@@ -87,7 +87,7 @@ class TeamMemberResource extends Resource
             TextInput::make('name')->label('Nome')->required()->maxLength(255),
             TextInput::make('email')->label('E-mail')->email()->required()->maxLength(255),
             TextInput::make('password')->label('Senha')->password()->required(fn (string $operation): bool => $operation === 'create')->dehydrated(fn (?string $state): bool => filled($state)),
-            Select::make('role')->label('Papel')->options(CompanyRole::options())->required()->live(),
+            Select::make('role')->label('Papel')->options(fn (): array => CompanyRole::options(Filament::getTenant() instanceof Company ? Filament::getTenant() : null))->required()->live(),
             Toggle::make('membership_active')->label('Acesso ativo')->default(true),
             Toggle::make('use_role_defaults')->label('Usar permissões padrão do papel')->default(true)->live(),
             CheckboxList::make('permissions')->label('Permissões personalizadas')->options(CompanyPermission::options())->columns(2)->visible(fn (Get $get): bool => ! (bool) $get('use_role_defaults'))->columnSpanFull(),

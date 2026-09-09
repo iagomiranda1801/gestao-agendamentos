@@ -47,24 +47,24 @@ class ClientResource extends Resource
 
     public static function getModelLabel(): string
     {
-        return static::isDentalTenant() ? 'paciente' : 'cliente';
+        return static::isClinicalTenant() ? 'paciente' : 'cliente';
     }
 
     public static function getPluralModelLabel(): string
     {
-        return static::isDentalTenant() ? 'pacientes' : 'clientes';
+        return static::isClinicalTenant() ? 'pacientes' : 'clientes';
     }
 
     public static function getNavigationLabel(): string
     {
-        return static::isDentalTenant() ? 'Pacientes' : 'Clientes';
+        return static::isClinicalTenant() ? 'Pacientes' : 'Clientes';
     }
 
-    protected static function isDentalTenant(): bool
+    protected static function isClinicalTenant(): bool
     {
         $company = Filament::getTenant();
 
-        return $company instanceof Company && $company->isDentalClinic();
+        return $company instanceof Company && $company->usesClinicalChart();
     }
 
     public static function table(Table $table): Table

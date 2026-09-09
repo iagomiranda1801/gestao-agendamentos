@@ -30,9 +30,9 @@ class DentalClinicSettingsPage extends Page
 
     protected static ?string $slug = 'configuracoes-odontologicas';
 
-    protected static ?string $navigationLabel = 'Configurações odontológicas';
+    protected static ?string $navigationLabel = 'Configurações clínicas';
 
-    protected static ?string $title = 'Configurações odontológicas';
+    protected static ?string $title = 'Configurações clínicas';
 
     protected static string|UnitEnum|null $navigationGroup = 'Configurações';
 
@@ -49,7 +49,7 @@ class DentalClinicSettingsPage extends Page
     {
         $company = Filament::getTenant();
 
-        return static::tenantHasRequiredModule() && $company instanceof Company && $company->isDentalClinic()
+        return static::tenantHasRequiredModule() && $company instanceof Company && $company->usesClinicalChart()
             && app(CompanyPermissionService::class)->allows(auth()->user(), $company, CompanyPermission::ManagePermissions);
     }
 
@@ -68,7 +68,7 @@ class DentalClinicSettingsPage extends Page
     public function form(Schema $schema): Schema
     {
         return $schema->components([Section::make('Regras clínicas')->schema([
-            Select::make('professional_record_scope')->label('Acesso dos dentistas aos prontuários')->options(['all' => 'Todos os pacientes da clínica', 'related' => 'Somente pacientes relacionados ao dentista'])->required(),
+            Select::make('professional_record_scope')->label('Acesso dos profissionais aos prontuários')->options(['all' => 'Todos os pacientes da clínica', 'related' => 'Somente pacientes relacionados ao profissional'])->required(),
             Toggle::make('minor_guardian_required')->label('Exigir responsável para paciente menor de idade'),
             Toggle::make('clinical_entry_required_to_complete')->label('Exigir evolução finalizada antes de concluir atendimento'),
         ])]);
@@ -78,7 +78,7 @@ class DentalClinicSettingsPage extends Page
     {
         abort_unless(static::canAccess(), 403);
         app(DentalClinicSettingService::class)->update(Filament::getTenant(), $this->form->getState());
-        Notification::make()->success()->title('Configurações odontológicas salvas')->send();
+        Notification::make()->success()->title('Configurações clínicas salvas')->send();
     }
 
     /** @return array<Action> */
@@ -90,7 +90,7 @@ class DentalClinicSettingsPage extends Page
                 ->icon('heroicon-o-user-group')
                 ->requiresConfirmation()
                 ->modalHeading('Preparar cadastros existentes')
-                ->modalDescription('Cria somente os perfis odontológicos e números de prontuário que estiverem ausentes. Nenhum cliente, agenda, atendimento ou dado financeiro será alterado ou removido.')
+                ->modalDescription('Cria somente os perfis clínicos e números de prontuário que estiverem ausentes. Nenhum cliente, agenda, atendimento ou dado financeiro será alterado ou removido.')
                 ->action(function (): void {
                     /** @var Company $company */
                     $company = Filament::getTenant();

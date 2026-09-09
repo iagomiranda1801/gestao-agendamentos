@@ -15,6 +15,7 @@ use App\Models\Company;
 use App\Services\Clinical\ClinicalAuditService;
 use App\Services\Company\CompanyModuleService;
 use App\Services\Company\CompanyPermissionService;
+use App\Support\ClinicalAttachmentTypes;
 use App\Support\CompanyTerminology;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -34,12 +35,12 @@ class ViewPatientRecord extends ViewRecord
      */
     public static function canAccess(array $parameters = []): bool
     {
-        return parent::canAccess($parameters) && static::isDentalClinicTenant();
+        return parent::canAccess($parameters) && static::isClinicalTenant();
     }
 
     protected function authorizeAccess(): void
     {
-        abort_unless(static::getResource()::canView($this->getRecord()) && static::isDentalClinicTenant(), 403);
+        abort_unless(static::getResource()::canView($this->getRecord()) && static::isClinicalTenant(), 403);
     }
 
     public function mount(int|string $record): void
@@ -65,7 +66,7 @@ class ViewPatientRecord extends ViewRecord
             Action::make('new_anamnesis')->label('Nova anamnese')->url(fn (): string => AnamnesisResource::getUrl('create', ['client_id' => $this->record->getKey()]))->visible(fn (): bool => $this->canWriteClinical()),
             Action::make('new_entry')->label('Nova evolução')->url(fn (): string => ClinicalEntryResource::getUrl('create', ['client_id' => $this->record->getKey()]))->visible(fn (): bool => $this->canWriteClinical()),
             Action::make('new_plan')->label('Novo plano')->url(fn (): string => TreatmentPlanResource::getUrl('create', ['client_id' => $this->record->getKey()]))->visible(fn (): bool => $this->canManagePlans()),
-            Action::make('new_odontogram')->label('Novo odontograma')->url(fn (): string => OdontogramResource::getUrl('create', ['client_id' => $this->record->getKey()]))->visible(fn (): bool => $this->canWriteClinical()),
+            Action::make('new_odontogram')->label('Novo odontograma')->url(fn (): string => OdontogramResource::getUrl('create', ['client_id' => $this->record->getKey()]))->visible(fn (): bool => $this->canWriteClinical() && static::isDentalClinicTenant()),
             Action::make('new_document')->label('Anexar documento')->url(fn (): string => ClinicalAttachmentResource::getUrl('create', ['client_id' => $this->record->getKey()]))->visible(fn (): bool => $this->canWriteClinical()),
         ];
     }
@@ -78,11 +79,11 @@ class ViewPatientRecord extends ViewRecord
                 TextEntry::make('dentalProfile.social_name')
                     ->label('Nome social')
                     ->placeholder('—')
-                    ->visible(fn (): bool => static::isDentalClinicTenant()),
+                    ->visible(fn (): bool => static::isClinicalTenant()),
                 TextEntry::make('dentalProfile.record_number')
                     ->label('Prontuário')
                     ->placeholder('—')
-                    ->visible(fn (): bool => static::isDentalClinicTenant()),
+                    ->visible(fn (): bool => static::isClinicalTenant()),
                 TextEntry::make('birth_date')->label('Nascimento')->date('d/m/Y')->placeholder('—'),
                 TextEntry::make('phone')->label('Telefone'),
                 TextEntry::make('email')->label('E-mail')->placeholder('—'),
@@ -97,7 +98,7 @@ class ViewPatientRecord extends ViewRecord
             Section::make('Evoluções recentes')->schema([
                 RepeatableEntry::make('clinicalEntries')->label('')->schema([
                     TextEntry::make('occurred_at')->label('Data')->dateTime('d/m/Y H:i'),
-                    TextEntry::make('professional.name')->label('Dentista'),
+                    TextEntry::make('professional.name')->label(CompanyTerminology::professional()),
                     TextEntry::make('procedure_performed')->label('Procedimento')->placeholder('—'),
                     TextEntry::make('status')->label('Status')->badge()->formatStateUsing(fn (string $state): string => $state === 'finalized' ? 'Finalizada' : 'Rascunho'),
                 ])->columns(4),
@@ -115,11 +116,11 @@ class ViewPatientRecord extends ViewRecord
             Section::make('Planos de tratamento')->schema([
                 RepeatableEntry::make('treatmentPlans')->label('')->schema([
                     TextEntry::make('title')->label('Plano'),
-                    TextEntry::make('professional.name')->label('Dentista'),
+                    TextEntry::make('professional.name')->label(CompanyTerminology::professional()),
                     TextEntry::make('status')->label('Situação')->badge()->formatStateUsing(fn (string $state): string => static::treatmentStatusLabel($state)),
                     TextEntry::make('total_amount')->label('Total')->money('BRL', locale: 'pt_BR'),
                 ])->columns(4),
-            ])->visible(fn (): bool => $this->canManagePlans()),
+            ])->visible(fn (): bool => $this->canManagePlans() && static::isDentalClinicTenant()),
             Section::make('Documentos')->schema([
                 RepeatableEntry::make('clinicalAttachments')->label('')->schema([
                     TextEntry::make('title')->label('Documento'),
@@ -144,14 +145,14 @@ class ViewPatientRecord extends ViewRecord
 
     protected function canViewClinical(): bool
     {
-        return static::isDentalClinicTenant()
+        return static::isClinicalTenant()
             && $this->hasClinicalRecordsModule()
             && $this->allows(CompanyPermission::ViewClinicalRecords);
     }
 
     protected function canWriteClinical(): bool
     {
-        return static::isDentalClinicTenant()
+        return static::isClinicalTenant()
             && $this->hasClinicalRecordsModule()
             && $this->allows(CompanyPermission::WriteClinicalRecords);
     }
@@ -161,6 +162,13 @@ class ViewPatientRecord extends ViewRecord
         return static::isDentalClinicTenant()
             && $this->hasClinicalRecordsModule()
             && $this->allows(CompanyPermission::ManageTreatmentPlans);
+    }
+
+    protected static function isClinicalTenant(): bool
+    {
+        $company = Filament::getTenant();
+
+        return $company instanceof Company && $company->usesClinicalChart();
     }
 
     protected static function isDentalClinicTenant(): bool
@@ -234,14 +242,6 @@ class ViewPatientRecord extends ViewRecord
 
     protected static function attachmentTypeLabel(string $type): string
     {
-        return match ($type) {
-            'radiograph' => 'Radiografia',
-            'photo' => 'Fotografia',
-            'exam' => 'Exame',
-            'prescription' => 'Receita',
-            'certificate' => 'Atestado',
-            'consent' => 'Termo / consentimento',
-            default => 'Documento geral',
-        };
+        return ClinicalAttachmentTypes::label($type);
     }
 }

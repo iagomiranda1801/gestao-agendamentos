@@ -8,8 +8,10 @@ use App\Filament\App\Resources\TreatmentPlans\Pages\CreateTreatmentPlan;
 use App\Filament\App\Resources\TreatmentPlans\Pages\EditTreatmentPlan;
 use App\Filament\App\Resources\TreatmentPlans\Pages\ListTreatmentPlans;
 use App\Filament\App\Resources\TreatmentPlans\Schemas\TreatmentPlanForm;
+use App\Models\Company;
 use App\Models\DentalTreatmentPlan;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -40,6 +42,23 @@ class TreatmentPlanResource extends Resource
     protected static function requiredCompanyModule(): CompanyModule
     {
         return CompanyModule::ClinicalRecords;
+    }
+
+    public static function canViewAny(): bool
+    {
+        return parent::canViewAny() && static::isDentalTenant();
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return parent::shouldRegisterNavigation() && static::isDentalTenant();
+    }
+
+    protected static function isDentalTenant(): bool
+    {
+        $company = Filament::getTenant();
+
+        return $company instanceof Company && $company->isDentalClinic();
     }
 
     public static function form(Schema $schema): Schema

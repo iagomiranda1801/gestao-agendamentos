@@ -8,6 +8,7 @@ use App\Enums\CompanyRole;
 use App\Enums\PlatformInvoiceStatus;
 use App\Enums\SubscriptionStatus;
 use App\Filament\Admin\Resources\Companies\Pages\EditCompany;
+use App\Filament\Admin\Resources\PlatformInvoices\Pages\ListPlatformInvoices;
 use App\Filament\Admin\Resources\PlatformInvoices\Pages\ViewPlatformInvoice;
 use App\Filament\App\Pages\Dashboard;
 use App\Filament\App\Pages\SubscriptionExpiredPage;
@@ -206,6 +207,26 @@ class CompanySubscriptionServiceTest extends TestCase
             ->assertHasNoActionErrors();
 
         $this->assertSame(9900, $company->fresh()->quoted_price_cents);
+    }
+
+    public function test_issue_invoice_modal_shows_amount_field(): void
+    {
+        $admin = $this->createSuperAdmin();
+        $company = Company::factory()->create([
+            'enabled_modules' => [CompanyModule::Sales->value],
+            'billing_interval' => BillingInterval::Monthly,
+        ]);
+
+        $this->actingAs($admin);
+        Filament::setCurrentPanel('admin');
+
+        Livewire::test(EditCompany::class, ['record' => $company->getKey()])
+            ->mountAction('issueInvoice')
+            ->assertMountedActionModalSee('Valor da fatura');
+
+        Livewire::test(ListPlatformInvoices::class)
+            ->mountAction('issueInvoice')
+            ->assertMountedActionModalSee('Valor da fatura');
     }
 
     public function test_issue_invoice_refuses_second_outstanding_invoice(): void

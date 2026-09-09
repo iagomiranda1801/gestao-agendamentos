@@ -10,7 +10,7 @@ class CompanyTerminology
     public static function client(?Company $company = null, bool $plural = false, bool $capitalized = true): string
     {
         $company ??= Filament::getTenant();
-        $word = $company instanceof Company && $company->isDentalClinic()
+        $word = $company instanceof Company && $company->usesClinicalChart()
             ? ($plural ? 'pacientes' : 'paciente')
             : ($plural ? 'clientes' : 'cliente');
 
@@ -23,6 +23,7 @@ class CompanyTerminology
         $word = match (true) {
             $company instanceof Company && $company->isDentalClinic() => $plural ? 'dentistas' : 'dentista',
             $company instanceof Company && $company->isCarWash() => $plural ? 'lavadores' : 'lavador',
+            $company instanceof Company && $company->usesClinicalChart() => $plural ? 'profissionais clínicos' : 'profissional clínico',
             default => $plural ? 'profissionais' : 'profissional',
         };
 

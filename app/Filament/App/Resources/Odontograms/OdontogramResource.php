@@ -8,8 +8,10 @@ use App\Filament\App\Resources\Odontograms\Pages\CreateOdontogram;
 use App\Filament\App\Resources\Odontograms\Pages\EditOdontogram;
 use App\Filament\App\Resources\Odontograms\Pages\ListOdontograms;
 use App\Filament\App\Resources\Odontograms\Schemas\OdontogramForm;
+use App\Models\Company;
 use App\Models\DentalOdontogram;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -40,6 +42,23 @@ class OdontogramResource extends Resource
     protected static function requiredCompanyModule(): CompanyModule
     {
         return CompanyModule::ClinicalRecords;
+    }
+
+    public static function canViewAny(): bool
+    {
+        return parent::canViewAny() && static::isDentalTenant();
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return parent::shouldRegisterNavigation() && static::isDentalTenant();
+    }
+
+    protected static function isDentalTenant(): bool
+    {
+        $company = Filament::getTenant();
+
+        return $company instanceof Company && $company->isDentalClinic();
     }
 
     public static function form(Schema $schema): Schema
