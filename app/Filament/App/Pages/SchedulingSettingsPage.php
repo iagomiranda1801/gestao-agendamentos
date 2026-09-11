@@ -104,6 +104,7 @@ class SchedulingSettingsPage extends Page
             'privacy_notice' => $setting->privacy_notice,
             'booking_terms' => $setting->booking_terms,
             'whatsapp_notifications_enabled' => $setting->whatsapp_notifications_enabled,
+            'whatsapp_bot_enabled' => $setting->whatsapp_bot_enabled,
             'whatsapp_instance' => $setting->whatsapp_instance,
             'whatsapp_sender_phone' => $setting->whatsapp_sender_phone,
             'whatsapp_confirmation_template' => $setting->whatsapp_confirmation_template,
@@ -377,6 +378,19 @@ class SchedulingSettingsPage extends Page
                             ->columnSpanFull(),
                     ])
                     ->columns(2)
+                    ->visible(fn (): bool => (new CompanySchedulingSettingPolicy)->update(
+                        auth()->user(),
+                        app(CompanySchedulingSettingService::class)->getOrCreate(Filament::getTenant()),
+                    )),
+                Section::make('Bot de agendamento no WhatsApp')
+                    ->description('Quando ativado, o próprio WhatsApp responde ao cliente com um menu numerado e cria o agendamento pelo chat. Requer agendamento online habilitado e a conexão WhatsApp da empresa conectada.')
+                    ->schema([
+                        Toggle::make('whatsapp_bot_enabled')
+                            ->label('Atender agendamento pelo WhatsApp automaticamente')
+                            ->helperText('Ao receber uma mensagem do cliente, o bot conduz o agendamento (serviço, profissional, data, horário e confirmação) sem sair do WhatsApp.')
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(1)
                     ->visible(fn (): bool => (new CompanySchedulingSettingPolicy)->update(
                         auth()->user(),
                         app(CompanySchedulingSettingService::class)->getOrCreate(Filament::getTenant()),

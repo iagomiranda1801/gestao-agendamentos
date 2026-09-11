@@ -3,6 +3,7 @@
 namespace App\Services\WhatsApp;
 
 use App\Enums\WhatsAppCampaignRecipientStatus;
+use App\Jobs\HandleWhatsAppInboundMessageJob;
 use App\Models\EvolutionWebhookEvent;
 use App\Models\WhatsAppCampaignRecipient;
 use App\Services\WhatsApp\Campaigns\WhatsAppCampaignService;
@@ -30,8 +31,100 @@ class EvolutionWebhookService
         ]);
 
         $this->updateCampaignRecipient($event, $payload);
+        $this->maybeDispatchInboundBot($event, $payload);
 
         return $event->refresh();
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    protected function maybeDispatchInboundBot(EvolutionWebhookEvent $event, array $payload): void
+    {
+        if (! $this->isInboundUserMessage($payload)) {
+            return;
+        }
+
+        $remoteJid = (string) ($event->remote_jid ?? '');
+
+        if ($remoteJid === '' || str_ends_with($remoteJid, '@g.us')) {
+            return;
+        }
+
+        $instance = (string) ($event->instance ?? '');
+
+        if ($instance === '') {
+            return;
+        }
+
+        $phone = $this->extractPhone($remoteJid);
+
+        if ($phone === '') {
+            return;
+        }
+
+        $text = $this->extractText($payload);
+
+        HandleWhatsAppInboundMessageJob::dispatch(
+            instanceName: $instance,
+            remoteJid: $remoteJid,
+            phone: $phone,
+            text: $text,
+            messageId: (string) ($event->message_id ?? ''),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    protected function isInboundUserMessage(array $payload): bool
+    {
+        $event = strtolower((string) Arr::get($payload, 'event'));
+
+        if (! in_array($event, ['messages.upsert', 'messages-upsert'], true)) {
+            return false;
+        }
+
+        $fromMe = Arr::get($payload, 'data.key.fromMe')
+            ?? Arr::get($payload, 'data.0.key.fromMe')
+            ?? Arr::get($payload, 'key.fromMe');
+
+        return $fromMe === false || $fromMe === 0 || $fromMe === '0' || $fromMe === 'false';
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    protected function extractText(array $payload): string
+    {
+        $candidates = [
+            'data.message.conversation',
+            'data.0.message.conversation',
+            'data.message.extendedTextMessage.text',
+            'data.0.message.extendedTextMessage.text',
+            'data.message.buttonsResponseMessage.selectedDisplayText',
+            'data.message.listResponseMessage.title',
+            'data.text',
+            'message.conversation',
+            'message.extendedTextMessage.text',
+        ];
+
+        foreach ($candidates as $key) {
+            $value = Arr::get($payload, $key);
+
+            if (is_string($value) && $value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    protected function extractPhone(string $remoteJid): string
+    {
+        $digits = preg_replace('/\D+/', '', explode('@', $remoteJid)[0]) ?? '';
+
+        return (string) $digits;
     }
 
     /**
