@@ -26,4 +26,11 @@ class BotContext
     {
         return $this->data()[$key] ?? $default;
     }
+
+    public function intOrNull(string $key): ?int
+    {
+        $value = $this->get($key);
+
+        return is_numeric($value) ? (int) $value : null;
+    }
 }

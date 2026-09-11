@@ -14,6 +14,7 @@ class ChooseServiceStep implements BotStep
     public function __construct(
         protected OnlineBookingCatalogService $catalog,
         protected WhatsAppBookingBotMessageBuilder $messages,
+        protected ChooseProfessionalStep $professionals,
     ) {}
 
     public function prompt(BotContext $context): string
@@ -56,10 +57,8 @@ class ChooseServiceStep implements BotStep
         }
 
         $service = $services[$index];
+        $professionals = $this->catalog->getEligibleProfessionals($context->company, $service);
 
-        return BotAction::goTo(WhatsAppBotConversationState::ChoosingProfessional, [
-            'service_id' => (int) $service->getKey(),
-            'service_name' => (string) $service->name,
-        ]);
+        return $this->professionals->actionAfterService($context, $service, $professionals);
     }
 }

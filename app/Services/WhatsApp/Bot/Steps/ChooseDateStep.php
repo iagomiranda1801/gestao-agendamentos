@@ -79,8 +79,7 @@ class ChooseDateStep implements BotStep
             return [[], false];
         }
 
-        $professionalId = $context->get('professional_id');
-        $professionalId = is_int($professionalId) ? $professionalId : null;
+        $professionalId = $context->intOrNull('professional_id');
 
         $all = $this->catalog->getAvailableDates(
             $context->company,

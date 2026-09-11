@@ -50,13 +50,16 @@ class ConfirmStep implements BotStep
     protected function createAppointment(BotContext $context): BotAction
     {
         $serviceId = (int) ($context->get('service_id') ?? 0);
-        $professionalId = $context->get('professional_id');
-        $professionalId = is_int($professionalId) ? $professionalId : null;
+        $professionalId = $context->intOrNull('professional_id');
         $date = (string) $context->get('selected_date', '');
         $slot = (string) $context->get('selected_slot', '');
         $name = (string) $context->get('client_name', '');
         $email = $context->get('client_email');
         $email = is_string($email) && $email !== '' ? $email : null;
+        $phone = $context->get('client_phone');
+        $phone = is_string($phone) && $phone !== ''
+            ? $phone
+            : $context->conversation->phone_normalized;
 
         if ($serviceId <= 0 || $date === '' || $slot === '' || $name === '') {
             return BotAction::abandon(
@@ -84,7 +87,7 @@ class ConfirmStep implements BotStep
             professionalId: $professionalId,
             localStart: $localStart,
             clientName: $name,
-            clientPhone: $context->conversation->phone_normalized,
+            clientPhone: $phone,
             clientEmail: $email,
             notes: null,
             idempotencyUuid: $this->idempotencyUuid($context),

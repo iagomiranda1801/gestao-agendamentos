@@ -3,12 +3,14 @@
 namespace App\Services\WhatsApp\Bot\Steps;
 
 use App\Enums\WhatsAppBotConversationState;
+use App\Models\Professional;
 use App\Models\Service;
 use App\Services\PublicBooking\OnlineBookingCatalogService;
 use App\Services\WhatsApp\Bot\BotAction;
 use App\Services\WhatsApp\Bot\BotContext;
 use App\Services\WhatsApp\Bot\BotStep;
 use App\Services\WhatsApp\Bot\WhatsAppBookingBotMessageBuilder;
+use Illuminate\Support\Collection;
 
 class ChooseProfessionalStep implements BotStep
 {
@@ -33,7 +35,9 @@ class ChooseProfessionalStep implements BotStep
         }
 
         if (! (bool) $context->settings->allow_professional_selection) {
-            return "Vamos alocar um profissional disponível. Digite *1* para continuar.";
+            $professional = $professionals->first();
+
+            return "Vou agendar com *{$professional->name}*. Digite *1* para continuar.";
         }
 
         return $this->messages->professionalMenu($professionals, $allowNoPreference);
@@ -60,10 +64,7 @@ class ChooseProfessionalStep implements BotStep
                 return BotAction::stay($this->messages->invalidOption());
             }
 
-            return BotAction::goTo(WhatsAppBotConversationState::ChoosingDate, [
-                'professional_id' => null,
-                'professional_name' => 'Sem preferência',
-            ]);
+            return $this->goToDateWithProfessional($professionals->first());
         }
 
         if ($trimmed === '0' && $allowNoPreference) {
@@ -83,8 +84,35 @@ class ChooseProfessionalStep implements BotStep
             return BotAction::stay($this->messages->invalidOption());
         }
 
-        $professional = $professionals[$index];
+        return $this->goToDateWithProfessional($professionals[$index]);
+    }
 
+    /**
+     * Depois do serviço: se a empresa não deixa escolher profissional, já avança com um nome.
+     *
+     * @param  Collection<int, Professional>  $professionals
+     */
+    public function actionAfterService(BotContext $context, Service $service, Collection $professionals): BotAction
+    {
+        $base = [
+            'service_id' => (int) $service->getKey(),
+            'service_name' => (string) $service->name,
+        ];
+
+        if ($professionals->isNotEmpty() && ! (bool) $context->settings->allow_professional_selection) {
+            $professional = $professionals->first();
+
+            return BotAction::goTo(WhatsAppBotConversationState::ChoosingDate, array_replace($base, [
+                'professional_id' => (int) $professional->getKey(),
+                'professional_name' => (string) $professional->name,
+            ]));
+        }
+
+        return BotAction::goTo(WhatsAppBotConversationState::ChoosingProfessional, $base);
+    }
+
+    protected function goToDateWithProfessional(Professional $professional): BotAction
+    {
         return BotAction::goTo(WhatsAppBotConversationState::ChoosingDate, [
             'professional_id' => (int) $professional->getKey(),
             'professional_name' => (string) $professional->name,

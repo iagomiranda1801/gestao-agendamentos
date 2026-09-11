@@ -6,6 +6,7 @@ use App\Enums\WhatsAppBotConversationState;
 use App\Models\Service;
 use App\Services\PublicBooking\OnlineBookingCatalogService;
 use App\Services\WhatsApp\Bot\BotAction;
+use App\Services\WhatsApp\Bot\BotClientLookup;
 use App\Services\WhatsApp\Bot\BotContext;
 use App\Services\WhatsApp\Bot\BotStep;
 use App\Services\WhatsApp\Bot\WhatsAppBookingBotMessageBuilder;
@@ -18,6 +19,7 @@ class ChooseTimeStep implements BotStep
     public function __construct(
         protected OnlineBookingCatalogService $catalog,
         protected WhatsAppBookingBotMessageBuilder $messages,
+        protected BotClientLookup $clients,
     ) {}
 
     public function prompt(BotContext $context): string
@@ -69,10 +71,24 @@ class ChooseTimeStep implements BotStep
             return BotAction::stay($this->messages->invalidOption());
         }
 
-        return BotAction::goTo(WhatsAppBotConversationState::CollectingName, [
+        $slot = [
             'selected_slot' => $slots[$index]['value'],
             'selected_slot_label' => $slots[$index]['label'],
-        ]);
+        ];
+
+        $client = $this->clients->find($context);
+
+        if ($client !== null && filled($client->name)) {
+            return $this->clients->advanceAfterIdentity(
+                $context,
+                (string) $client->name,
+                filled($client->email) ? (string) $client->email : null,
+                $client,
+                $slot,
+            );
+        }
+
+        return BotAction::goTo(WhatsAppBotConversationState::CollectingName, $slot);
     }
 
     /**
@@ -97,8 +113,7 @@ class ChooseTimeStep implements BotStep
             return [[], false];
         }
 
-        $professionalId = $context->get('professional_id');
-        $professionalId = is_int($professionalId) ? $professionalId : null;
+        $professionalId = $context->intOrNull('professional_id');
 
         $all = $this->catalog->getAvailableSlots(
             $context->company,

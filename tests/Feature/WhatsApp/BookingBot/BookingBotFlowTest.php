@@ -7,6 +7,7 @@ use App\Enums\AppointmentStatus;
 use App\Enums\CompanyModule;
 use App\Enums\WhatsAppBotConversationState;
 use App\Models\Appointment;
+use App\Models\Client;
 use App\Models\Company;
 use App\Models\CompanyWhatsAppInstance;
 use App\Models\WhatsAppBotConversation;
@@ -141,6 +142,63 @@ class BookingBotFlowTest extends TestCase
         $this->assertSame('handoff', $conversation->finished_reason);
     }
 
+    public function test_auto_assigns_professional_when_selection_is_disabled(): void
+    {
+        $setup = $this->createBookableSetup();
+        $company = $setup['company'];
+        $this->enableBot($company, [
+            'allow_professional_selection' => false,
+            'allow_no_professional_preference' => false,
+        ]);
+
+        $bot = app(WhatsAppBookingBotService::class);
+        $phone = '5511977776300';
+        $jid = "{$phone}@s.whatsapp.net";
+
+        $bot->handleIncoming($company, null, $jid, $phone, 'oi', 'p-1');
+        $dates = $bot->handleIncoming($company, null, $jid, $phone, '1', 'p-2');
+        $this->assertStringContainsString('serviço', (string) $dates);
+
+        $afterService = $bot->handleIncoming($company, null, $jid, $phone, '1', 'p-3');
+        $this->assertStringContainsString('data', (string) $afterService);
+        $this->assertStringNotContainsString('Selecione um profissional', (string) $afterService);
+
+        $conversation = WhatsAppBotConversation::query()
+            ->where('company_id', $company->getKey())
+            ->where('phone_normalized', $phone)
+            ->firstOrFail();
+
+        $this->assertSame(WhatsAppBotConversationState::ChoosingDate, $conversation->state);
+        $this->assertSame($setup['professional']->getKey(), (int) ($conversation->data['professional_id'] ?? 0));
+    }
+
+    public function test_reuses_existing_client_by_whatsapp_phone(): void
+    {
+        $setup = $this->createBookableSetup();
+        $company = $setup['company'];
+        $this->enableBot($company);
+
+        Client::factory()->forCompany($company)->active()->create([
+            'name' => 'Maria Silva',
+            'phone' => '(11) 97777-6200',
+            'email' => 'maria@example.com',
+        ]);
+
+        $bot = app(WhatsAppBookingBotService::class);
+        $phone = '5511977776200';
+        $jid = "{$phone}@s.whatsapp.net";
+
+        $bot->handleIncoming($company, null, $jid, $phone, 'oi', 'c-1');
+        $bot->handleIncoming($company, null, $jid, $phone, '1', 'c-2');
+        $bot->handleIncoming($company, null, $jid, $phone, '1', 'c-3');
+        $bot->handleIncoming($company, null, $jid, $phone, '1', 'c-4');
+        $bot->handleIncoming($company, null, $jid, $phone, '1', 'c-5');
+        $reply = $bot->handleIncoming($company, null, $jid, $phone, '1', 'c-6');
+
+        $this->assertStringContainsString('Maria Silva', (string) $reply);
+        $this->assertStringContainsString('Confirme', (string) $reply);
+    }
+
     public function test_invalid_option_keeps_state_and_prompts_again(): void
     {
         $setup = $this->createBookableSetup();
@@ -164,7 +222,10 @@ class BookingBotFlowTest extends TestCase
         $this->assertSame(WhatsAppBotConversationState::Greeting, $conversation->state);
     }
 
-    protected function enableBot(Company $company): void
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    protected function enableBot(Company $company, array $overrides = []): void
     {
         $company->update([
             'enabled_modules' => [
@@ -172,7 +233,9 @@ class BookingBotFlowTest extends TestCase
                 CompanyModule::WhatsApp->value,
             ],
         ]);
-        $this->enablePublicBooking($company, ['whatsapp_bot_enabled' => true]);
+        $this->enablePublicBooking($company, array_merge([
+            'whatsapp_bot_enabled' => true,
+        ], $overrides));
     }
 
     protected function createInstance(Company $company): CompanyWhatsAppInstance
