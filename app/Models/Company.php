@@ -117,6 +117,11 @@ class Company extends Model
         return $this->business_profile === CompanyProfile::CarWash;
     }
 
+    public function isRestaurant(): bool
+    {
+        return $this->business_profile === CompanyProfile::Restaurant;
+    }
+
     public function hasActiveAdmin(): bool
     {
         return $this->users()
@@ -222,6 +227,22 @@ class Company extends Model
     public function schedulingSetting(): HasOne
     {
         return $this->hasOne(CompanySchedulingSetting::class);
+    }
+
+    /**
+     * @return HasOne<CompanyOrderSetting, $this>
+     */
+    public function orderSetting(): HasOne
+    {
+        return $this->hasOne(CompanyOrderSetting::class);
+    }
+
+    /**
+     * @return HasMany<Order, $this>
+     */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
     }
 
     public function dentalClinicSetting(): HasOne

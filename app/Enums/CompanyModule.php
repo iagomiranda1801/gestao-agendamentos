@@ -11,6 +11,7 @@ enum CompanyModule: string
     case Sales = 'sales';
     case WhatsApp = 'whatsapp';
     case Marketing = 'marketing';
+    case Orders = 'orders';
 
     public function label(): string
     {
@@ -22,6 +23,7 @@ enum CompanyModule: string
             self::Sales => 'Vendas/PDV',
             self::WhatsApp => 'WhatsApp operacional',
             self::Marketing => 'Marketing',
+            self::Orders => 'Pedidos',
         };
     }
 
@@ -35,6 +37,7 @@ enum CompanyModule: string
             self::Sales => 'Venda rápida, PDV, carrinho de produtos e checkout.',
             self::WhatsApp => 'Conexão do WhatsApp e mensagens operacionais de agendamento.',
             self::Marketing => 'Campanhas, automações de reconquista, listas e comunicação promocional com clientes.',
+            self::Orders => 'Cardápio online, pedidos para retirada ou entrega e tela da cozinha.',
         };
     }
 

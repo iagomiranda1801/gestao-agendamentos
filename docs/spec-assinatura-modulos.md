@@ -45,14 +45,15 @@ Mensal sugerido; semestral = ×5; anual = ×10. Persistidos em **centavos**.
 | Prontuário clínico | 49 | 245 | 490 |
 | WhatsApp operacional | 19 | 95 | 190 |
 | Marketing | 39 | 195 | 390 |
+| Pedidos | 49 | 245 | 490 |
 
 Exemplos:
 
 - Só PDV mensal → **R$ 39**
 - Só Financeiro anual → **R$ 390**
 - Agenda + WhatsApp mensal → **R$ 68**
-- Completo (todos) mensal → **R$ 259**
-- Completo anual → **R$ 2.590**
+- Completo (todos) mensal → **R$ 308**
+- Completo anual → **R$ 3.080**
 
 Se o WhatsApp “vier junto” com a Agenda, zere o preço do WhatsApp no admin.
 

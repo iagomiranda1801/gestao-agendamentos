@@ -22,6 +22,7 @@ class ModulePriceSeeder extends Seeder
         CompanyModule::ClinicalRecords->value => 4900,
         CompanyModule::WhatsApp->value => 1900,
         CompanyModule::Marketing->value => 3900,
+        CompanyModule::Orders->value => 4900,
     ];
 
     public function run(): void

@@ -15,6 +15,9 @@ enum CompanyPermission: string
     case ViewTreatmentPrices = 'view_treatment_prices';
     case ViewFinancial = 'view_financial';
     case ManagePermissions = 'manage_permissions';
+    case ViewOrders = 'view_orders';
+    case ManageOrders = 'manage_orders';
+    case KitchenOrders = 'kitchen_orders';
 
     /** @return list<self> */
     public static function defaultsForRole(CompanyRole $role): array
@@ -32,6 +35,9 @@ enum CompanyPermission: string
                 self::ViewTreatmentPrices,
                 self::ViewFinancial,
                 self::ManagePermissions,
+                self::ViewOrders,
+                self::ManageOrders,
+                self::KitchenOrders,
             ],
             CompanyRole::Manager => [
                 self::ManagePatients,
@@ -39,11 +45,16 @@ enum CompanyPermission: string
                 self::ManageTreatmentPlans,
                 self::ViewTreatmentPrices,
                 self::ViewFinancial,
+                self::ViewOrders,
+                self::ManageOrders,
+                self::KitchenOrders,
             ],
             CompanyRole::Receptionist => [
                 self::ManagePatients,
                 self::ManageAppointments,
                 self::ViewTreatmentPrices,
+                self::ViewOrders,
+                self::KitchenOrders,
             ],
             CompanyRole::Dentist => [
                 self::ManagePatients,
@@ -55,7 +66,9 @@ enum CompanyPermission: string
                 self::AddClinicalAddenda,
                 self::ManageTreatmentPlans,
             ],
-            CompanyRole::Employee => [],
+            CompanyRole::Employee => [
+                self::KitchenOrders,
+            ],
         };
     }
 
@@ -74,6 +87,9 @@ enum CompanyPermission: string
             self::ViewTreatmentPrices->value => 'Ver valores de tratamentos',
             self::ViewFinancial->value => 'Ver financeiro',
             self::ManagePermissions->value => 'Gerenciar permissões',
+            self::ViewOrders->value => 'Ver pedidos',
+            self::ManageOrders->value => 'Gerenciar pedidos',
+            self::KitchenOrders->value => 'Cozinha / comanda',
         ];
     }
 }
