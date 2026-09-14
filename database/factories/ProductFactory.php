@@ -6,6 +6,8 @@ use App\Enums\ProductType;
 use App\Models\Company;
 use App\Models\MeasurementUnit;
 use App\Models\Product;
+use App\Services\Orders\MenuCategoryService;
+use App\Services\Product\ProductVariantService;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -35,6 +37,7 @@ class ProductFactory extends Factory
             'is_sellable' => false,
             'available_for_online_order' => false,
             'online_order_category' => null,
+            'menu_category_id' => null,
             'prep_time_minutes' => null,
             'notes' => fake()->optional()->sentence(),
             'is_active' => true,
@@ -99,6 +102,40 @@ class ProductFactory extends Factory
             'online_order_category' => $category,
             'prep_time_minutes' => 15,
             'tracks_stock' => false,
-        ]);
+        ])->afterCreating(function (Product $product) use ($category): void {
+            if ($category === null || trim($category) === '') {
+                return;
+            }
+
+            $company = $product->company ?? Company::query()->find($product->company_id);
+
+            if ($company === null) {
+                return;
+            }
+
+            $menuCategory = app(MenuCategoryService::class)->findOrCreate($company, $category);
+
+            $product->forceFill([
+                'menu_category_id' => $menuCategory->getKey(),
+                'online_order_category' => $menuCategory->name,
+            ])->saveQuietly();
+        });
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $variants
+     */
+    public function withVariants(array $variants = []): static
+    {
+        return $this->afterCreating(function (Product $product) use ($variants): void {
+            if ($variants === []) {
+                $variants = [
+                    ['name' => 'Média', 'price' => 28, 'is_default' => true, 'is_active' => true],
+                    ['name' => 'Grande', 'price' => 32, 'is_default' => false, 'is_active' => true],
+                ];
+            }
+
+            app(ProductVariantService::class)->sync($product, $variants);
+        });
     }
 }

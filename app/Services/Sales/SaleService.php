@@ -165,7 +165,8 @@ class SaleService
 
             if ($type === SaleItemType::Product) {
                 $product = $this->resolveProductItem($company, $item, $index);
-                $name = $product->name;
+                $providedName = trim((string) ($item['name'] ?? ''));
+                $name = $providedName !== '' ? $providedName : $product->name;
                 $unitCost = $product->getCurrentUnitCost();
                 $tracksStock = (bool) $product->tracks_stock;
             }

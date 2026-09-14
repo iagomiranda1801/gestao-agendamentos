@@ -4,6 +4,7 @@ namespace App\Filament\App\Resources\Products\Schemas;
 
 use App\Enums\CompanyModule;
 use App\Enums\ProductType;
+use App\Filament\App\Resources\OnlineMenus\Schemas\OnlineMenuFields;
 use App\Models\Company;
 use App\Models\MeasurementUnit;
 use App\Services\Company\CompanyModuleService;
@@ -107,15 +108,14 @@ class ProductForm
                         Toggle::make('available_for_online_order')
                             ->label('Disponível no cardápio online')
                             ->default(false),
-                        TextInput::make('online_order_category')
-                            ->label('Categoria no cardápio')
-                            ->maxLength(80)
-                            ->placeholder('Lanches, Bebidas, Sobremesas…'),
+                        OnlineMenuFields::categorySelect()
+                            ->label('Categoria no cardápio'),
                         TextInput::make('prep_time_minutes')
                             ->label('Tempo de preparo (min)')
                             ->numeric()
                             ->minValue(0)
                             ->maxValue(240),
+                        OnlineMenuFields::variantsRepeater(),
                     ])
                     ->columns(2),
                 Section::make('Informações adicionais')

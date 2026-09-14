@@ -11,6 +11,7 @@ use App\Models\Company;
 use App\Models\User;
 use App\Services\Clinical\DentalClinicSettingService;
 use App\Services\Orders\CompanyOrderSettingService;
+use App\Services\Orders\MenuCategoryService;
 use App\Services\Scheduling\CompanyBusinessHoursService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\Automations\WhatsAppAutomationService;
@@ -123,6 +124,7 @@ class CompanyProvisioningService
 
             if ($modules->contains(CompanyModule::Orders)) {
                 $this->orderSettingService->getOrCreate($company);
+                app(MenuCategoryService::class)->ensureDefaults($company);
             }
 
             return [

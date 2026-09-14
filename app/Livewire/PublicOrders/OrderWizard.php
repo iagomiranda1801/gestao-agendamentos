@@ -6,6 +6,7 @@ use App\Enums\OrderFulfillment;
 use App\Models\Company;
 use App\Models\CompanyBusinessHour;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Services\Orders\CompanyOrderSettingService;
 use App\Services\Orders\OrderCatalogService;
 use App\Services\Orders\OrderService;
@@ -42,8 +43,11 @@ class OrderWizard extends Component
 
     public string $website_url = '';
 
-    /** @var array<int, array{product_id: int, quantity: int, notes: string}> */
+    /** @var array<string, array{product_id: int, variant_id: int|null, quantity: int, notes: string}> */
     public array $cart = [];
+
+    /** @var array<int|string, int|string|null> */
+    public array $selectedVariant = [];
 
     public string $fulfillment = '';
 
@@ -80,6 +84,7 @@ class OrderWizard extends Component
         $this->company = $company->load(['orderSetting', 'businessHours']);
         $this->idempotencyUuid = (string) Str::uuid();
         $this->formStartedAt = time();
+        $this->hydrateSelectedVariants();
     }
 
     /**
@@ -98,10 +103,11 @@ class OrderWizard extends Component
         ];
     }
 
-    public function addToCart(int $productId): void
+    public function addToCart(int $productId, ?int $variantId = null): void
     {
         $this->errorMessage = null;
-        $product = app(OrderCatalogService::class)->findAvailable($this->company, $productId);
+        $catalog = app(OrderCatalogService::class);
+        $product = $catalog->findAvailable($this->company, $productId);
 
         if ($product === null) {
             $this->errorMessage = 'Item indisponível.';
@@ -109,46 +115,79 @@ class OrderWizard extends Component
             return;
         }
 
-        if (isset($this->cart[$productId])) {
-            $this->cart[$productId]['quantity'] = min(99, $this->cart[$productId]['quantity'] + 1);
+        $variant = null;
+
+        if ($product->hasActiveVariants()) {
+            $resolvedId = $variantId ?? (int) ($this->selectedVariant[$productId] ?? 0);
+
+            if ($resolvedId < 1) {
+                $resolvedId = (int) ($catalog->defaultVariant($product)?->getKey() ?? 0);
+            }
+
+            if ($resolvedId < 1) {
+                $this->errorMessage = 'Escolha o tamanho.';
+
+                return;
+            }
+
+            $variant = $catalog->findActiveVariant($product, $resolvedId);
+
+            if ($variant === null) {
+                $this->errorMessage = 'Tamanho inválido.';
+
+                return;
+            }
+
+            $this->selectedVariant[$productId] = (int) $variant->getKey();
+        }
+
+        $cartKey = $this->cartKey($productId, $variant !== null ? (int) $variant->getKey() : null);
+
+        if (isset($this->cart[$cartKey])) {
+            $this->cart[$cartKey]['quantity'] = min(99, $this->cart[$cartKey]['quantity'] + 1);
 
             return;
         }
 
-        $this->cart[$productId] = [
+        $this->cart[$cartKey] = [
             'product_id' => $productId,
+            'variant_id' => $variant !== null ? (int) $variant->getKey() : null,
             'quantity' => 1,
             'notes' => '',
         ];
     }
 
-    public function incrementItem(int $productId): void
+    public function incrementItem(int|string $key): void
     {
-        if (! isset($this->cart[$productId])) {
-            $this->addToCart($productId);
+        $cartKey = $this->resolveCartKey($key);
+
+        if (! isset($this->cart[$cartKey])) {
+            $this->addToCartFromKey($key);
 
             return;
         }
 
-        $this->cart[$productId]['quantity'] = min(99, $this->cart[$productId]['quantity'] + 1);
+        $this->cart[$cartKey]['quantity'] = min(99, $this->cart[$cartKey]['quantity'] + 1);
     }
 
-    public function decrementItem(int $productId): void
+    public function decrementItem(int|string $key): void
     {
-        if (! isset($this->cart[$productId])) {
+        $cartKey = $this->resolveCartKey($key);
+
+        if (! isset($this->cart[$cartKey])) {
             return;
         }
 
-        $this->cart[$productId]['quantity']--;
+        $this->cart[$cartKey]['quantity']--;
 
-        if ($this->cart[$productId]['quantity'] < 1) {
-            unset($this->cart[$productId]);
+        if ($this->cart[$cartKey]['quantity'] < 1) {
+            unset($this->cart[$cartKey]);
         }
     }
 
-    public function removeItem(int $productId): void
+    public function removeItem(int|string $key): void
     {
-        unset($this->cart[$productId]);
+        unset($this->cart[$this->resolveCartKey($key)]);
     }
 
     public function goToFulfillment(): void
@@ -221,7 +260,15 @@ class OrderWizard extends Component
             $this->validate($this->customerRules());
 
             $order = app(OrderService::class)->createPublic($this->company, [
-                'items' => array_values($this->cart),
+                'items' => collect($this->cart)
+                    ->map(fn (array $row): array => [
+                        'product_id' => (int) $row['product_id'],
+                        'variant_id' => ((int) ($row['variant_id'] ?? 0)) > 0 ? (int) $row['variant_id'] : null,
+                        'quantity' => (int) $row['quantity'],
+                        'notes' => $row['notes'] ?? null,
+                    ])
+                    ->values()
+                    ->all(),
                 'fulfillment' => $this->fulfillment,
                 'customer_name' => $this->customerName,
                 'customer_phone' => $this->customerPhone,
@@ -307,7 +354,8 @@ class OrderWizard extends Component
                 continue;
             }
 
-            $total += $catalog->unitPriceCents($product) * (int) $item['quantity'];
+            $variant = $this->resolveCartVariant($catalog, $product, $item);
+            $total += $catalog->unitPriceCents($product, $variant) * (int) $item['quantity'];
         }
 
         return $total;
@@ -335,7 +383,7 @@ class OrderWizard extends Component
     }
 
     /**
-     * @return Collection<int, array{product: Product, quantity: int, notes: string, line_total_cents: int}>
+     * @return Collection<int, array{product: Product, variant: ProductVariant|null, label: string, quantity: int, notes: string, line_total_cents: int}>
      */
     public function cartLines(): Collection
     {
@@ -349,11 +397,15 @@ class OrderWizard extends Component
                     return null;
                 }
 
+                $variant = $this->resolveCartVariant($catalog, $product, $item);
+
                 return [
                     'product' => $product,
+                    'variant' => $variant,
+                    'label' => $catalog->snapshotName($product, $variant),
                     'quantity' => (int) $item['quantity'],
                     'notes' => (string) ($item['notes'] ?? ''),
-                    'line_total_cents' => $catalog->unitPriceCents($product) * (int) $item['quantity'],
+                    'line_total_cents' => $catalog->unitPriceCents($product, $variant) * (int) $item['quantity'],
                 ];
             })
             ->filter()
@@ -377,6 +429,80 @@ class OrderWizard extends Component
             })
             ->values()
             ->all();
+    }
+
+    protected function hydrateSelectedVariants(): void
+    {
+        $catalog = app(OrderCatalogService::class);
+        $grouped = $catalog->groupedByCategory($this->company);
+
+        foreach ($grouped as $products) {
+            foreach ($products as $product) {
+                if (! $product->hasActiveVariants()) {
+                    continue;
+                }
+
+                if (! empty($this->selectedVariant[$product->id])) {
+                    continue;
+                }
+
+                $default = $catalog->defaultVariant($product);
+                $this->selectedVariant[$product->id] = $default !== null ? (int) $default->getKey() : null;
+            }
+        }
+    }
+
+    protected function cartKey(int $productId, ?int $variantId): string
+    {
+        return $productId.':'.((int) $variantId);
+    }
+
+    protected function resolveCartKey(int|string $key): string
+    {
+        if (is_string($key) && str_contains($key, ':')) {
+            return $key;
+        }
+
+        $productId = (int) $key;
+        $zero = $this->cartKey($productId, null);
+
+        if (isset($this->cart[$zero])) {
+            return $zero;
+        }
+
+        foreach (array_keys($this->cart) as $candidate) {
+            if (str_starts_with((string) $candidate, $productId.':')) {
+                return (string) $candidate;
+            }
+        }
+
+        return $zero;
+    }
+
+    protected function addToCartFromKey(int|string $key): void
+    {
+        if (is_string($key) && str_contains($key, ':')) {
+            [$productId, $variantId] = array_map('intval', explode(':', $key, 2));
+            $this->addToCart($productId, $variantId > 0 ? $variantId : null);
+
+            return;
+        }
+
+        $this->addToCart((int) $key);
+    }
+
+    /**
+     * @param  array{product_id?: mixed, variant_id?: mixed}  $item
+     */
+    protected function resolveCartVariant(OrderCatalogService $catalog, Product $product, array $item): ?ProductVariant
+    {
+        $variantId = (int) ($item['variant_id'] ?? 0);
+
+        if ($variantId < 1) {
+            return null;
+        }
+
+        return $catalog->findActiveVariant($product, $variantId);
     }
 
     public function render(OrderCatalogService $catalog, CompanyOrderSettingService $settings)

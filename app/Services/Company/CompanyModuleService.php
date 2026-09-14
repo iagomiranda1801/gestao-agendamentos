@@ -6,6 +6,7 @@ use App\Enums\CompanyModule;
 use App\Enums\CompanyProfile;
 use App\Enums\SubscriptionStatus;
 use App\Models\Company;
+use App\Services\Orders\MenuCategoryService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Validation\ValidationException;
@@ -90,6 +91,10 @@ class CompanyModuleService
                 ->map(fn (CompanyModule $module) => $module->value)
                 ->all(),
         ])->save();
+
+        if ($normalized->contains(CompanyModule::Orders)) {
+            app(MenuCategoryService::class)->ensureDefaults($company);
+        }
     }
 
     public function isTrialActive(Company $company, ?CarbonInterface $now = null): bool

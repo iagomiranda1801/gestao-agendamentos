@@ -6,6 +6,7 @@ use App\Enums\CompanyModule;
 use App\Enums\CompanyRole;
 use App\Filament\App\Pages\KitchenDisplayPage;
 use App\Filament\App\Pages\OrderSettingsPage;
+use App\Filament\App\Resources\MenuCategories\MenuCategoryResource;
 use App\Filament\App\Resources\OnlineMenus\OnlineMenuResource;
 use App\Filament\App\Resources\Orders\OrderResource;
 use Filament\Facades\Filament;
@@ -29,6 +30,7 @@ class OrderModuleGatingTest extends TestCase
         $this->assertFalse(OrderResource::canViewAny());
         $this->assertFalse(OrderResource::shouldRegisterNavigation());
         $this->assertFalse(OnlineMenuResource::canViewAny());
+        $this->assertFalse(MenuCategoryResource::canViewAny());
         $this->assertFalse(KitchenDisplayPage::canAccess());
         $this->assertFalse(OrderSettingsPage::canAccess());
     }
@@ -44,6 +46,7 @@ class OrderModuleGatingTest extends TestCase
         $this->assertTrue(OrderResource::canViewAny());
         $this->assertTrue(OrderResource::shouldRegisterNavigation());
         $this->assertTrue(OnlineMenuResource::canViewAny());
+        $this->assertTrue(MenuCategoryResource::canViewAny());
         $this->assertTrue(KitchenDisplayPage::canAccess());
         $this->assertTrue(OrderSettingsPage::canAccess());
     }
@@ -59,6 +62,7 @@ class OrderModuleGatingTest extends TestCase
         $this->assertTrue(KitchenDisplayPage::canAccess());
         $this->assertFalse(OrderSettingsPage::canAccess());
         $this->assertFalse(OrderResource::canViewAny());
+        $this->assertFalse(MenuCategoryResource::canViewAny());
         $this->assertFalse(OrderResource::shouldRegisterNavigation());
     }
 

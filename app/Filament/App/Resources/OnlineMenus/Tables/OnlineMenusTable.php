@@ -23,7 +23,7 @@ class OnlineMenusTable
                     ->label('Nome')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('online_order_category')
+                TextColumn::make('menuCategory.name')
                     ->label('Categoria')
                     ->placeholder('Cardápio')
                     ->sortable(),

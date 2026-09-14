@@ -20,15 +20,13 @@ class OnlineMenuForm
                     ->maxLength(255),
                 TextInput::make('sale_price')
                     ->label('Preço')
+                    ->helperText('Usado quando o item não tem tamanhos. Com tamanhos, o pedido usa o preço de cada tamanho.')
                     ->numeric()
                     ->prefix('R$')
                     ->step(0.01)
                     ->minValue(0.01)
                     ->required(),
-                TextInput::make('online_order_category')
-                    ->label('Categoria')
-                    ->maxLength(80)
-                    ->placeholder('Lanches, Bebidas, Sobremesas…'),
+                OnlineMenuFields::categorySelect(),
                 TextInput::make('prep_time_minutes')
                     ->label('Tempo de preparo (min)')
                     ->numeric()
@@ -44,6 +42,7 @@ class OnlineMenuForm
                     ->label('Descrição')
                     ->rows(3)
                     ->columnSpanFull(),
+                OnlineMenuFields::variantsRepeater(),
             ])->columns(2),
         ]);
     }

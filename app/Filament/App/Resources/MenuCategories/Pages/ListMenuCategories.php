@@ -1,17 +1,17 @@
 <?php
 
-namespace App\Filament\App\Resources\OnlineMenus\Pages;
+namespace App\Filament\App\Resources\MenuCategories\Pages;
 
 use App\Filament\App\Concerns\SeedsMenuCategoryDefaults;
-use App\Filament\App\Resources\OnlineMenus\OnlineMenuResource;
+use App\Filament\App\Resources\MenuCategories\MenuCategoryResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
-class ListOnlineMenuItems extends ListRecords
+class ListMenuCategories extends ListRecords
 {
     use SeedsMenuCategoryDefaults;
 
-    protected static string $resource = OnlineMenuResource::class;
+    protected static string $resource = MenuCategoryResource::class;
 
     public function mount(): void
     {
@@ -23,7 +23,7 @@ class ListOnlineMenuItems extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()->label('Novo item'),
+            CreateAction::make()->label('Nova categoria'),
         ];
     }
 }

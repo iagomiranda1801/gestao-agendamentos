@@ -40,7 +40,7 @@ class OrderService
 
     /**
      * @param  array{
-     *     items: list<array{product_id: int, quantity: int, notes?: string|null}>,
+     *     items: list<array{product_id: int, variant_id?: int|null, quantity: int, notes?: string|null}>,
      *     fulfillment: OrderFulfillment|string,
      *     customer_name: string,
      *     customer_phone: string,
@@ -259,8 +259,8 @@ class OrderService
     }
 
     /**
-     * @param  list<array{product_id?: mixed, quantity?: mixed, notes?: mixed}>  $rawItems
-     * @return list<array{product_id: int, name: string, unit_price_cents: int, quantity: int, line_total_cents: int, notes: string|null}>
+     * @param  list<array{product_id?: mixed, variant_id?: mixed, quantity?: mixed, notes?: mixed}>  $rawItems
+     * @return list<array{product_id: int, product_variant_id: int|null, name: string, variant_name: string|null, unit_price_cents: int, quantity: int, line_total_cents: int, notes: string|null}>
      */
     protected function snapshotItems(Company $company, array $rawItems): array
     {
@@ -296,7 +296,27 @@ class OrderService
                 ]);
             }
 
-            $unitPrice = $this->catalog->unitPriceCents($product);
+            $variant = null;
+
+            if ($product->hasActiveVariants()) {
+                $variantId = (int) ($raw['variant_id'] ?? 0);
+
+                if ($variantId < 1) {
+                    throw ValidationException::withMessages([
+                        "items.{$index}" => "Escolha o tamanho de {$product->name}.",
+                    ]);
+                }
+
+                $variant = $this->catalog->findActiveVariant($product, $variantId);
+
+                if ($variant === null) {
+                    throw ValidationException::withMessages([
+                        "items.{$index}" => "Tamanho inválido para {$product->name}.",
+                    ]);
+                }
+            }
+
+            $unitPrice = $this->catalog->unitPriceCents($product, $variant);
 
             if ($unitPrice < 1) {
                 throw ValidationException::withMessages([
@@ -306,7 +326,9 @@ class OrderService
 
             $snapshots[] = [
                 'product_id' => (int) $product->getKey(),
-                'name' => (string) $product->name,
+                'product_variant_id' => $variant !== null ? (int) $variant->getKey() : null,
+                'name' => $this->catalog->snapshotName($product, $variant),
+                'variant_name' => $variant?->name,
                 'unit_price_cents' => $unitPrice,
                 'quantity' => $quantity,
                 'line_total_cents' => $unitPrice * $quantity,
@@ -329,7 +351,7 @@ class OrderService
      *     delivery_city?: string|null,
      *     notes?: string|null,
      * }  $data
-     * @param  list<array{product_id: int, name: string, unit_price_cents: int, quantity: int, line_total_cents: int, notes: string|null}>  $items
+     * @param  list<array{product_id: int, product_variant_id: int|null, name: string, variant_name: string|null, unit_price_cents: int, quantity: int, line_total_cents: int, notes: string|null}>  $items
      */
     protected function persistPublicOrder(
         Company $company,
