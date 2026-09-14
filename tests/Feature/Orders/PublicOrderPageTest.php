@@ -117,6 +117,31 @@ class PublicOrderPageTest extends TestCase
         $this->assertSame(2500, $order->total_cents);
     }
 
+    public function test_double_submit_with_same_idempotency_key_does_not_fail(): void
+    {
+        $setup = $this->createRestaurantSetup();
+
+        $component = Livewire::test(OrderWizard::class, ['company' => $setup['company']])
+            ->call('addToCart', $setup['burger']->id)
+            ->call('goToFulfillment')
+            ->call('selectFulfillment', OrderFulfillment::Pickup->value)
+            ->set('customerName', 'Maria Cliente')
+            ->set('customerPhone', '(34) 99999-1111')
+            ->call('goToReview')
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('step', OrderWizard::STEP_CONFIRMATION);
+
+        $component
+            ->set('isSubmitting', false)
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('step', OrderWizard::STEP_CONFIRMATION)
+            ->assertSet('errorMessage', null);
+
+        $this->assertSame(1, Order::query()->where('company_id', $setup['company']->id)->count());
+    }
+
     public function test_livewire_wizard_completes_delivery_order(): void
     {
         $setup = $this->createRestaurantSetup();

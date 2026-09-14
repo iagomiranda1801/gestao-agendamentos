@@ -69,11 +69,11 @@ Pedidos têm número sequencial por empresa, `public_code`, snapshots de cliente
 
 ## 6. Permissões
 
-- `view_orders` — ver histórico
+- `view_orders` — ver histórico (inclui PII de contato: telefone/e-mail)
 - `manage_orders` — configurações, cancelar, gerenciar cardápio (via papéis de admin/gerente)
-- `kitchen_orders` — tela da cozinha e avanço de status
+- `kitchen_orders` — tela da cozinha e avanço de status. **Não** abre o Histórico.
 
-Padrão: admin e gerente têm as três; recepção vê e opera a cozinha; colaborador opera a cozinha.
+Padrão: admin e gerente têm as três; recepção tem `view_orders` + `kitchen_orders`; colaborador só opera a Cozinha (`kitchen_orders`), sem Histórico.
 
 ## 7. WhatsApp
 

@@ -15,6 +15,8 @@ use App\Models\User;
 use App\Services\Company\CompanyModuleService;
 use App\Support\PhoneNormalizer;
 use App\Support\PublicBookingTextSanitizer;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -126,9 +128,8 @@ class OrderService
             ? (string) $data['idempotency_key']
             : null;
 
-        return DB::transaction(function () use (
+        $persist = fn (): Order => $this->persistPublicOrder(
             $company,
-            $setting,
             $fulfillment,
             $customerName,
             $phone,
@@ -138,63 +139,27 @@ class OrderService
             $subtotalCents,
             $deliveryFeeCents,
             $idempotencyKey,
-        ): Order {
-            if ($idempotencyKey !== null) {
-                $existing = Order::query()
-                    ->where('company_id', $company->getKey())
-                    ->where('idempotency_key', $idempotencyKey)
-                    ->first();
+        );
 
-                if ($existing) {
-                    return $existing->load('items');
-                }
-            }
+        if ($idempotencyKey === null) {
+            return $persist();
+        }
 
-            $order = new Order([
-                'number' => $this->nextNumber($company),
-                'public_code' => $this->codes->generate($company),
-                'idempotency_key' => $idempotencyKey,
-                'status' => OrderStatus::Received,
-                'fulfillment' => $fulfillment,
-                'customer_name' => $customerName,
-                'customer_phone' => $phone,
-                'customer_phone_normalized' => $phoneNormalized,
-                'customer_email' => PublicBookingTextSanitizer::sanitize($data['customer_email'] ?? null, 255),
-                'delivery_address' => $fulfillment === OrderFulfillment::Delivery
-                    ? PublicBookingTextSanitizer::sanitize($data['delivery_address'] ?? null, 255)
-                    : null,
-                'delivery_complement' => $fulfillment === OrderFulfillment::Delivery
-                    ? PublicBookingTextSanitizer::sanitize($data['delivery_complement'] ?? null, 120)
-                    : null,
-                'delivery_neighborhood' => $fulfillment === OrderFulfillment::Delivery
-                    ? PublicBookingTextSanitizer::sanitize($data['delivery_neighborhood'] ?? null, 120)
-                    : null,
-                'delivery_city' => $fulfillment === OrderFulfillment::Delivery
-                    ? PublicBookingTextSanitizer::sanitize($data['delivery_city'] ?? null, 120)
-                    : null,
-                'subtotal_cents' => $subtotalCents,
-                'delivery_fee_cents' => $deliveryFeeCents,
-                'total_cents' => $subtotalCents + $deliveryFeeCents,
-                'notes' => PublicBookingTextSanitizer::clientNotes($data['notes'] ?? null),
-                'received_at' => now(),
-            ]);
-            $order->company()->associate($company);
-            $order->save();
+        $existing = $this->findByIdempotencyKey($company, $idempotencyKey);
 
-            foreach ($items as $item) {
-                $orderItem = new OrderItem($item);
-                $orderItem->order()->associate($order);
-                $orderItem->save();
-            }
+        if ($existing !== null) {
+            return $existing->load('items');
+        }
 
-            $this->recordHistory($company, $order, null, OrderStatus::Received, null);
+        $lock = Cache::lock("public-order:{$company->getKey()}:{$idempotencyKey}", 10);
 
-            unset($setting);
+        try {
+            $lock->block(5);
 
-            DB::afterCommit(fn () => event(new OrderCreated($order->fresh(['items', 'company']))));
-
-            return $order->fresh(['items']) ?? $order;
-        });
+            return $persist();
+        } finally {
+            optional($lock)->release();
+        }
     }
 
     public function advance(Company $company, Order $order, ?User $user = null): Order
@@ -353,6 +318,125 @@ class OrderService
         }
 
         return $snapshots;
+    }
+
+    /**
+     * @param  array{
+     *     customer_email?: string|null,
+     *     delivery_address?: string|null,
+     *     delivery_complement?: string|null,
+     *     delivery_neighborhood?: string|null,
+     *     delivery_city?: string|null,
+     *     notes?: string|null,
+     * }  $data
+     * @param  list<array{product_id: int, name: string, unit_price_cents: int, quantity: int, line_total_cents: int, notes: string|null}>  $items
+     */
+    protected function persistPublicOrder(
+        Company $company,
+        OrderFulfillment $fulfillment,
+        string $customerName,
+        string $phone,
+        string $phoneNormalized,
+        array $data,
+        array $items,
+        int $subtotalCents,
+        int $deliveryFeeCents,
+        ?string $idempotencyKey,
+    ): Order {
+        $attempts = 0;
+        $maxAttempts = 3;
+
+        while ($attempts < $maxAttempts) {
+            $attempts++;
+
+            try {
+                return DB::transaction(function () use (
+                    $company,
+                    $fulfillment,
+                    $customerName,
+                    $phone,
+                    $phoneNormalized,
+                    $data,
+                    $items,
+                    $subtotalCents,
+                    $deliveryFeeCents,
+                    $idempotencyKey,
+                ): Order {
+                    if ($idempotencyKey !== null) {
+                        $existing = $this->findByIdempotencyKey($company, $idempotencyKey);
+
+                        if ($existing !== null) {
+                            return $existing->load('items');
+                        }
+                    }
+
+                    $order = new Order([
+                        'number' => $this->nextNumber($company),
+                        'public_code' => $this->codes->generate($company),
+                        'idempotency_key' => $idempotencyKey,
+                        'status' => OrderStatus::Received,
+                        'fulfillment' => $fulfillment,
+                        'customer_name' => $customerName,
+                        'customer_phone' => $phone,
+                        'customer_phone_normalized' => $phoneNormalized,
+                        'customer_email' => PublicBookingTextSanitizer::sanitize($data['customer_email'] ?? null, 255),
+                        'delivery_address' => $fulfillment === OrderFulfillment::Delivery
+                            ? PublicBookingTextSanitizer::sanitize($data['delivery_address'] ?? null, 255)
+                            : null,
+                        'delivery_complement' => $fulfillment === OrderFulfillment::Delivery
+                            ? PublicBookingTextSanitizer::sanitize($data['delivery_complement'] ?? null, 120)
+                            : null,
+                        'delivery_neighborhood' => $fulfillment === OrderFulfillment::Delivery
+                            ? PublicBookingTextSanitizer::sanitize($data['delivery_neighborhood'] ?? null, 120)
+                            : null,
+                        'delivery_city' => $fulfillment === OrderFulfillment::Delivery
+                            ? PublicBookingTextSanitizer::sanitize($data['delivery_city'] ?? null, 120)
+                            : null,
+                        'subtotal_cents' => $subtotalCents,
+                        'delivery_fee_cents' => $deliveryFeeCents,
+                        'total_cents' => $subtotalCents + $deliveryFeeCents,
+                        'notes' => PublicBookingTextSanitizer::clientNotes($data['notes'] ?? null),
+                        'received_at' => now(),
+                    ]);
+                    $order->company()->associate($company);
+                    $order->save();
+
+                    foreach ($items as $item) {
+                        $orderItem = new OrderItem($item);
+                        $orderItem->order()->associate($order);
+                        $orderItem->save();
+                    }
+
+                    $this->recordHistory($company, $order, null, OrderStatus::Received, null);
+
+                    DB::afterCommit(fn () => event(new OrderCreated($order->fresh(['items', 'company']))));
+
+                    return $order->fresh(['items']) ?? $order;
+                });
+            } catch (UniqueConstraintViolationException $exception) {
+                if ($idempotencyKey !== null) {
+                    $existing = $this->findByIdempotencyKey($company, $idempotencyKey);
+
+                    if ($existing !== null) {
+                        return $existing->load('items');
+                    }
+                }
+
+                if ($attempts >= $maxAttempts) {
+                    throw $exception;
+                }
+            }
+        }
+
+        throw new \RuntimeException('Não foi possível gravar o pedido. Tente novamente.');
+    }
+
+    protected function findByIdempotencyKey(Company $company, string $idempotencyKey): ?Order
+    {
+        return Order::query()
+            ->where('company_id', $company->getKey())
+            ->where('idempotency_key', $idempotencyKey)
+            ->first();
     }
 
     protected function nextNumber(Company $company): int

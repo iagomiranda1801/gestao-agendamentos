@@ -6,6 +6,7 @@ use App\Enums\OrderFulfillment;
 use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Services\Orders\CompanyOrderSettingService;
+use App\Services\Orders\OrderPublicCodeGenerator;
 use App\Services\Orders\OrderService;
 use Illuminate\Validation\ValidationException;
 use Tests\Concerns\CreatesOrderFixtures;
@@ -138,6 +139,30 @@ class OrderServiceTest extends TestCase
 
         $this->assertTrue($first->is($second));
         $this->assertSame(1, Order::query()->where('company_id', $setup['company']->id)->count());
+    }
+
+    public function test_retries_when_unique_constraint_collides_on_public_code(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        Order::factory()->forCompany($setup['company'])->create([
+            'number' => 1,
+            'public_code' => 'ABC-1111',
+        ]);
+
+        $this->mock(OrderPublicCodeGenerator::class, function ($mock): void {
+            $mock->shouldReceive('generate')->andReturn('ABC-1111', 'ABC-2222');
+        });
+
+        $result = app(OrderService::class)->createPublic($setup['company'], [
+            'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],
+            'fulfillment' => OrderFulfillment::Pickup,
+            'customer_name' => 'Maria',
+            'customer_phone' => '34988887777',
+        ]);
+
+        $this->assertSame('ABC-2222', $result->public_code);
+        $this->assertSame(2, $result->number);
+        $this->assertSame(2, Order::query()->where('company_id', $setup['company']->id)->count());
     }
 
     public function test_pickup_status_path_reaches_completed(): void

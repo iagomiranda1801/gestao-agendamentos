@@ -17,6 +17,11 @@ class OrderPolicy
         return $this->userCanViewOrders($user);
     }
 
+    public function viewKitchen(User $user): bool
+    {
+        return $this->userCanAccessKitchen($user);
+    }
+
     public function view(User $user, Order $order): bool
     {
         return $this->recordBelongsToAccessibleTenant($user, $order->company)

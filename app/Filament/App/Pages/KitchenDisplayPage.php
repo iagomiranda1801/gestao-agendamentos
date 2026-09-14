@@ -48,7 +48,7 @@ class KitchenDisplayPage extends Page
 
         $user = auth()->user();
 
-        return $user !== null && (new OrderPolicy)->viewAny($user);
+        return $user !== null && (new OrderPolicy)->viewKitchen($user);
     }
 
     public function mount(): void
