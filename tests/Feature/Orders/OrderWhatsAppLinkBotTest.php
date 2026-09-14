@@ -115,6 +115,25 @@ class OrderWhatsAppLinkBotTest extends TestCase
         $this->assertSame(0, WhatsAppBotConversation::query()->count());
     }
 
+    public function test_failed_send_does_not_consume_cooldown_so_retry_can_deliver(): void
+    {
+        Http::fake([
+            'evolution.test/*' => Http::sequence()
+                ->push('fail', 500)
+                ->push(['key' => ['id' => 'ok']], 200),
+        ]);
+
+        $setup = $this->createRestaurantSetup();
+        $instance = $this->createInstance($setup['company']);
+
+        $this->runInbound($instance, 'oi', 'rest-retry-1');
+        $this->runInbound($instance, 'oi', 'rest-retry-1');
+        $this->runInbound($instance, 'quero pedir', 'rest-retry-2');
+
+        Http::assertSentCount(2);
+        Http::assertSent(fn ($request): bool => str_contains((string) ($request['text'] ?? ''), '/pedir/'));
+    }
+
     public function test_salon_booking_bot_still_replies_to_inbound(): void
     {
         $setup = $this->createBookableSetup();

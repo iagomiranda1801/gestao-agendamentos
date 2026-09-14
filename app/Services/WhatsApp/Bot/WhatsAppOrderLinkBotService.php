@@ -65,20 +65,39 @@ class WhatsAppOrderLinkBotService
             $lock->block(5);
 
             if ($messageId !== null && $messageId !== '') {
-                $messageKey = "wa:order-link-msgid:{$company->getKey()}:{$messageId}";
-
-                if (! Cache::add($messageKey, true, now()->addMinutes(30))) {
+                if (Cache::has($this->messageKey($company, $messageId))) {
                     return null;
                 }
             }
 
-            $cooldownKey = "wa:order-link-sent:{$company->getKey()}:{$phone}";
-
-            if (! Cache::add($cooldownKey, true, now()->addSeconds(self::RESEND_COOLDOWN_SECONDS))) {
+            if (Cache::has($this->cooldownKey($company, $phone))) {
                 return null;
             }
 
             return $this->composeMessage($company);
+        } finally {
+            optional($lock)->release();
+        }
+    }
+
+    public function rememberDelivered(Company $company, string $rawPhone, ?string $messageId = null): void
+    {
+        $phone = PhoneNormalizer::normalize($rawPhone);
+
+        if ($phone === null) {
+            return;
+        }
+
+        $lock = Cache::lock("wa:order-link:{$company->getKey()}:{$phone}", 10);
+
+        try {
+            $lock->block(5);
+
+            if ($messageId !== null && $messageId !== '') {
+                Cache::put($this->messageKey($company, $messageId), true, now()->addMinutes(30));
+            }
+
+            Cache::put($this->cooldownKey($company, $phone), true, now()->addSeconds(self::RESEND_COOLDOWN_SECONDS));
         } finally {
             optional($lock)->release();
         }
@@ -89,5 +108,15 @@ class WhatsAppOrderLinkBotService
         $url = route('public.orders.show', ['company' => $company->slug]);
 
         return "Olá! Peça pelo cardápio da {$company->name}:\n{$url}";
+    }
+
+    protected function messageKey(Company $company, string $messageId): string
+    {
+        return "wa:order-link-msgid:{$company->getKey()}:{$messageId}";
+    }
+
+    protected function cooldownKey(Company $company, string $phone): string
+    {
+        return "wa:order-link-sent:{$company->getKey()}:{$phone}";
     }
 }
