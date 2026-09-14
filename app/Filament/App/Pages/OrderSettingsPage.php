@@ -73,6 +73,7 @@ class OrderSettingsPage extends Page
             'min_order_reais' => number_format(((int) $setting->min_order_cents) / 100, 2, '.', ''),
             'delivery_radius_note' => $setting->delivery_radius_note,
             'orders_whatsapp_notify' => $setting->orders_whatsapp_notify,
+            'whatsapp_order_link_bot_enabled' => $setting->whatsapp_order_link_bot_enabled,
             'page_title' => $setting->page_title,
             'page_description' => $setting->page_description,
             'confirmation_message' => $setting->confirmation_message,
@@ -121,6 +122,10 @@ class OrderSettingsPage extends Page
                     ->columnSpanFull(),
                 Toggle::make('orders_whatsapp_notify')
                     ->label('Avisar o cliente no WhatsApp (se o módulo estiver conectado)'),
+                Toggle::make('whatsapp_order_link_bot_enabled')
+                    ->label('Enviar link do cardápio no WhatsApp')
+                    ->helperText('Quando alguém mandar mensagem no WhatsApp da empresa, o bot responde só com o link do cardápio. Não inicia conversa de agendamento.')
+                    ->columnSpanFull(),
             ])->columns(2),
             Section::make('Página pública')->schema([
                 TextInput::make('page_title')
@@ -154,6 +159,7 @@ class OrderSettingsPage extends Page
             'min_order_cents' => (int) round(((float) ($state['min_order_reais'] ?? 0)) * 100),
             'delivery_radius_note' => $state['delivery_radius_note'] ?? null,
             'orders_whatsapp_notify' => (bool) ($state['orders_whatsapp_notify'] ?? false),
+            'whatsapp_order_link_bot_enabled' => (bool) ($state['whatsapp_order_link_bot_enabled'] ?? false),
             'page_title' => $state['page_title'] ?? null,
             'page_description' => $state['page_description'] ?? null,
             'confirmation_message' => $state['confirmation_message'] ?? null,

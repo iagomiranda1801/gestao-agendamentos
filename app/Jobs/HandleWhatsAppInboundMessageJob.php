@@ -10,6 +10,7 @@ use App\Models\CompanyWhatsAppInstance;
 use App\Services\Company\CompanyModuleService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\Bot\WhatsAppBookingBotService;
+use App\Services\WhatsApp\Bot\WhatsAppOrderLinkBotService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -34,6 +35,7 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
         EvolutionApiClient $client,
         CompanyModuleService $modules,
         CompanySchedulingSettingService $settingsService,
+        WhatsAppOrderLinkBotService $orderLinkBot,
     ): void {
         if (trim($this->phone) === '' || trim($this->instanceName) === '') {
             return;
@@ -54,7 +56,23 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
             return;
         }
 
-        if (! $this->botIsAllowed($company, $modules, $settingsService)) {
+        if ($orderLinkBot->prefersThisBot($company)) {
+            if (! $orderLinkBot->canReply($company)) {
+                Log::info('WhatsApp order-link bot: disabled for company.', [
+                    'company_id' => $company->getKey(),
+                    'instance' => $this->instanceName,
+                ]);
+
+                return;
+            }
+
+            $reply = $orderLinkBot->handleIncoming($company, $this->phone, $this->messageId);
+            $this->sendReply($company, $client, $reply);
+
+            return;
+        }
+
+        if (! $this->bookingBotIsAllowed($company, $modules, $settingsService)) {
             Log::info('WhatsApp bot: disabled for company.', [
                 'company_id' => $company->getKey(),
                 'instance' => $this->instanceName,
@@ -72,29 +90,7 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
             messageId: $this->messageId,
         );
 
-        if ($reply === null || trim($reply) === '') {
-            return;
-        }
-
-        if (! $this->deferUntilOutboundSlot($company, WhatsAppOutboundKind::BotReply)) {
-            Log::info('WhatsApp bot reply deferred.', [
-                'company_id' => $company->getKey(),
-                'retry_in_seconds' => $this->whatsappOutboundRetrySeconds,
-            ]);
-
-            return;
-        }
-
-        try {
-            $client->sendText($this->instanceName, $this->phone, $reply);
-            $this->rememberOutboundSuccess($company);
-        } catch (Throwable $exception) {
-            Log::warning('WhatsApp bot reply failed.', [
-                'company_id' => $company->getKey(),
-                'error' => $exception->getMessage(),
-            ]);
-            $this->rememberOutboundFailureAndMaybeRethrow($company, $exception);
-        }
+        $this->sendReply($company, $client, $reply);
     }
 
     protected function resolveCompany(?CompanyWhatsAppInstance $instance): ?Company
@@ -106,7 +102,7 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
         return null;
     }
 
-    protected function botIsAllowed(
+    protected function bookingBotIsAllowed(
         Company $company,
         CompanyModuleService $modules,
         CompanySchedulingSettingService $settingsService,
@@ -134,5 +130,32 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
         }
 
         return true;
+    }
+
+    protected function sendReply(Company $company, EvolutionApiClient $client, ?string $reply): void
+    {
+        if ($reply === null || trim($reply) === '') {
+            return;
+        }
+
+        if (! $this->deferUntilOutboundSlot($company, WhatsAppOutboundKind::BotReply)) {
+            Log::info('WhatsApp bot reply deferred.', [
+                'company_id' => $company->getKey(),
+                'retry_in_seconds' => $this->whatsappOutboundRetrySeconds,
+            ]);
+
+            return;
+        }
+
+        try {
+            $client->sendText($this->instanceName, $this->phone, $reply);
+            $this->rememberOutboundSuccess($company);
+        } catch (Throwable $exception) {
+            Log::warning('WhatsApp bot reply failed.', [
+                'company_id' => $company->getKey(),
+                'error' => $exception->getMessage(),
+            ]);
+            $this->rememberOutboundFailureAndMaybeRethrow($company, $exception);
+        }
     }
 }

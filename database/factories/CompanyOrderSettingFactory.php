@@ -27,6 +27,7 @@ class CompanyOrderSettingFactory extends Factory
             'min_order_cents' => 0,
             'delivery_radius_note' => null,
             'orders_whatsapp_notify' => true,
+            'whatsapp_order_link_bot_enabled' => true,
             'page_title' => null,
             'page_description' => null,
             'confirmation_message' => null,

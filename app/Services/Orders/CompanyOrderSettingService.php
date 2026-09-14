@@ -27,6 +27,7 @@ class CompanyOrderSettingService
             'delivery_fee_cents' => 0,
             'min_order_cents' => 0,
             'orders_whatsapp_notify' => true,
+            'whatsapp_order_link_bot_enabled' => true,
         ]);
         $setting->company()->associate($company);
         $setting->save();
