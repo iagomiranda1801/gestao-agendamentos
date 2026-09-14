@@ -6,6 +6,7 @@
 
     $company = Filament::getTenant();
     $columns = $this->kitchenOrders();
+    $companyIsTenant = $company instanceof \App\Models\Company;
 @endphp
 
 <div
@@ -118,7 +119,7 @@
                     </div>
                     <p class="kitchen-card__meta">
                         {{ $order->customer_name }}
-                        · {{ $order->created_at ? CompanyDateTime::formatLocal($company, $order->created_at, 'H:i') : '' }}
+                        · {{ $order->created_at && $companyIsTenant ? CompanyDateTime::formatLocal($company, $order->created_at, 'H:i') : '' }}
                         · {{ Money::formatCents((int) $order->total_cents) }}
                     </p>
                     <ul class="kitchen-card__items">
@@ -140,8 +141,9 @@
                     <div class="kitchen-card__actions">
                         @if ($order->canAdvance() && auth()->user()?->can('advance', $order))
                             <x-filament::button
+                                type="button"
                                 size="sm"
-                                wire:click="advanceOrder({{ $order->getKey() }})"
+                                wire:click.prevent="advanceOrder({{ $order->getKey() }})"
                                 wire:loading.attr="disabled"
                             >
                                 {{ $order->nextStatus()?->label() }}
@@ -149,10 +151,11 @@
                         @endif
                         @if ($order->canCancel() && auth()->user()?->can('cancel', $order))
                             <x-filament::button
+                                type="button"
                                 size="sm"
                                 color="danger"
                                 outlined
-                                wire:click="startCancel({{ $order->getKey() }})"
+                                wire:click.prevent="startCancel({{ $order->getKey() }})"
                             >
                                 Cancelar
                             </x-filament::button>
@@ -179,8 +182,8 @@
                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                 @enderror
                 <div class="mt-4 flex justify-end gap-2">
-                    <x-filament::button color="gray" wire:click="dismissCancel">Voltar</x-filament::button>
-                    <x-filament::button color="danger" wire:click="confirmCancel">Confirmar cancelamento</x-filament::button>
+                    <x-filament::button type="button" color="gray" wire:click.prevent="dismissCancel">Voltar</x-filament::button>
+                    <x-filament::button type="button" color="danger" wire:click.prevent="confirmCancel">Confirmar cancelamento</x-filament::button>
                 </div>
             </div>
         </div>

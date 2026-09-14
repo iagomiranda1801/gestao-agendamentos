@@ -7,7 +7,10 @@ use App\Enums\OrderFulfillment;
 use App\Enums\OrderStatus;
 use App\Filament\App\Pages\KitchenDisplayPage;
 use App\Filament\App\Resources\Orders\Pages\ListOrders;
+use App\Models\Order;
+use App\Services\Orders\CompanyOrderSettingService;
 use App\Services\Orders\OrderService;
+use Filament\Facades\Filament;
 use Livewire\Livewire;
 use Tests\Concerns\CreatesOrderFixtures;
 use Tests\TestCase;
@@ -37,6 +40,108 @@ class KitchenDisplayTest extends TestCase
             ->assertSuccessful();
 
         $this->assertSame(OrderStatus::Preparing, $order->fresh()->status);
+    }
+
+    public function test_kitchen_keeps_order_in_ready_column_after_advance(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $admin = $this->createCompanyUser($setup['company']);
+        $order = app(OrderService::class)->createPublic($setup['company'], [
+            'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],
+            'fulfillment' => OrderFulfillment::Pickup,
+            'customer_name' => 'Maria Pronto',
+            'customer_phone' => '34988887777',
+        ]);
+
+        $this->authenticateForAppTenant($admin, $setup['company']);
+
+        $page = Livewire::test(KitchenDisplayPage::class)
+            ->assertSuccessful()
+            ->call('advanceOrder', $order->id)
+            ->assertSuccessful()
+            ->call('advanceOrder', $order->id)
+            ->assertSuccessful()
+            ->assertSee('Maria Pronto', false);
+
+        $this->assertSame(OrderStatus::Ready, $order->fresh()->status);
+
+        $readyOrders = $page->instance()->kitchenOrders()->get(OrderStatus::Ready->value);
+
+        $this->assertNotNull($readyOrders);
+        $this->assertTrue(
+            $readyOrders->contains(fn (Order $listed): bool => (int) $listed->getKey() === (int) $order->getKey()),
+        );
+        $this->assertSame(
+            route('public.orders.show', ['company' => $setup['company']->slug]),
+            $page->instance()->publicOrderingUrl(),
+        );
+
+        Filament::setTenant(null, isQuiet: true);
+
+        $this->assertTrue(
+            $page->instance()->kitchenOrders()->get(OrderStatus::Ready->value)
+                ->contains(fn (Order $listed): bool => (int) $listed->getKey() === (int) $order->getKey()),
+        );
+
+        $this->withoutVite();
+        $this->get(KitchenDisplayPage::getUrl(['tenant' => $setup['company']]))
+            ->assertOk()
+            ->assertSee('Maria Pronto', false);
+    }
+
+    public function test_kitchen_advance_to_ready_stays_ok_when_online_ordering_is_disabled(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $admin = $this->createCompanyUser($setup['company']);
+        $order = app(OrderService::class)->createPublic($setup['company'], [
+            'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],
+            'fulfillment' => OrderFulfillment::Pickup,
+            'customer_name' => 'Ana Cozinha',
+            'customer_phone' => '34988887777',
+        ]);
+
+        app(CompanyOrderSettingService::class)->update($setup['company'], [
+            'online_ordering_enabled' => false,
+        ]);
+        $setup['company']->unsetRelation('orderSetting');
+
+        $this->authenticateForAppTenant($admin, $setup['company']->fresh(['orderSetting']));
+
+        $page = Livewire::test(KitchenDisplayPage::class)
+            ->assertSuccessful()
+            ->call('advanceOrder', $order->id)
+            ->assertSuccessful()
+            ->call('advanceOrder', $order->id)
+            ->assertSuccessful()
+            ->assertSee('Ana Cozinha', false);
+
+        $this->assertSame(OrderStatus::Ready, $order->fresh()->status);
+        $this->assertNull($page->instance()->publicOrderingUrl());
+        $this->assertTrue(
+            $page->instance()->kitchenOrders()->get(OrderStatus::Ready->value)
+                ->contains(fn (Order $listed): bool => (int) $listed->getKey() === (int) $order->getKey()),
+        );
+
+        $this->withoutVite();
+        $this->get(route('public.orders.show', ['company' => $setup['company']->slug]))
+            ->assertNotFound();
+
+        $this->get(KitchenDisplayPage::getUrl(['tenant' => $setup['company']]))
+            ->assertOk()
+            ->assertSee('Ana Cozinha', false);
+    }
+
+    public function test_public_ordering_url_is_not_generated_without_tenant(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $admin = $this->createCompanyUser($setup['company']);
+        $this->authenticateForAppTenant($admin, $setup['company']);
+
+        $page = Livewire::test(KitchenDisplayPage::class)->assertSuccessful();
+
+        Filament::setTenant(null, isQuiet: true);
+
+        $this->assertNull($page->instance()->publicOrderingUrl());
     }
 
     public function test_kitchen_can_complete_delivery_path(): void

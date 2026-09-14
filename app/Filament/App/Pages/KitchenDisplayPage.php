@@ -16,6 +16,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
 use UnitEnum;
 
 class KitchenDisplayPage extends Page
@@ -40,6 +41,9 @@ class KitchenDisplayPage extends Page
 
     public string $cancelReason = '';
 
+    #[Locked]
+    public ?int $kitchenTenantId = null;
+
     public static function canAccess(): bool
     {
         if (! static::tenantHasRequiredModule()) {
@@ -51,9 +55,16 @@ class KitchenDisplayPage extends Page
         return $user !== null && (new OrderPolicy)->viewKitchen($user);
     }
 
+    public function boot(): void
+    {
+        $this->restoreFilamentTenantFromComponentState();
+    }
+
     public function mount(): void
     {
         abort_unless(static::canAccess(), 403);
+
+        $this->kitchenTenantId = $this->tenantCompany()->getKey();
     }
 
     /**
@@ -61,8 +72,7 @@ class KitchenDisplayPage extends Page
      */
     public function kitchenOrders(): Collection
     {
-        /** @var Company $company */
-        $company = Filament::getTenant();
+        $company = $this->tenantCompany();
 
         $orders = Order::query()
             ->where('company_id', $company->getKey())
@@ -76,7 +86,9 @@ class KitchenDisplayPage extends Page
 
         return collect(OrderStatus::kitchenColumns())
             ->mapWithKeys(fn (OrderStatus $status): array => [
-                $status->value => $orders->where('status', $status)->values(),
+                $status->value => $orders
+                    ->filter(fn (Order $order): bool => $this->orderMatchesKitchenStatus($order, $status))
+                    ->values(),
             ]);
     }
 
@@ -87,7 +99,7 @@ class KitchenDisplayPage extends Page
 
         abort_unless($user !== null && $user->can('advance', $order), 403);
 
-        app(OrderService::class)->advance(Filament::getTenant(), $order, $user);
+        app(OrderService::class)->advance($this->tenantCompany(), $order, $user);
 
         Notification::make()
             ->success()
@@ -120,7 +132,7 @@ class KitchenDisplayPage extends Page
 
         abort_unless($user !== null && $user->can('cancel', $order), 403);
 
-        app(OrderService::class)->cancel(Filament::getTenant(), $order, $this->cancelReason, $user);
+        app(OrderService::class)->cancel($this->tenantCompany(), $order, $this->cancelReason, $user);
 
         $this->cancelingOrderId = null;
         $this->cancelReason = '';
@@ -139,8 +151,7 @@ class KitchenDisplayPage extends Page
 
     protected function findTenantOrder(int $orderId): Order
     {
-        /** @var Company $company */
-        $company = Filament::getTenant();
+        $company = $this->tenantCompany();
 
         return Order::query()
             ->where('company_id', $company->getKey())
@@ -153,14 +164,87 @@ class KitchenDisplayPage extends Page
      */
     protected function getHeaderActions(): array
     {
+        $this->restoreFilamentTenantFromComponentState();
+
+        $url = $this->publicOrderingUrl();
+
+        if ($url === null) {
+            return [];
+        }
+
         return [
             Action::make('openPublicLink')
                 ->label('Link público')
                 ->icon('heroicon-o-arrow-top-right-on-square')
-                ->url(fn (): string => route('public.orders.show', ['company' => Filament::getTenant()?->slug]))
+                ->url($url)
                 ->openUrlInNewTab()
                 ->color('gray'),
         ];
+    }
+
+    public function publicOrderingUrl(): ?string
+    {
+        $tenant = Filament::getTenant();
+
+        if (! $tenant instanceof Company || blank($tenant->slug)) {
+            return null;
+        }
+
+        if (! $tenant->orderSetting?->online_ordering_enabled) {
+            return null;
+        }
+
+        return route('public.orders.show', ['company' => $tenant->slug]);
+    }
+
+    protected function tenantCompany(): Company
+    {
+        $this->restoreFilamentTenantFromComponentState();
+
+        $tenant = Filament::getTenant();
+
+        abort_unless($tenant instanceof Company, 403);
+
+        return $tenant;
+    }
+
+    protected function restoreFilamentTenantFromComponentState(): void
+    {
+        $current = Filament::getTenant();
+
+        if ($current instanceof Company) {
+            $this->kitchenTenantId = (int) $current->getKey();
+
+            return;
+        }
+
+        if ($this->kitchenTenantId === null) {
+            return;
+        }
+
+        $user = auth()->user();
+        $company = Company::query()->find($this->kitchenTenantId);
+
+        if (! $company instanceof Company || $user === null || ! $user->canAccessTenant($company)) {
+            return;
+        }
+
+        Filament::setTenant($company, isQuiet: true);
+    }
+
+    protected function orderMatchesKitchenStatus(Order $order, OrderStatus $status): bool
+    {
+        $current = $order->status;
+
+        if ($current === $status) {
+            return true;
+        }
+
+        $currentValue = $current instanceof OrderStatus
+            ? $current->value
+            : (is_string($current) ? $current : null);
+
+        return $currentValue === $status->value;
     }
 
     protected static function requiredCompanyModule(): CompanyModule
