@@ -26,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'is_sellable',
     'available_for_online_order',
     'online_order_category',
+    'menu_category_id',
     'prep_time_minutes',
     'notes',
     'is_active',
@@ -74,6 +75,42 @@ class Product extends Model
     public function measurementUnit(): BelongsTo
     {
         return $this->belongsTo(MeasurementUnit::class);
+    }
+
+    /**
+     * @return BelongsTo<MenuCategory, $this>
+     */
+    public function menuCategory(): BelongsTo
+    {
+        return $this->belongsTo(MenuCategory::class);
+    }
+
+    /**
+     * @return HasMany<ProductVariant, $this>
+     */
+    public function variants(): HasMany
+    {
+        return $this->hasMany(ProductVariant::class)->orderBy('sort_order')->orderBy('name');
+    }
+
+    /**
+     * @return HasMany<ProductVariant, $this>
+     */
+    public function activeVariants(): HasMany
+    {
+        return $this->hasMany(ProductVariant::class)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name');
+    }
+
+    public function hasActiveVariants(): bool
+    {
+        if ($this->relationLoaded('activeVariants')) {
+            return $this->activeVariants->isNotEmpty();
+        }
+
+        return $this->activeVariants()->exists();
     }
 
     /**

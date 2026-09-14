@@ -41,7 +41,20 @@
                         <div class="booking-option-list">
                             @foreach ($products as $product)
                                 @php
-                                    $qty = $cart[$product->getKey()]['quantity'] ?? 0;
+                                    $variants = $product->activeVariants;
+                                    $hasVariants = $variants->isNotEmpty();
+                                    $selectedVariantId = $hasVariants
+                                        ? (int) ($this->selectedVariant[$product->getKey()] ?? $variants->firstWhere('is_default', true)?->id ?? $variants->first()->id)
+                                        : 0;
+                                    $cartKey = $product->getKey().':'.$selectedVariantId;
+                                    $qty = $cart[$cartKey]['quantity'] ?? 0;
+                                    $displayCents = $hasVariants
+                                        ? \App\Support\Money::toCents($variants->firstWhere('id', $selectedVariantId)?->price ?? $variants->min('price'))
+                                        : \App\Support\Money::toCents($product->sale_price);
+                                    $showFrom = $hasVariants
+                                        && $variants->count() > 1
+                                        && (string) $variants->min('price') !== (string) $variants->max('price')
+                                        && $qty < 1;
                                 @endphp
                                 <div class="booking-option" wire:key="menu-{{ $product->getKey() }}">
                                     <div class="booking-option__content">
@@ -50,20 +63,38 @@
                                             <p class="booking-option__subtitle">{{ e($product->description) }}</p>
                                         @endif
                                         <p class="booking-option__subtitle">
-                                            {{ $this->formatMoneyCents(\App\Support\Money::toCents($product->sale_price)) }}
+                                            @if ($showFrom)
+                                                A partir de {{ $this->formatMoneyCents(\App\Support\Money::toCents($variants->min('price'))) }}
+                                            @else
+                                                {{ $this->formatMoneyCents($displayCents) }}
+                                            @endif
                                             @if ($product->prep_time_minutes)
                                                 · {{ $product->prep_time_minutes }} min
                                             @endif
                                         </p>
                                     </div>
-                                    <div class="order-qty">
-                                        @if ($qty > 0)
-                                            <button type="button" class="booking-btn booking-btn--secondary" wire:click="decrementItem({{ $product->getKey() }})">−</button>
-                                            <span>{{ $qty }}</span>
-                                            <button type="button" class="booking-btn booking-btn--secondary" wire:click="incrementItem({{ $product->getKey() }})">+</button>
-                                        @else
-                                            <button type="button" class="booking-btn booking-btn--primary" wire:click="addToCart({{ $product->getKey() }})">Adicionar</button>
+                                    <div class="order-item-actions">
+                                        @if ($hasVariants)
+                                            <select
+                                                class="booking-select order-size-select"
+                                                wire:model.live="selectedVariant.{{ $product->getKey() }}"
+                                            >
+                                                @foreach ($variants as $variant)
+                                                    <option value="{{ $variant->getKey() }}">
+                                                        {{ e($variant->name) }} — {{ $this->formatMoneyCents(\App\Support\Money::toCents($variant->price)) }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
                                         @endif
+                                        <div class="order-qty">
+                                            @if ($qty > 0)
+                                                <button type="button" class="booking-btn booking-btn--secondary" wire:click="decrementItem('{{ $cartKey }}')">−</button>
+                                                <span>{{ $qty }}</span>
+                                                <button type="button" class="booking-btn booking-btn--secondary" wire:click="incrementItem('{{ $cartKey }}')">+</button>
+                                            @else
+                                                <button type="button" class="booking-btn booking-btn--primary" wire:click="addToCart({{ $product->getKey() }})">Adicionar</button>
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
                             @endforeach
@@ -164,7 +195,7 @@
                     @foreach ($cartLines as $line)
                         <li class="booking-option">
                             <div class="booking-option__content">
-                                <p class="booking-option__title">{{ $line['quantity'] }}× {{ e($line['product']->name) }}</p>
+                                <p class="booking-option__title">{{ $line['quantity'] }}× {{ e($line['label']) }}</p>
                                 @if (filled($line['notes']))
                                     <p class="booking-option__subtitle">{{ e($line['notes']) }}</p>
                                 @endif

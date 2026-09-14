@@ -1,7 +1,7 @@
 # Especificação — Pedidos para restaurante (MVP)
 
 **Status:** implementada  
-**Versão:** 1.1  
+**Versão:** 1.2  
 **Data:** 14/09/2026  
 **Produto:** Agendaqui
 
@@ -45,13 +45,17 @@ O módulo é vendável no mesmo padrão de cobrança dos demais (`CompanyModule`
 - textos da página pública (`page_title`, `page_description`, `confirmation_message`, `primary_color`)
 - horário comercial reutilizado de `company_business_hours` quando existir (exibição no link público)
 
-### 4.2 Produtos
+### 4.2 Produtos e cardápio
 
 - `available_for_online_order`
-- `online_order_category` (string nula)
+- `menu_category_id` (FK para `menu_categories`; UX principal no formulário)
+- `online_order_category` (string de compatibilidade; preenchida com o nome da categoria)
 - `prep_time_minutes` (inteiro nulo)
+- `product_variants`: tamanhos opcionais por item (`name`, `price` decimal, `sort_order`, `is_default`, `is_active`). Sem variantes, o pedido usa `sale_price`. Com 1+ variantes ativas, o cliente escolhe o tamanho (padrão pré-selecionado) e o item do pedido grava snapshot (`name` com “Item — Tamanho”, `variant_name`, preço).
 
-Empresas sem o módulo Estoque gerenciam o cardápio em **Cardápio online**.
+`menu_categories` é por empresa (`company_id`, `name`, `slug` único, `sort_order`, `is_active`). Restaurantes novos (ou primeira visita a Categorias/Cardápio, se ainda não houver nenhuma) recebem Lanches, Bebidas, Sobremesas, Combos e Outros. O `/pedir/{slug}` agrupa pela ordem de `sort_order`.
+
+Empresas sem o módulo Estoque gerenciam o cardápio em **Cardápio online** e as seções em **Categorias do cardápio**.
 
 ### 4.3 `orders` / `order_items` / `order_status_histories`
 
@@ -65,6 +69,7 @@ Pedidos têm número sequencial por empresa, `public_code`, snapshots de cliente
 | Cozinha (`/app/empresa/{slug}/cozinha`) | Cozinha / recepção |
 | Histórico de pedidos | Gerência |
 | Cardápio online | Gerência |
+| Categorias do cardápio | Gerência |
 | Configurações de pedidos | Admin / gerente |
 
 ## 6. Permissões
@@ -90,7 +95,8 @@ O fluxo web funciona sem WhatsApp.
 - mapa de mesas, reserva de mesa e `dine_in` no link público
 - garçom / comanda presencial
 - iFood e outros marketplaces
-- modificadores/adicionais complexos
+- modificadores/adicionais complexos (além de tamanhos/preço por tamanho)
+- regras de combo, meio-a-meio
 - multi-cozinha
 - pagamento online / gateway
 - mapa de estoque próprio do pedido (a baixa segue o `SaleService` existente, só para produtos com `tracks_stock`)

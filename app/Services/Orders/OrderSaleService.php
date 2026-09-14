@@ -97,6 +97,7 @@ class OrderSaleService
                     return [
                         'item_type' => SaleItemType::Product->value,
                         'product_id' => $product->getKey(),
+                        'name' => (string) $item->name,
                         'quantity' => $quantity,
                         'unit_price' => $unitPrice,
                     ];

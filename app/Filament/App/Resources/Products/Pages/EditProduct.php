@@ -2,16 +2,28 @@
 
 namespace App\Filament\App\Resources\Products\Pages;
 
+use App\Filament\App\Concerns\FillsProductVariantForm;
+use App\Filament\App\Resources\Pages\EditRecord;
 use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\Company;
 use App\Services\Product\ProductService;
 use Filament\Facades\Filament;
-use App\Filament\App\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 
 class EditProduct extends EditRecord
 {
+    use FillsProductVariantForm;
+
     protected static string $resource = ProductResource::class;
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        return $this->fillProductVariants($data);
+    }
 
     protected function getHeaderActions(): array
     {

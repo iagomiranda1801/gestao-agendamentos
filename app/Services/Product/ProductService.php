@@ -5,22 +5,32 @@ namespace App\Services\Product;
 use App\Enums\ProductType;
 use App\Models\Company;
 use App\Models\MeasurementUnit;
+use App\Models\MenuCategory;
 use App\Models\Product;
+use App\Services\Orders\MenuCategoryService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ProductService
 {
+    public function __construct(
+        protected MenuCategoryService $menuCategories,
+        protected ProductVariantService $variants,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $data
      */
     public function create(Company $company, array $data): Product
     {
         return DB::transaction(function () use ($company, $data): Product {
-            $payload = $this->preparePayload($data) + [
+            [$payload, $variants] = $this->extractVariants($data);
+            $payload = $this->preparePayload($payload) + [
                 'is_sellable' => false,
                 'sale_price' => 0,
             ];
+            $this->applyMenuCategory($company, $payload);
+            $this->applyDefaultSalePriceFromVariants($payload, $variants);
 
             $this->validateBusinessRules($company, $payload);
 
@@ -28,7 +38,11 @@ class ProductService
             $product->company()->associate($company);
             $product->save();
 
-            return $product->refresh();
+            if ($variants !== null) {
+                $this->variants->sync($product, $variants);
+            }
+
+            return $product->refresh()->load(['menuCategory', 'variants']);
         });
     }
 
@@ -40,14 +54,21 @@ class ProductService
         return DB::transaction(function () use ($company, $product, $data): Product {
             $this->ensureBelongsToCompany($company, $product);
 
-            $payload = $this->preparePayload($data);
+            [$payload, $variants] = $this->extractVariants($data);
+            $payload = $this->preparePayload($payload);
+            $this->applyMenuCategory($company, $payload);
+            $this->applyDefaultSalePriceFromVariants($payload, $variants);
 
             $this->validateBusinessRules($company, $payload, $product);
 
             $product->fill($payload);
             $product->save();
 
-            return $product->refresh();
+            if ($variants !== null) {
+                $this->variants->sync($product, $variants);
+            }
+
+            return $product->refresh()->load(['menuCategory', 'variants']);
         });
     }
 
@@ -69,8 +90,83 @@ class ProductService
 
     /**
      * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
+     * @return array{0: array<string, mixed>, 1: list<array<string, mixed>>|null}
      */
+    protected function extractVariants(array $data): array
+    {
+        $variants = null;
+
+        if (array_key_exists('variants', $data)) {
+            $variants = is_array($data['variants']) ? array_values($data['variants']) : [];
+        }
+
+        unset($data['variants']);
+
+        return [$data, $variants];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    protected function applyMenuCategory(Company $company, array &$payload): void
+    {
+        if (array_key_exists('menu_category_id', $payload) && filled($payload['menu_category_id'])) {
+            $category = MenuCategory::query()
+                ->where('company_id', $company->getKey())
+                ->whereKey((int) $payload['menu_category_id'])
+                ->first();
+
+            if ($category === null) {
+                throw ValidationException::withMessages([
+                    'menu_category_id' => 'Selecione uma categoria válida.',
+                ]);
+            }
+
+            $payload['menu_category_id'] = (int) $category->getKey();
+            $payload['online_order_category'] = $category->name;
+
+            return;
+        }
+
+        if (array_key_exists('menu_category_id', $payload) && blank($payload['menu_category_id'])) {
+            $payload['menu_category_id'] = null;
+
+            if (! array_key_exists('online_order_category', $payload) || blank($payload['online_order_category'])) {
+                $payload['online_order_category'] = null;
+            }
+        }
+
+        if (array_key_exists('online_order_category', $payload) && filled($payload['online_order_category'])) {
+            $category = $this->menuCategories->findOrCreate($company, (string) $payload['online_order_category']);
+            $payload['menu_category_id'] = (int) $category->getKey();
+            $payload['online_order_category'] = $category->name;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  list<array<string, mixed>>|null  $variants
+     */
+    protected function applyDefaultSalePriceFromVariants(array &$payload, ?array $variants): void
+    {
+        if ($variants === null || $variants === []) {
+            return;
+        }
+
+        $current = (string) ($payload['sale_price'] ?? '0');
+
+        if (bccomp($current, '0', 2) > 0) {
+            return;
+        }
+
+        $default = collect($variants)->firstWhere('is_default', true) ?? $variants[0];
+        $price = $default['price'] ?? null;
+
+        if ($price !== null && $price !== '' && bccomp((string) $price, '0', 2) > 0) {
+            $payload['sale_price'] = $price;
+        }
+    }
+
     protected function preparePayload(array $data): array
     {
         unset($data['company_id']);

@@ -45,6 +45,10 @@ class RestaurantProfileTest extends TestCase
         $this->assertTrue(app(CompanyModuleService::class)->hasModule($company, CompanyModule::Orders));
         $this->assertTrue(app(CompanyModuleService::class)->hasModule($company, CompanyModule::WhatsApp));
         $this->assertNotNull($company->orderSetting);
+        $this->assertSame(
+            ['Lanches', 'Bebidas', 'Sobremesas', 'Combos', 'Outros'],
+            $company->menuCategories()->orderBy('sort_order')->pluck('name')->all(),
+        );
     }
 
     public function test_module_price_seeder_includes_orders_at_entry_price(): void

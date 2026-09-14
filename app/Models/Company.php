@@ -182,6 +182,14 @@ class Company extends Model
     }
 
     /**
+     * @return HasMany<MenuCategory, $this>
+     */
+    public function menuCategories(): HasMany
+    {
+        return $this->hasMany(MenuCategory::class);
+    }
+
+    /**
      * @return HasMany<Service, $this>
      */
     public function services(): HasMany
