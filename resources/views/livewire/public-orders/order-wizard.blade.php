@@ -55,47 +55,62 @@
                                         && $variants->count() > 1
                                         && (string) $variants->min('price') !== (string) $variants->max('price')
                                         && $qty < 1;
+                                    $otherCartedSizes = collect($this->cartedSizesForProduct($product))
+                                        ->reject(fn (array $line): bool => (int) $line['variant_id'] === $selectedVariantId)
+                                        ->values();
                                 @endphp
-                                <div class="booking-option" wire:key="menu-{{ $product->getKey() }}">
-                                    <div class="booking-option__content">
-                                        <p class="booking-option__title">{{ e($product->name) }}</p>
-                                        @if (filled($product->description))
-                                            <p class="booking-option__subtitle">{{ e($product->description) }}</p>
-                                        @endif
-                                        <p class="booking-option__subtitle">
-                                            @if ($showFrom)
-                                                A partir de {{ $this->formatMoneyCents(\App\Support\Money::toCents($variants->min('price'))) }}
-                                            @else
-                                                {{ $this->formatMoneyCents($displayCents) }}
+                                <div class="booking-option booking-option--menu" wire:key="menu-{{ $product->getKey() }}">
+                                    <div class="booking-option__row">
+                                        <div class="booking-option__content">
+                                            <p class="booking-option__title">{{ e($product->name) }}</p>
+                                            @if (filled($product->description))
+                                                <p class="booking-option__subtitle">{{ e($product->description) }}</p>
                                             @endif
-                                            @if ($product->prep_time_minutes)
-                                                · {{ $product->prep_time_minutes }} min
+                                            <p class="booking-option__subtitle">
+                                                @if ($showFrom)
+                                                    A partir de {{ $this->formatMoneyCents(\App\Support\Money::toCents($variants->min('price'))) }}
+                                                @else
+                                                    {{ $this->formatMoneyCents($displayCents) }}
+                                                @endif
+                                                @if ($product->prep_time_minutes)
+                                                    · {{ $product->prep_time_minutes }} min
+                                                @endif
+                                            </p>
+                                        </div>
+                                        <div class="order-item-actions">
+                                            @if ($hasVariants)
+                                                <select
+                                                    class="booking-select order-size-select"
+                                                    wire:model.live="selectedVariant.{{ $product->getKey() }}"
+                                                >
+                                                    @foreach ($variants as $variant)
+                                                        <option value="{{ $variant->getKey() }}">
+                                                            {{ e($variant->name) }} — {{ $this->formatMoneyCents(\App\Support\Money::toCents($variant->price)) }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
                                             @endif
-                                        </p>
-                                    </div>
-                                    <div class="order-item-actions">
-                                        @if ($hasVariants)
-                                            <select
-                                                class="booking-select order-size-select"
-                                                wire:model.live="selectedVariant.{{ $product->getKey() }}"
-                                            >
-                                                @foreach ($variants as $variant)
-                                                    <option value="{{ $variant->getKey() }}">
-                                                        {{ e($variant->name) }} — {{ $this->formatMoneyCents(\App\Support\Money::toCents($variant->price)) }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                        @endif
-                                        <div class="order-qty">
-                                            @if ($qty > 0)
-                                                <button type="button" class="booking-btn booking-btn--secondary" wire:click="decrementItem('{{ $cartKey }}')">−</button>
-                                                <span>{{ $qty }}</span>
-                                                <button type="button" class="booking-btn booking-btn--secondary" wire:click="incrementItem('{{ $cartKey }}')">+</button>
-                                            @else
-                                                <button type="button" class="booking-btn booking-btn--primary" wire:click="addToCart({{ $product->getKey() }})">Adicionar</button>
-                                            @endif
+                                            <div class="order-qty">
+                                                @if ($qty > 0)
+                                                    <button type="button" class="booking-btn booking-btn--secondary" wire:click="decrementItem('{{ $cartKey }}')">−</button>
+                                                    <span>{{ $qty }}</span>
+                                                    <button type="button" class="booking-btn booking-btn--secondary" wire:click="incrementItem('{{ $cartKey }}')">+</button>
+                                                @else
+                                                    <button type="button" class="booking-btn booking-btn--primary" wire:click="addToCart({{ $product->getKey() }})">Adicionar</button>
+                                                @endif
+                                            </div>
                                         </div>
                                     </div>
+                                    @foreach ($otherCartedSizes as $sizeLine)
+                                        <div class="order-carted-size" wire:key="cart-size-{{ $sizeLine['cart_key'] }}">
+                                            <span>{{ e($sizeLine['label']) }} no pedido</span>
+                                            <div class="order-qty">
+                                                <button type="button" class="booking-btn booking-btn--secondary" wire:click="decrementItem('{{ $sizeLine['cart_key'] }}')">−</button>
+                                                <span>{{ $sizeLine['quantity'] }}</span>
+                                                <button type="button" class="booking-btn booking-btn--secondary" wire:click="incrementItem('{{ $sizeLine['cart_key'] }}')">+</button>
+                                            </div>
+                                        </div>
+                                    @endforeach
                                 </div>
                             @endforeach
                         </div>
