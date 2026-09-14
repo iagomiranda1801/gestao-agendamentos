@@ -98,6 +98,7 @@ class ProductFactory extends Factory
             'available_for_online_order' => true,
             'online_order_category' => $category,
             'prep_time_minutes' => 15,
+            'tracks_stock' => false,
         ]);
     }
 }

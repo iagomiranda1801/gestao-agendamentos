@@ -19,4 +19,11 @@ class MoneyTest extends TestCase
         $this->assertSame('R$ 25,00', Money::formatCents(2500));
         $this->assertSame('R$ 8,00', Money::formatCents(800));
     }
+
+    public function test_converts_cents_to_decimal_string(): void
+    {
+        $this->assertSame('25.00', Money::fromCents(2500));
+        $this->assertSame('8.00', Money::fromCents(800));
+        $this->assertSame('0.00', Money::fromCents(0));
+    }
 }

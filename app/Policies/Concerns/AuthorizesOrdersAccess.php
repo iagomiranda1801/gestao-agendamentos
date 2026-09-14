@@ -54,11 +54,8 @@ trait AuthorizesOrdersAccess
             return true;
         }
 
-        if ($company instanceof Company && app(CompanyPermissionService::class)->allows($user, $company, CompanyPermission::ViewOrders)) {
-            return true;
-        }
-
-        return $this->userCanAccessKitchen($user, $company instanceof Company ? $company : null);
+        return $company instanceof Company
+            && app(CompanyPermissionService::class)->allows($user, $company, CompanyPermission::ViewOrders);
     }
 
     protected function userCanAccessKitchen(User $user, ?Company $company = null): bool

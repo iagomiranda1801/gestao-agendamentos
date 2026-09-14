@@ -42,6 +42,11 @@ class OrderResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'company';
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::tenantHasRequiredModule() && static::canViewAny();
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema;

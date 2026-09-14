@@ -58,5 +58,21 @@ class OrderModuleGatingTest extends TestCase
 
         $this->assertTrue(KitchenDisplayPage::canAccess());
         $this->assertFalse(OrderSettingsPage::canAccess());
+        $this->assertFalse(OrderResource::canViewAny());
+        $this->assertFalse(OrderResource::shouldRegisterNavigation());
+    }
+
+    public function test_receptionist_can_open_kitchen_and_order_history(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $receptionist = $this->createCompanyUser($setup['company'], role: CompanyRole::Receptionist);
+
+        $this->authenticateForAppTenant($receptionist, $setup['company']);
+        Filament::setCurrentPanel('app');
+
+        $this->assertTrue(KitchenDisplayPage::canAccess());
+        $this->assertTrue(OrderResource::canViewAny());
+        $this->assertTrue(OrderResource::shouldRegisterNavigation());
+        $this->assertFalse(OrderSettingsPage::canAccess());
     }
 }
