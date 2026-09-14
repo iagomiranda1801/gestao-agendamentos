@@ -67,7 +67,24 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
             }
 
             $reply = $orderLinkBot->handleIncoming($company, $this->phone, $this->messageId);
-            $this->sendReply($company, $client, $reply);
+
+            if ($reply === null || trim($reply) === '') {
+                return;
+            }
+
+            try {
+                $sent = $this->sendReply($company, $client, $reply);
+            } catch (Throwable $exception) {
+                $orderLinkBot->releaseClaim($company, $this->phone, $this->messageId);
+
+                throw $exception;
+            }
+
+            if ($sent) {
+                $orderLinkBot->rememberDelivered($company, $this->phone, $this->messageId);
+            } else {
+                $orderLinkBot->releaseClaim($company, $this->phone, $this->messageId);
+            }
 
             return;
         }
@@ -132,10 +149,10 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
         return true;
     }
 
-    protected function sendReply(Company $company, EvolutionApiClient $client, ?string $reply): void
+    protected function sendReply(Company $company, EvolutionApiClient $client, ?string $reply): bool
     {
         if ($reply === null || trim($reply) === '') {
-            return;
+            return false;
         }
 
         if (! $this->deferUntilOutboundSlot($company, WhatsAppOutboundKind::BotReply)) {
@@ -144,18 +161,22 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
                 'retry_in_seconds' => $this->whatsappOutboundRetrySeconds,
             ]);
 
-            return;
+            return false;
         }
 
         try {
             $client->sendText($this->instanceName, $this->phone, $reply);
             $this->rememberOutboundSuccess($company);
+
+            return true;
         } catch (Throwable $exception) {
             Log::warning('WhatsApp bot reply failed.', [
                 'company_id' => $company->getKey(),
                 'error' => $exception->getMessage(),
             ]);
             $this->rememberOutboundFailureAndMaybeRethrow($company, $exception);
+
+            return false;
         }
     }
 }

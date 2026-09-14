@@ -12,6 +12,8 @@ use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\Bot\WhatsAppBookingBotService;
 use App\Services\WhatsApp\Bot\WhatsAppOrderLinkBotService;
 use App\Services\WhatsApp\EvolutionApiClient;
+use GuzzleHttp\Psr7\Response;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Tests\Concerns\CreatesOrderFixtures;
 use Tests\Concerns\CreatesPublicBookingFixtures;
@@ -115,6 +117,69 @@ class OrderWhatsAppLinkBotTest extends TestCase
         $this->assertSame(0, WhatsAppBotConversation::query()->count());
     }
 
+    public function test_failed_send_does_not_consume_cooldown_so_retry_can_deliver(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $instance = $this->createInstance($setup['company']);
+        $slug = $setup['company']->slug;
+
+        $client = \Mockery::mock(EvolutionApiClient::class);
+        $client->shouldReceive('sendText')
+            ->once()
+            ->andThrow(new RequestException(
+                new \Illuminate\Http\Client\Response(new Response(500, [], 'fail')),
+            ));
+        $client->shouldReceive('sendText')
+            ->once()
+            ->withArgs(fn (string $instanceName, string $phone, string $text): bool => str_contains($text, '/pedir/'.$slug))
+            ->andReturn(['key' => ['id' => 'ok']]);
+
+        $this->runInbound($instance, 'oi', 'rest-retry-1', client: $client);
+        $this->runInbound($instance, 'oi', 'rest-retry-1', client: $client);
+        $this->runInbound($instance, 'quero pedir', 'rest-retry-2', client: $client);
+    }
+
+    public function test_claim_blocks_concurrent_phone_before_send_and_releases_on_failure(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $bot = app(WhatsAppOrderLinkBotService::class);
+        $phone = '5511922221111';
+
+        $first = $bot->handleIncoming($setup['company'], $phone, 'claim-1');
+        $second = $bot->handleIncoming($setup['company'], $phone, 'claim-2');
+
+        $this->assertNotNull($first);
+        $this->assertNull($second);
+
+        $bot->releaseClaim($setup['company'], $phone, 'claim-1');
+
+        $retry = $bot->handleIncoming($setup['company'], $phone, 'claim-1');
+        $this->assertNotNull($retry);
+    }
+
+    public function test_stale_in_flight_claim_expires_before_queue_retry_after(): void
+    {
+        $this->assertLessThan(
+            (int) config('queue.connections.redis.retry_after'),
+            WhatsAppOrderLinkBotService::CLAIM_SECONDS,
+        );
+        $this->assertLessThan(
+            (int) config('horizon.defaults.supervisor-1.timeout'),
+            WhatsAppOrderLinkBotService::CLAIM_SECONDS,
+        );
+
+        $setup = $this->createRestaurantSetup();
+        $bot = app(WhatsAppOrderLinkBotService::class);
+        $phone = '5511922221111';
+
+        $this->assertNotNull($bot->handleIncoming($setup['company'], $phone, 'stale-1'));
+        $this->assertNull($bot->handleIncoming($setup['company'], $phone, 'stale-1'));
+
+        $this->travel(WhatsAppOrderLinkBotService::CLAIM_SECONDS + 1)->seconds();
+
+        $this->assertNotNull($bot->handleIncoming($setup['company'], $phone, 'stale-1'));
+    }
+
     public function test_salon_booking_bot_still_replies_to_inbound(): void
     {
         $setup = $this->createBookableSetup();
@@ -139,6 +204,7 @@ class OrderWhatsAppLinkBotTest extends TestCase
         string $text,
         string $messageId,
         string $phone = '5511922221111',
+        ?EvolutionApiClient $client = null,
     ): void {
         (new HandleWhatsAppInboundMessageJob(
             instanceName: $instance->instance_name,
@@ -148,7 +214,7 @@ class OrderWhatsAppLinkBotTest extends TestCase
             messageId: $messageId,
         ))->handle(
             app(WhatsAppBookingBotService::class),
-            app(EvolutionApiClient::class),
+            $client ?? app(EvolutionApiClient::class),
             app(CompanyModuleService::class),
             app(CompanySchedulingSettingService::class),
             app(WhatsAppOrderLinkBotService::class),

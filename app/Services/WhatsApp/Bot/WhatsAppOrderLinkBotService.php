@@ -13,6 +13,13 @@ class WhatsAppOrderLinkBotService
 {
     public const RESEND_COOLDOWN_SECONDS = 600;
 
+    /**
+     * In-flight reservation while Evolution send is running.
+     * Must stay below Horizon job timeout (60s) and queue retry_after (90s)
+     * so a killed worker's retry can reclaim and deliver.
+     */
+    public const CLAIM_SECONDS = 45;
+
     public function __construct(
         protected CompanyModuleService $modules,
         protected CompanyOrderSettingService $orderSettings,
@@ -64,21 +71,71 @@ class WhatsAppOrderLinkBotService
         try {
             $lock->block(5);
 
-            if ($messageId !== null && $messageId !== '') {
-                $messageKey = "wa:order-link-msgid:{$company->getKey()}:{$messageId}";
+            $claimedMessage = false;
 
-                if (! Cache::add($messageKey, true, now()->addMinutes(30))) {
+            if ($messageId !== null && $messageId !== '') {
+                if (! Cache::add($this->messageKey($company, $messageId), true, now()->addSeconds(self::CLAIM_SECONDS))) {
                     return null;
                 }
+
+                $claimedMessage = true;
             }
 
-            $cooldownKey = "wa:order-link-sent:{$company->getKey()}:{$phone}";
+            if (! Cache::add($this->cooldownKey($company, $phone), true, now()->addSeconds(self::CLAIM_SECONDS))) {
+                if ($claimedMessage) {
+                    Cache::forget($this->messageKey($company, $messageId));
+                }
 
-            if (! Cache::add($cooldownKey, true, now()->addSeconds(self::RESEND_COOLDOWN_SECONDS))) {
                 return null;
             }
 
             return $this->composeMessage($company);
+        } finally {
+            optional($lock)->release();
+        }
+    }
+
+    public function rememberDelivered(Company $company, string $rawPhone, ?string $messageId = null): void
+    {
+        $phone = PhoneNormalizer::normalize($rawPhone);
+
+        if ($phone === null) {
+            return;
+        }
+
+        $lock = Cache::lock("wa:order-link:{$company->getKey()}:{$phone}", 10);
+
+        try {
+            $lock->block(5);
+
+            if ($messageId !== null && $messageId !== '') {
+                Cache::put($this->messageKey($company, $messageId), true, now()->addMinutes(30));
+            }
+
+            Cache::put($this->cooldownKey($company, $phone), true, now()->addSeconds(self::RESEND_COOLDOWN_SECONDS));
+        } finally {
+            optional($lock)->release();
+        }
+    }
+
+    public function releaseClaim(Company $company, string $rawPhone, ?string $messageId = null): void
+    {
+        $phone = PhoneNormalizer::normalize($rawPhone);
+
+        if ($phone === null) {
+            return;
+        }
+
+        $lock = Cache::lock("wa:order-link:{$company->getKey()}:{$phone}", 10);
+
+        try {
+            $lock->block(5);
+
+            if ($messageId !== null && $messageId !== '') {
+                Cache::forget($this->messageKey($company, $messageId));
+            }
+
+            Cache::forget($this->cooldownKey($company, $phone));
         } finally {
             optional($lock)->release();
         }
@@ -89,5 +146,15 @@ class WhatsAppOrderLinkBotService
         $url = route('public.orders.show', ['company' => $company->slug]);
 
         return "Olá! Peça pelo cardápio da {$company->name}:\n{$url}";
+    }
+
+    protected function messageKey(Company $company, string $messageId): string
+    {
+        return "wa:order-link-msgid:{$company->getKey()}:{$messageId}";
+    }
+
+    protected function cooldownKey(Company $company, string $phone): string
+    {
+        return "wa:order-link-sent:{$company->getKey()}:{$phone}";
     }
 }
