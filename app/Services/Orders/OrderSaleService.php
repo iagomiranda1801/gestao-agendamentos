@@ -83,7 +83,7 @@ class OrderSaleService
     protected function saleItems(Order $order): array
     {
         $items = $order->items
-            ->map(function (OrderItem $item): array {
+            ->map(function (OrderItem $item) use ($order): array {
                 $product = $item->product;
                 $unitPrice = Money::fromCents((int) $item->unit_price_cents);
                 $quantity = (string) $item->quantity;
