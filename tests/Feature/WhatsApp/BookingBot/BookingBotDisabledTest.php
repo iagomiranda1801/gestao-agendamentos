@@ -7,6 +7,11 @@ use App\Jobs\HandleWhatsAppInboundMessageJob;
 use App\Models\Company;
 use App\Models\CompanyWhatsAppInstance;
 use App\Models\WhatsAppBotConversation;
+use App\Services\Company\CompanyModuleService;
+use App\Services\Scheduling\CompanySchedulingSettingService;
+use App\Services\WhatsApp\Bot\WhatsAppBookingBotService;
+use App\Services\WhatsApp\Bot\WhatsAppOrderLinkBotService;
+use App\Services\WhatsApp\EvolutionApiClient;
 use Illuminate\Support\Facades\Http;
 use Tests\Concerns\CreatesPublicBookingFixtures;
 use Tests\Concerns\CreatesSchedulingFixtures;
@@ -51,10 +56,11 @@ class BookingBotDisabledTest extends TestCase
             text: 'oi',
             messageId: 'gate-off',
         ))->handle(
-            app(\App\Services\WhatsApp\Bot\WhatsAppBookingBotService::class),
-            app(\App\Services\WhatsApp\EvolutionApiClient::class),
-            app(\App\Services\Company\CompanyModuleService::class),
-            app(\App\Services\Scheduling\CompanySchedulingSettingService::class),
+            app(WhatsAppBookingBotService::class),
+            app(EvolutionApiClient::class),
+            app(CompanyModuleService::class),
+            app(CompanySchedulingSettingService::class),
+            app(WhatsAppOrderLinkBotService::class),
         );
 
         $this->assertSame(0, WhatsAppBotConversation::query()->count());
@@ -80,10 +86,11 @@ class BookingBotDisabledTest extends TestCase
             text: 'oi',
             messageId: 'module-off',
         ))->handle(
-            app(\App\Services\WhatsApp\Bot\WhatsAppBookingBotService::class),
-            app(\App\Services\WhatsApp\EvolutionApiClient::class),
-            app(\App\Services\Company\CompanyModuleService::class),
-            app(\App\Services\Scheduling\CompanySchedulingSettingService::class),
+            app(WhatsAppBookingBotService::class),
+            app(EvolutionApiClient::class),
+            app(CompanyModuleService::class),
+            app(CompanySchedulingSettingService::class),
+            app(WhatsAppOrderLinkBotService::class),
         );
 
         $this->assertSame(0, WhatsAppBotConversation::query()->count());
@@ -108,10 +115,11 @@ class BookingBotDisabledTest extends TestCase
             text: 'oi',
             messageId: 'no-instance',
         ))->handle(
-            app(\App\Services\WhatsApp\Bot\WhatsAppBookingBotService::class),
-            app(\App\Services\WhatsApp\EvolutionApiClient::class),
-            app(\App\Services\Company\CompanyModuleService::class),
-            app(\App\Services\Scheduling\CompanySchedulingSettingService::class),
+            app(WhatsAppBookingBotService::class),
+            app(EvolutionApiClient::class),
+            app(CompanyModuleService::class),
+            app(CompanySchedulingSettingService::class),
+            app(WhatsAppOrderLinkBotService::class),
         );
 
         $this->assertSame(0, WhatsAppBotConversation::query()->count());

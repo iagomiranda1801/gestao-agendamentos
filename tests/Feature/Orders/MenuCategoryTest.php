@@ -143,6 +143,36 @@ class MenuCategoryTest extends TestCase
             ->assertSeeInOrder(['Lanches', 'Bebidas']);
     }
 
+    public function test_uncategorized_group_does_not_replace_cardapio_category(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $company = $setup['company'];
+
+        $setup['burger']->update(['menu_category_id' => null, 'online_order_category' => null]);
+        $setup['soda']->update(['menu_category_id' => null, 'online_order_category' => null]);
+        MenuCategory::query()->where('company_id', $company->id)->delete();
+
+        $cardapio = app(MenuCategoryService::class)->create($company, [
+            'name' => 'Cardápio',
+            'sort_order' => 10,
+        ]);
+
+        $setup['burger']->update([
+            'menu_category_id' => $cardapio->id,
+            'online_order_category' => 'Cardápio',
+        ]);
+
+        $grouped = app(OrderCatalogService::class)->groupedByCategory($company);
+
+        $this->assertSame(['Cardápio', 'Sem categoria'], $grouped->keys()->all());
+        $this->assertTrue($grouped['Cardápio']->contains(
+            fn (Product $product): bool => $product->is($setup['burger']->fresh()),
+        ));
+        $this->assertTrue($grouped['Sem categoria']->contains(
+            fn (Product $product): bool => $product->is($setup['soda']->fresh()),
+        ));
+    }
+
     public function test_manager_can_open_categories_and_employee_cannot(): void
     {
         $setup = $this->createRestaurantSetup();

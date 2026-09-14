@@ -1,7 +1,7 @@
 # Especificação — Pedidos para restaurante (MVP)
 
 **Status:** implementada  
-**Versão:** 1.2  
+**Versão:** 1.3  
 **Data:** 14/09/2026  
 **Produto:** Agendaqui
 
@@ -89,6 +89,10 @@ Se o módulo WhatsApp estiver ativo, houver instância Evolution e `orders_whats
 - saiu para entrega (`out_for_delivery`)
 
 O fluxo web funciona sem WhatsApp.
+
+Restaurantes **não** usam o bot de agendamento. Com módulo WhatsApp, pedidos online ligados e “Enviar link do cardápio no WhatsApp” (padrão ligado), uma mensagem recebida no WhatsApp da empresa recebe só o link `/pedir/{slug}`. Sem conversa de horários. Se o cardápio online estiver desligado, o bot não responde e também não cai no agendamento.
+
+Empresas que não são restaurante (salão, clínica, etc.) continuam no bot de agendamento existente.
 
 ## 8. Fora do escopo (fase B)
 

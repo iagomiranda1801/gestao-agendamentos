@@ -118,6 +118,27 @@ class ProductVariantOrderTest extends TestCase
         $this->assertSame(2800 + 3200, $order->total_cents);
     }
 
+    public function test_switching_size_keeps_previous_size_visible_in_the_menu(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $variants = $this->attachSizes($setup['burger']);
+        $media = $variants->firstWhere('name', 'Média');
+        $grande = $variants->firstWhere('name', 'Grande');
+        $mediaKey = $setup['burger']->id.':'.$media->id;
+
+        $component = Livewire::test(OrderWizard::class, ['company' => $setup['company']])
+            ->call('addToCart', $setup['burger']->id);
+
+        $this->assertSame(1, $component->get('cart')[$mediaKey]['quantity'] ?? null);
+
+        $component
+            ->set('selectedVariant.'.$setup['burger']->id, $grande->id)
+            ->assertSee('Média no pedido', false)
+            ->assertSee('1 item(ns)', false)
+            ->call('decrementItem', $mediaKey)
+            ->assertDontSee('Média no pedido', false);
+    }
+
     public function test_kitchen_shows_size_in_the_item_line(): void
     {
         $setup = $this->createRestaurantSetup();

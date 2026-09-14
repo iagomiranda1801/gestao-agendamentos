@@ -61,10 +61,24 @@ class OrderCatalogService
             ->values();
 
         if ($uncategorized->isNotEmpty()) {
-            $grouped->put('Cardápio', $uncategorized);
+            $grouped->put($this->uncategorizedGroupName($grouped), $uncategorized);
         }
 
         return $grouped;
+    }
+
+    /**
+     * @param  Collection<string, mixed>  $grouped
+     */
+    protected function uncategorizedGroupName(Collection $grouped): string
+    {
+        foreach (['Cardápio', 'Sem categoria', 'Outros itens'] as $name) {
+            if (! $grouped->has($name)) {
+                return $name;
+            }
+        }
+
+        return 'Sem categoria';
     }
 
     public function findAvailable(Company $company, int $productId): ?Product

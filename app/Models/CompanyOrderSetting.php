@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'min_order_cents',
     'delivery_radius_note',
     'orders_whatsapp_notify',
+    'whatsapp_order_link_bot_enabled',
     'page_title',
     'page_description',
     'confirmation_message',
@@ -40,6 +41,7 @@ class CompanyOrderSetting extends Model
             'delivery_fee_cents' => 'integer',
             'min_order_cents' => 'integer',
             'orders_whatsapp_notify' => 'boolean',
+            'whatsapp_order_link_bot_enabled' => 'boolean',
         ];
     }
 

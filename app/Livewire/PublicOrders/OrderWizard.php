@@ -505,6 +505,35 @@ class OrderWizard extends Component
         return $catalog->findActiveVariant($product, $variantId);
     }
 
+    /**
+     * @return list<array{cart_key: string, variant_id: int, quantity: int, label: string}>
+     */
+    public function cartedSizesForProduct(Product $product): array
+    {
+        $prefix = $product->getKey().':';
+        $lines = [];
+
+        foreach ($this->cart as $key => $item) {
+            if (! str_starts_with((string) $key, $prefix)) {
+                continue;
+            }
+
+            $variantId = (int) ($item['variant_id'] ?? 0);
+            $variant = $product->relationLoaded('activeVariants')
+                ? $product->activeVariants->firstWhere('id', $variantId)
+                : null;
+
+            $lines[] = [
+                'cart_key' => (string) $key,
+                'variant_id' => $variantId,
+                'quantity' => (int) $item['quantity'],
+                'label' => $variant?->name ?? 'Tamanho',
+            ];
+        }
+
+        return $lines;
+    }
+
     public function render(OrderCatalogService $catalog, CompanyOrderSettingService $settings)
     {
         $setting = $this->company->orderSetting ?? $settings->getOrCreate($this->company);
