@@ -13,6 +13,13 @@ use Tests\TestCase;
 
 class CompanyProfilePageTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withoutVite();
+    }
+
     public function test_company_admin_can_render_company_profile_page(): void
     {
         $company = $this->createCompany();
