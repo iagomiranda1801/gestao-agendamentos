@@ -12,6 +12,8 @@ use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\Bot\WhatsAppBookingBotService;
 use App\Services\WhatsApp\Bot\WhatsAppOrderLinkBotService;
 use App\Services\WhatsApp\EvolutionApiClient;
+use GuzzleHttp\Psr7\Response;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Tests\Concerns\CreatesOrderFixtures;
 use Tests\Concerns\CreatesPublicBookingFixtures;
@@ -117,21 +119,24 @@ class OrderWhatsAppLinkBotTest extends TestCase
 
     public function test_failed_send_does_not_consume_cooldown_so_retry_can_deliver(): void
     {
-        Http::fake([
-            'evolution.test/*' => Http::sequence()
-                ->push('fail', 500)
-                ->push(['key' => ['id' => 'ok']], 200),
-        ]);
-
         $setup = $this->createRestaurantSetup();
         $instance = $this->createInstance($setup['company']);
+        $slug = $setup['company']->slug;
 
-        $this->runInbound($instance, 'oi', 'rest-retry-1');
-        $this->runInbound($instance, 'oi', 'rest-retry-1');
-        $this->runInbound($instance, 'quero pedir', 'rest-retry-2');
+        $client = \Mockery::mock(EvolutionApiClient::class);
+        $client->shouldReceive('sendText')
+            ->once()
+            ->andThrow(new RequestException(
+                new \Illuminate\Http\Client\Response(new Response(500, [], 'fail')),
+            ));
+        $client->shouldReceive('sendText')
+            ->once()
+            ->withArgs(fn (string $instanceName, string $phone, string $text): bool => str_contains($text, '/pedir/'.$slug))
+            ->andReturn(['key' => ['id' => 'ok']]);
 
-        Http::assertSentCount(2);
-        Http::assertSent(fn ($request): bool => str_contains((string) ($request['text'] ?? ''), '/pedir/'));
+        $this->runInbound($instance, 'oi', 'rest-retry-1', client: $client);
+        $this->runInbound($instance, 'oi', 'rest-retry-1', client: $client);
+        $this->runInbound($instance, 'quero pedir', 'rest-retry-2', client: $client);
     }
 
     public function test_salon_booking_bot_still_replies_to_inbound(): void
@@ -158,6 +163,7 @@ class OrderWhatsAppLinkBotTest extends TestCase
         string $text,
         string $messageId,
         string $phone = '5511922221111',
+        ?EvolutionApiClient $client = null,
     ): void {
         (new HandleWhatsAppInboundMessageJob(
             instanceName: $instance->instance_name,
@@ -167,7 +173,7 @@ class OrderWhatsAppLinkBotTest extends TestCase
             messageId: $messageId,
         ))->handle(
             app(WhatsAppBookingBotService::class),
-            app(EvolutionApiClient::class),
+            $client ?? app(EvolutionApiClient::class),
             app(CompanyModuleService::class),
             app(CompanySchedulingSettingService::class),
             app(WhatsAppOrderLinkBotService::class),
