@@ -10,6 +10,7 @@ use App\Enums\Weekday;
 use App\Models\Company;
 use App\Models\User;
 use App\Services\Clinical\DentalClinicSettingService;
+use App\Services\Orders\CompanyOrderSettingService;
 use App\Services\Scheduling\CompanyBusinessHoursService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\Automations\WhatsAppAutomationService;
@@ -25,6 +26,7 @@ class CompanyProvisioningService
         protected CompanySchedulingSettingService $schedulingSettingService,
         protected CompanyBusinessHoursService $businessHoursService,
         protected DentalClinicSettingService $dentalClinicSettingService,
+        protected CompanyOrderSettingService $orderSettingService,
     ) {}
 
     /**
@@ -117,6 +119,10 @@ class CompanyProvisioningService
 
             if ($profile === CompanyProfile::DentalClinic) {
                 $this->dentalClinicSettingService->getOrCreate($company);
+            }
+
+            if ($modules->contains(CompanyModule::Orders)) {
+                $this->orderSettingService->getOrCreate($company);
             }
 
             return [

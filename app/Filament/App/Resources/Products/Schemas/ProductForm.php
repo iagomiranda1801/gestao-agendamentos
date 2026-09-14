@@ -2,8 +2,12 @@
 
 namespace App\Filament\App\Resources\Products\Schemas;
 
+use App\Enums\CompanyModule;
 use App\Enums\ProductType;
+use App\Models\Company;
 use App\Models\MeasurementUnit;
+use App\Services\Company\CompanyModuleService;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -96,6 +100,24 @@ class ProductForm
                             ->default(true),
                     ])
                     ->columns(2),
+                Section::make('Cardápio online')
+                    ->description('Itens marcados aparecem no link público de pedidos.')
+                    ->visible(fn (): bool => self::tenantHasOrdersModule())
+                    ->schema([
+                        Toggle::make('available_for_online_order')
+                            ->label('Disponível no cardápio online')
+                            ->default(false),
+                        TextInput::make('online_order_category')
+                            ->label('Categoria no cardápio')
+                            ->maxLength(80)
+                            ->placeholder('Lanches, Bebidas, Sobremesas…'),
+                        TextInput::make('prep_time_minutes')
+                            ->label('Tempo de preparo (min)')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(240),
+                    ])
+                    ->columns(2),
                 Section::make('Informações adicionais')
                     ->schema([
                         Textarea::make('notes')
@@ -104,5 +126,13 @@ class ProductForm
                             ->columnSpanFull(),
                     ]),
             ]);
+    }
+
+    protected static function tenantHasOrdersModule(): bool
+    {
+        $tenant = Filament::getTenant();
+
+        return $tenant instanceof Company
+            && app(CompanyModuleService::class)->hasModule($tenant, CompanyModule::Orders);
     }
 }

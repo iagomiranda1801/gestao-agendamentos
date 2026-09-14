@@ -74,6 +74,10 @@ class ProductsTable
                 IconColumn::make('is_sellable')
                     ->label('PDV')
                     ->boolean(),
+                IconColumn::make('available_for_online_order')
+                    ->label('Cardápio')
+                    ->boolean()
+                    ->toggleable(),
                 IconColumn::make('is_active')
                     ->label('Status')
                     ->boolean()

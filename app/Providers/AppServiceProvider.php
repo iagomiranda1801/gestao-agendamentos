@@ -7,9 +7,12 @@ use App\Events\AppointmentConfirmed;
 use App\Events\AppointmentCreated;
 use App\Events\AppointmentRescheduled;
 use App\Events\OnlineAppointmentCreated;
+use App\Events\OrderCreated;
+use App\Events\OrderStatusChanged;
 use App\Listeners\SendAppointmentCancelledNotifications;
 use App\Listeners\SendAppointmentRescheduledNotifications;
 use App\Listeners\SendOnlineBookingWhatsAppNotification;
+use App\Listeners\SendOrderWhatsAppNotification;
 use App\Listeners\SendProfessionalAppointmentNotifications;
 use App\Models\Company;
 use App\Models\User;
@@ -61,6 +64,9 @@ class AppServiceProvider extends ServiceProvider
             AppointmentRescheduled::class,
             SendAppointmentRescheduledNotifications::class,
         );
+
+        Event::listen(OrderCreated::class, SendOrderWhatsAppNotification::class);
+        Event::listen(OrderStatusChanged::class, SendOrderWhatsAppNotification::class);
 
         Filament::serving(function (): void {
             app()->setLocale('pt_BR');

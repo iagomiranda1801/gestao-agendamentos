@@ -40,7 +40,7 @@
                         @endif
                         <div class="booking-brand__text">
                             <span class="booking-brand__name">{{ e($company->name) }}</span>
-                            <span class="booking-brand__tagline">Agendamento online</span>
+                            <span class="booking-brand__tagline">{{ e($tagline ?? 'Agendamento online') }}</span>
                         </div>
                     </div>
                 @endif

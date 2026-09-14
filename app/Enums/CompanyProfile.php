@@ -11,6 +11,7 @@ enum CompanyProfile: string
     case Store = 'store';
     case ServicesAndProducts = 'services_products';
     case CarWash = 'car_wash';
+    case Restaurant = 'restaurant';
     case Custom = 'custom';
 
     public function label(): string
@@ -23,6 +24,7 @@ enum CompanyProfile: string
             self::Store => 'Loja de produtos',
             self::ServicesAndProducts => 'Serviços e produtos',
             self::CarWash => 'Lava jato ou estética automotiva',
+            self::Restaurant => 'Restaurante ou food service',
             self::Custom => 'Configuração personalizada',
         };
     }
@@ -37,6 +39,7 @@ enum CompanyProfile: string
             self::Store => 'Para empresas focadas em produtos, estoque, vendas e financeiro.',
             self::ServicesAndProducts => 'Para quem agenda serviços e também vende produtos.',
             self::CarWash => 'Para lava jatos e estética automotiva: pacotes de lavagem, agenda, PDV e retorno do cliente no WhatsApp.',
+            self::Restaurant => 'Para restaurantes, lanchonetes e food service: cardápio online, pedidos para retirada ou entrega e tela da cozinha.',
             self::Custom => 'Escolha manualmente os recursos que a empresa utilizará.',
         };
     }
@@ -58,6 +61,7 @@ enum CompanyProfile: string
             self::Store => [CompanyModule::Sales, CompanyModule::Stock, CompanyModule::Finance],
             self::ServicesAndProducts => [CompanyModule::Scheduling, CompanyModule::Sales, CompanyModule::Stock, CompanyModule::Finance, CompanyModule::WhatsApp],
             self::CarWash => [CompanyModule::Scheduling, CompanyModule::Sales, CompanyModule::Stock, CompanyModule::Finance, CompanyModule::WhatsApp, CompanyModule::Marketing],
+            self::Restaurant => [CompanyModule::Orders, CompanyModule::WhatsApp],
             self::Custom => [CompanyModule::Scheduling],
         };
     }

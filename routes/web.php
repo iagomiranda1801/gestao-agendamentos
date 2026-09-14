@@ -4,6 +4,7 @@ use App\Http\Controllers\EvolutionWebhookController;
 use App\Http\Controllers\PrintDentalTreatmentPlanController;
 use App\Livewire\PublicBooking\BookingWizard;
 use App\Livewire\PublicBooking\ManageAppointment;
+use App\Livewire\PublicOrders\OrderWizard;
 use App\Livewire\Signup\CompanySignupWizard;
 use Illuminate\Support\Facades\Route;
 
@@ -14,6 +15,7 @@ Route::get('/cadastro', CompanySignupWizard::class)
     ->name('signup.company');
 
 Route::get('/agendar/{company:slug}', BookingWizard::class)->name('public.booking.show');
+Route::get('/pedir/{company:slug}', OrderWizard::class)->name('public.orders.show');
 Route::get('/agendamento/{token}', ManageAppointment::class)->name('public.appointment.manage');
 Route::post('/webhooks/evolution/{instance?}', EvolutionWebhookController::class)
     ->name('webhooks.evolution');

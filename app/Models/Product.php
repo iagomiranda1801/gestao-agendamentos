@@ -24,6 +24,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'minimum_stock',
     'tracks_stock',
     'is_sellable',
+    'available_for_online_order',
+    'online_order_category',
+    'prep_time_minutes',
     'notes',
     'is_active',
 ])]
@@ -51,6 +54,8 @@ class Product extends Model
             'minimum_stock' => 'decimal:4',
             'tracks_stock' => 'boolean',
             'is_sellable' => 'boolean',
+            'available_for_online_order' => 'boolean',
+            'prep_time_minutes' => 'integer',
             'is_active' => 'boolean',
         ];
     }
@@ -213,6 +218,18 @@ class Product extends Model
     public function scopeSale(Builder $query): Builder
     {
         return $query->where('type', ProductType::Sale->value);
+    }
+
+    /**
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    public function scopeAvailableForOnlineOrder(Builder $query): Builder
+    {
+        return $query
+            ->where('available_for_online_order', true)
+            ->where('is_active', true)
+            ->where('type', ProductType::Sale->value);
     }
 
     /**

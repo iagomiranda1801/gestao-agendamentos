@@ -2,6 +2,7 @@
 
 @source '../../resources/views/layouts/public-booking.blade.php';
 @source '../../resources/views/livewire/public-booking/**/*.blade.php';
+@source '../../resources/views/livewire/public-orders/**/*.blade.php';
 @source '../../resources/views/components/public-booking/**/*.blade.php';
 
 @theme {
@@ -1045,4 +1046,11 @@ body.booking-body {
     .booking-slots-grid {
         grid-template-columns: repeat(5, minmax(0, 1fr));
     }
+}
+
+.order-qty {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
 }

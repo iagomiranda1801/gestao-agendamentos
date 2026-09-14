@@ -33,6 +33,9 @@ class ProductFactory extends Factory
             'minimum_stock' => fake()->randomFloat(4, 0, 50),
             'tracks_stock' => true,
             'is_sellable' => false,
+            'available_for_online_order' => false,
+            'online_order_category' => null,
+            'prep_time_minutes' => null,
             'notes' => fake()->optional()->sentence(),
             'is_active' => true,
         ];
@@ -86,6 +89,15 @@ class ProductFactory extends Factory
             'type' => ProductType::Sale,
             'is_sellable' => true,
             'sale_price' => fake()->randomFloat(2, 1, 200),
+        ]);
+    }
+
+    public function onlineMenu(?string $category = 'Lanches'): static
+    {
+        return $this->sellable()->state(fn (array $attributes) => [
+            'available_for_online_order' => true,
+            'online_order_category' => $category,
+            'prep_time_minutes' => 15,
         ]);
     }
 }

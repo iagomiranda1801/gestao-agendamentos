@@ -70,6 +70,7 @@ class AppPanelProvider extends PanelProvider
                 NavigationGroup::make('Caixa')->collapsed(),
                 NavigationGroup::make('Marketing')->collapsed(),
                 NavigationGroup::make('WhatsApp')->collapsed(),
+                NavigationGroup::make('Pedidos')->collapsed(),
                 NavigationGroup::make('Relatórios')->collapsed(),
                 NavigationGroup::make('Configurações')->collapsed(),
             ])
