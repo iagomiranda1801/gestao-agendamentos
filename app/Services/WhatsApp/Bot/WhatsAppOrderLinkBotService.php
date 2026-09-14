@@ -23,12 +23,7 @@ class WhatsAppOrderLinkBotService
      */
     public function prefersThisBot(Company $company): bool
     {
-        if ($company->isRestaurant()) {
-            return true;
-        }
-
-        return $this->modules->hasModule($company, CompanyModule::Orders)
-            && ! $this->modules->hasModule($company, CompanyModule::Scheduling);
+        return $this->modules->usesPublicOrdersChannel($company);
     }
 
     public function canReply(Company $company): bool

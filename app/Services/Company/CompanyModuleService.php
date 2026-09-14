@@ -63,6 +63,22 @@ class CompanyModuleService
     }
 
     /**
+     * Whether the company's public customer channel is online orders (cardápio), not scheduling.
+     *
+     * Restaurant profiles always use pedidos. Other companies use pedidos when Orders
+     * is enabled and Scheduling is not — if both modules are on, scheduling stays public.
+     */
+    public function usesPublicOrdersChannel(Company $company): bool
+    {
+        if ($company->isRestaurant()) {
+            return true;
+        }
+
+        return $this->hasModule($company, CompanyModule::Orders)
+            && ! $this->hasModule($company, CompanyModule::Scheduling);
+    }
+
+    /**
      * @param  list<CompanyModule|string>  $modules
      */
     public function syncModules(Company $company, array $modules): void

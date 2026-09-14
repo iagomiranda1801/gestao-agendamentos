@@ -115,4 +115,58 @@ class CompanyModuleServiceTest extends TestCase
 
         $this->assertTrue(app(CompanyModuleService::class)->isAccessAllowed($company));
     }
+
+    public function test_restaurant_profile_uses_public_orders_channel_even_with_scheduling(): void
+    {
+        $company = $this->createCompany([
+            'business_profile' => CompanyProfile::Restaurant,
+            'enabled_modules' => [
+                CompanyModule::Orders->value,
+                CompanyModule::Scheduling->value,
+                CompanyModule::WhatsApp->value,
+            ],
+        ]);
+
+        $this->assertTrue(app(CompanyModuleService::class)->usesPublicOrdersChannel($company));
+    }
+
+    public function test_orders_without_scheduling_uses_public_orders_channel(): void
+    {
+        $company = $this->createCompany([
+            'business_profile' => CompanyProfile::Custom,
+            'enabled_modules' => [CompanyModule::Orders->value, CompanyModule::WhatsApp->value],
+        ]);
+
+        $this->assertTrue(app(CompanyModuleService::class)->usesPublicOrdersChannel($company));
+    }
+
+    public function test_salon_and_clinic_keep_scheduling_as_public_channel(): void
+    {
+        $service = app(CompanyModuleService::class);
+
+        $salon = $this->createCompany([
+            'business_profile' => CompanyProfile::Salon,
+            'enabled_modules' => [CompanyModule::Scheduling->value, CompanyModule::Sales->value],
+        ]);
+        $clinic = $this->createCompany([
+            'business_profile' => CompanyProfile::Clinic,
+            'enabled_modules' => [CompanyModule::Scheduling->value, CompanyModule::WhatsApp->value],
+        ]);
+
+        $this->assertFalse($service->usesPublicOrdersChannel($salon));
+        $this->assertFalse($service->usesPublicOrdersChannel($clinic));
+    }
+
+    public function test_orders_plus_scheduling_without_restaurant_profile_keeps_scheduling_channel(): void
+    {
+        $company = $this->createCompany([
+            'business_profile' => CompanyProfile::ServicesAndProducts,
+            'enabled_modules' => [
+                CompanyModule::Orders->value,
+                CompanyModule::Scheduling->value,
+            ],
+        ]);
+
+        $this->assertFalse(app(CompanyModuleService::class)->usesPublicOrdersChannel($company));
+    }
 }

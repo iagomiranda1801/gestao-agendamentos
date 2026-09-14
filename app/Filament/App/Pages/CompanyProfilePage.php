@@ -5,6 +5,7 @@ namespace App\Filament\App\Pages;
 use App\Enums\CompanyRole;
 use App\Models\Company;
 use App\Models\User;
+use App\Services\Company\CompanyModuleService;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -64,7 +65,7 @@ class CompanyProfilePage extends Page
             'email' => $company->email,
             'logo_path' => filled($company->logo_path) ? [$company->logo_path] : [],
             'timezone' => $company->timezone,
-            'public_booking_url' => route('public.booking.show', ['company' => $company->slug]),
+            'public_page_url' => $this->publicPageUrl($company),
         ]);
     }
 
@@ -107,7 +108,7 @@ class CompanyProfilePage extends Page
                     ->schema([
                         FileUpload::make('logo_path')
                             ->label('Logo da empresa')
-                            ->helperText('Usada no painel da empresa e na página pública de agendamento. Se ficar vazia, o sistema mostra a logo padrão.')
+                            ->helperText(fn (): string => $this->logoHelperText())
                             ->disk((string) config('filesystems.company_logo_disk', 's3'))
                             ->directory(function (): string {
                                 /** @var Company $company */
@@ -148,16 +149,23 @@ class CompanyProfilePage extends Page
                             ->disabled(fn (): bool => ! $this->canEditCompany()),
                     ])
                     ->columns(2),
-                Section::make('Agendamento público')
+                Section::make(fn (): string => $this->usesPublicOrdersChannel()
+                    ? 'Pedidos online'
+                    : 'Agendamento público')
+                    ->description(fn (): ?string => $this->usesPublicOrdersChannel()
+                        ? 'Este é o link do cardápio para os clientes. Ative ou desative pedidos online nas configurações de pedidos.'
+                        : null)
                     ->schema([
-                        Placeholder::make('public_booking_url')
+                        Placeholder::make('public_page_url')
                             ->label('Link público')
-                            ->content(function (): string {
-                                /** @var Company $company */
-                                $company = Filament::getTenant();
-
-                                return route('public.booking.show', ['company' => $company->slug]);
-                            }),
+                            ->content(fn (): string => $this->publicPageUrl()),
+                        Actions::make([
+                            Action::make('openOrderSettings')
+                                ->label('Abrir configurações de pedidos')
+                                ->url(fn (): string => OrderSettingsPage::getUrl()),
+                        ])
+                            ->visible(fn (): bool => $this->usesPublicOrdersChannel()
+                                && OrderSettingsPage::canAccess()),
                     ]),
             ]);
     }
@@ -196,6 +204,35 @@ class CompanyProfilePage extends Page
         return $user instanceof User
             && $company instanceof Company
             && $user->hasActiveRoleInCompany($company, CompanyRole::CompanyAdmin);
+    }
+
+    protected function usesPublicOrdersChannel(?Company $company = null): bool
+    {
+        $company ??= Filament::getTenant();
+
+        return $company instanceof Company
+            && app(CompanyModuleService::class)->usesPublicOrdersChannel($company);
+    }
+
+    protected function publicPageUrl(?Company $company = null): string
+    {
+        /** @var Company $company */
+        $company ??= Filament::getTenant();
+
+        if ($this->usesPublicOrdersChannel($company)) {
+            return route('public.orders.show', ['company' => $company->slug]);
+        }
+
+        return route('public.booking.show', ['company' => $company->slug]);
+    }
+
+    protected function logoHelperText(): string
+    {
+        if ($this->usesPublicOrdersChannel()) {
+            return 'Usada no painel da empresa e na página pública de cardápio e pedidos online. Se ficar vazia, o sistema mostra a logo padrão.';
+        }
+
+        return 'Usada no painel da empresa e na página pública de agendamento. Se ficar vazia, o sistema mostra a logo padrão.';
     }
 
     protected function normalizeLogoPath(mixed $logoPath): ?string
