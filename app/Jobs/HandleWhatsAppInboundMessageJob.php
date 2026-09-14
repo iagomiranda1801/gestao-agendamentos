@@ -68,8 +68,22 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
 
             $reply = $orderLinkBot->handleIncoming($company, $this->phone, $this->messageId);
 
-            if ($this->sendReply($company, $client, $reply)) {
+            if ($reply === null || trim($reply) === '') {
+                return;
+            }
+
+            try {
+                $sent = $this->sendReply($company, $client, $reply);
+            } catch (Throwable $exception) {
+                $orderLinkBot->releaseClaim($company, $this->phone, $this->messageId);
+
+                throw $exception;
+            }
+
+            if ($sent) {
                 $orderLinkBot->rememberDelivered($company, $this->phone, $this->messageId);
+            } else {
+                $orderLinkBot->releaseClaim($company, $this->phone, $this->messageId);
             }
 
             return;

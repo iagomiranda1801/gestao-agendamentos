@@ -13,6 +13,8 @@ class WhatsAppOrderLinkBotService
 {
     public const RESEND_COOLDOWN_SECONDS = 600;
 
+    public const CLAIM_SECONDS = 120;
+
     public function __construct(
         protected CompanyModuleService $modules,
         protected CompanyOrderSettingService $orderSettings,
@@ -64,13 +66,21 @@ class WhatsAppOrderLinkBotService
         try {
             $lock->block(5);
 
+            $claimedMessage = false;
+
             if ($messageId !== null && $messageId !== '') {
-                if (Cache::has($this->messageKey($company, $messageId))) {
+                if (! Cache::add($this->messageKey($company, $messageId), true, now()->addSeconds(self::CLAIM_SECONDS))) {
                     return null;
                 }
+
+                $claimedMessage = true;
             }
 
-            if (Cache::has($this->cooldownKey($company, $phone))) {
+            if (! Cache::add($this->cooldownKey($company, $phone), true, now()->addSeconds(self::CLAIM_SECONDS))) {
+                if ($claimedMessage) {
+                    Cache::forget($this->messageKey($company, $messageId));
+                }
+
                 return null;
             }
 
@@ -98,6 +108,29 @@ class WhatsAppOrderLinkBotService
             }
 
             Cache::put($this->cooldownKey($company, $phone), true, now()->addSeconds(self::RESEND_COOLDOWN_SECONDS));
+        } finally {
+            optional($lock)->release();
+        }
+    }
+
+    public function releaseClaim(Company $company, string $rawPhone, ?string $messageId = null): void
+    {
+        $phone = PhoneNormalizer::normalize($rawPhone);
+
+        if ($phone === null) {
+            return;
+        }
+
+        $lock = Cache::lock("wa:order-link:{$company->getKey()}:{$phone}", 10);
+
+        try {
+            $lock->block(5);
+
+            if ($messageId !== null && $messageId !== '') {
+                Cache::forget($this->messageKey($company, $messageId));
+            }
+
+            Cache::forget($this->cooldownKey($company, $phone));
         } finally {
             optional($lock)->release();
         }

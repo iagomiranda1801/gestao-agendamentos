@@ -139,6 +139,24 @@ class OrderWhatsAppLinkBotTest extends TestCase
         $this->runInbound($instance, 'quero pedir', 'rest-retry-2', client: $client);
     }
 
+    public function test_claim_blocks_concurrent_phone_before_send_and_releases_on_failure(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $bot = app(WhatsAppOrderLinkBotService::class);
+        $phone = '5511922221111';
+
+        $first = $bot->handleIncoming($setup['company'], $phone, 'claim-1');
+        $second = $bot->handleIncoming($setup['company'], $phone, 'claim-2');
+
+        $this->assertNotNull($first);
+        $this->assertNull($second);
+
+        $bot->releaseClaim($setup['company'], $phone, 'claim-1');
+
+        $retry = $bot->handleIncoming($setup['company'], $phone, 'claim-1');
+        $this->assertNotNull($retry);
+    }
+
     public function test_salon_booking_bot_still_replies_to_inbound(): void
     {
         $setup = $this->createBookableSetup();
