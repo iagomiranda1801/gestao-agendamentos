@@ -7,6 +7,7 @@ enum SaleOrigin: string
     case Pos = 'pos';
     case QuickSale = 'quick_sale';
     case AttendanceCheckout = 'attendance_checkout';
+    case OnlineOrder = 'online_order';
 
     public function label(): string
     {
@@ -14,6 +15,7 @@ enum SaleOrigin: string
             self::Pos => 'PDV',
             self::QuickSale => 'Venda rápida',
             self::AttendanceCheckout => 'Checkout de atendimento',
+            self::OnlineOrder => 'Pedido online',
         };
     }
 

@@ -13,6 +13,7 @@ use App\Enums\StockDocumentType;
 use App\Models\FinancialTransaction;
 use App\Models\Service;
 use App\Models\ServiceProductConsumption;
+use App\Services\Financial\CompanyFinancialSettingService;
 use App\Services\Sales\SaleService;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\CreatesFinanceFixtures;
@@ -228,5 +229,47 @@ class SaleServiceTest extends TestCase
             'sale_id' => $sale->getKey(),
             'type' => StockDocumentType::ProductSale->value,
         ]);
+    }
+
+    public function test_completes_unpaid_sale_when_allow_unpaid_flag_overrides_company_setting(): void
+    {
+        $company = $this->createCompany();
+        $user = $this->createCompanyUser($company);
+        $product = $this->createTrackedProduct($company, [
+            'type' => ProductType::Sale,
+            'sale_price' => '25.00',
+            'tracks_stock' => false,
+        ]);
+
+        $settings = app(CompanyFinancialSettingService::class)->getOrCreate($company);
+        $settings->forceFill(['allow_unpaid_completion' => false])->save();
+
+        try {
+            app(SaleService::class)->complete($company, $user, [
+                'items' => [[
+                    'product_id' => $product->getKey(),
+                    'quantity' => '1.0000',
+                    'unit_price' => '25.00',
+                ]],
+                'payments' => [],
+            ]);
+            $this->fail('Expected validation exception when unpaid completion is disabled.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('payments', $exception->errors());
+        }
+
+        $sale = app(SaleService::class)->complete($company, $user, [
+            'items' => [[
+                'product_id' => $product->getKey(),
+                'quantity' => '1.0000',
+                'unit_price' => '25.00',
+            ]],
+            'payments' => [],
+            'allow_unpaid' => true,
+        ]);
+
+        $this->assertSame(SaleStatus::Completed, $sale->status);
+        $this->assertSame('25.00', $sale->outstanding_amount);
+        $this->assertSame(ReceivableStatus::Open, $sale->receivable?->status);
     }
 }

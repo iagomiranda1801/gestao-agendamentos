@@ -3,11 +3,11 @@
 namespace App\Services\Sales;
 
 use App\DataTransferObjects\Financial\PaymentData;
+use App\Enums\ProductType;
 use App\Enums\SaleItemType;
 use App\Enums\SaleOrigin;
 use App\Enums\SaleStatus;
 use App\Enums\StockDocumentType;
-use App\Enums\ProductType;
 use App\Models\Company;
 use App\Models\FinancialAccount;
 use App\Models\Product;
@@ -42,6 +42,8 @@ class SaleService
      * @param  array{
      *     client_id?: int|null,
      *     origin?: string|null,
+     *     reference_key?: string|null,
+     *     allow_unpaid?: bool,
      *     sold_at?: CarbonInterface|string|null,
      *     discount_amount?: string|int|float|null,
      *     notes?: string|null,
@@ -67,8 +69,17 @@ class SaleService
         }
 
         $payments = $data['payments'] ?? [];
-        $this->validatePayments($company, $payments, $finalAmount);
+        $this->validatePayments(
+            $company,
+            $payments,
+            $finalAmount,
+            (bool) ($data['allow_unpaid'] ?? false),
+        );
         $this->validateStockAvailability($validatedItems);
+
+        $referenceKey = filled($data['reference_key'] ?? null)
+            ? (string) $data['reference_key']
+            : null;
 
         return DB::transaction(function () use (
             $company,
@@ -80,10 +91,16 @@ class SaleService
             $discountAmount,
             $finalAmount,
             $payments,
+            $referenceKey,
         ): Sale {
+            if ($referenceKey !== null) {
+                $this->ensureReferenceKeyIsUnique($company, $referenceKey);
+            }
+
             $sale = new Sale([
                 'status' => SaleStatus::Completed,
                 'origin' => SaleOrigin::tryFrom((string) ($data['origin'] ?? SaleOrigin::Pos->value)) ?? SaleOrigin::Pos,
+                'reference_key' => $referenceKey,
                 'gross_amount' => $grossAmount,
                 'discount_amount' => $discountAmount,
                 'final_amount' => $finalAmount,
@@ -242,12 +259,16 @@ class SaleService
     /**
      * @param  list<PaymentData>  $payments
      */
-    protected function validatePayments(Company $company, array $payments, string $finalAmount): void
-    {
+    protected function validatePayments(
+        Company $company,
+        array $payments,
+        string $finalAmount,
+        bool $allowUnpaid = false,
+    ): void {
         $settings = $this->financialSettingService->getOrCreate($company);
 
         if ($payments === []) {
-            if (! $settings->allow_unpaid_completion) {
+            if (! $allowUnpaid && ! $settings->allow_unpaid_completion) {
                 throw ValidationException::withMessages([
                     'payments' => 'É necessário registrar ao menos um pagamento para finalizar a venda.',
                 ]);
@@ -500,6 +521,20 @@ class SaleService
         }
 
         return (string) $quantity;
+    }
+
+    protected function ensureReferenceKeyIsUnique(Company $company, string $referenceKey): void
+    {
+        $exists = Sale::query()
+            ->where('company_id', $company->getKey())
+            ->where('reference_key', $referenceKey)
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'reference_key' => 'Já existe uma venda com esta referência.',
+            ]);
+        }
     }
 
     protected function normalizeNonNegativeMoney(mixed $amount, string $field): string

@@ -1,8 +1,8 @@
 # Especificação — Pedidos para restaurante (MVP)
 
 **Status:** implementada  
-**Versão:** 1.0  
-**Data:** 12/09/2026  
+**Versão:** 1.1  
+**Data:** 14/09/2026  
 **Produto:** Agendaqui
 
 > Primeira versão para um cliente piloto de restaurante/food service. Mesas, garçom, iFood, modificadores complexos e multi-cozinha ficam fora deste MVP.
@@ -24,7 +24,7 @@ O módulo é vendável no mesmo padrão de cobrança dos demais (`CompanyModule`
 1. Novo perfil `CompanyProfile::Restaurant` (`restaurant`), rótulo **Restaurante ou food service**. Módulos padrão: Pedidos + WhatsApp. Financeiro, Vendas e Estoque são opcionais.
 2. Novo módulo `CompanyModule::Orders` (`orders`), rótulo **Pedidos**. Preço de entrada: R$ 49 / mês (semestral ×5, anual ×10).
 3. Rota pública própria: `/pedir/{slug}`. Não reutiliza `/agendar/{slug}`.
-4. Entidade central é `Order` (comanda), não `Appointment`. Totais ficam no próprio pedido. `sale_id` e `table_id` existem como ganchos nulos para fases seguintes.
+4. Entidade central é `Order` (comanda), não `Appointment`. Totais ficam no próprio pedido. Ao concluir, se o módulo **Vendas** estiver ativo, o pedido gera uma `Sale` e preenche `orders.sale_id`. `table_id` permanece nulo neste MVP.
 5. Tela da cozinha é página Filament/Livewire sempre aberta, com polling de 4s.
 6. Sem gateway de pagamento: o cliente paga na retirada ou na entrega.
 7. UI de mesas fica de fora. O schema já aceita `table_id` nulo e fulfillment `dine_in`.
@@ -92,5 +92,22 @@ O fluxo web funciona sem WhatsApp.
 - iFood e outros marketplaces
 - modificadores/adicionais complexos
 - multi-cozinha
-- pagamento online
-- baixa automática de estoque e vínculo obrigatório com venda/PDV
+- pagamento online / gateway
+- mapa de estoque próprio do pedido (a baixa segue o `SaleService` existente, só para produtos com `tracks_stock`)
+
+## 9. Venda na conclusão
+
+A criação da venda acontece **somente** em `OrderService::transition` ao entrar em `completed` (cozinha e histórico usam o mesmo caminho).
+
+| Condição | Efeito |
+|---|---|
+| Módulo **Vendas** (`sales`) ativo | Cria `Sale` + itens, liga `orders.sale_id`, origem `online_order` (“Pedido online”). Sem pagamentos: conta a receber em aberto (cliente paga na retirada/entrega). |
+| Vendas **não** ativo | Pedido conclui normalmente; `sale_id` fica nulo; nenhum erro. |
+| Pedido já tem `sale_id` (ou `sales.reference_key` = `order:{id}`) | Não cria segunda venda. Reconcluir `completed → completed` é no-op idempotente. |
+| Retirada e entrega | Mesmo tratamento financeiro. Taxa de entrega vira item avulso “Taxa de entrega”. |
+| Cancelar depois de concluído | **Não permitido** no MVP (`completed` é terminal). A venda e o recebível permanecem; não há estorno automático. |
+| Cancelar antes de concluir | Sem venda. |
+| Financeiro (`finance`) | Não é gate extra. O `SaleService` já abre o recebível como nas demais vendas do PDV. Caixa/ledger de entrada só quando alguém registrar o pagamento na conta a receber. |
+| Estoque | Sem caminho novo. Cardápio online nasce com `tracks_stock = false`. Se o produto controla estoque, vale a regra já existente do PDV (saldo insuficiente **impede** a conclusão). |
+| Sem usuário autenticado na transição | A conclusão do pedido não falha; a venda é adiada até uma transição idempotente com usuário (a cozinha sempre tem usuário). |
+| Configuração “exigir pagamento na finalização” do PDV | Pedido online ignora essa trava (`allow_unpaid`): o combinado do MVP é pagar na retirada/entrega. |

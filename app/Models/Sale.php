@@ -126,4 +126,12 @@ class Sale extends Model
     {
         return $this->hasOne(StockDocument::class);
     }
+
+    /**
+     * @return HasOne<Order, $this>
+     */
+    public function order(): HasOne
+    {
+        return $this->hasOne(Order::class);
+    }
 }

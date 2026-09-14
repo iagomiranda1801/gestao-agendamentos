@@ -26,6 +26,7 @@ class OrderService
         protected OrderPublicCodeGenerator $codes,
         protected CompanyModuleService $modules,
         protected PublicOrderRateLimiter $rateLimiter,
+        protected OrderSaleService $orderSales,
     ) {}
 
     public function ensureBelongsToCompany(Company $company, Order $order): void
@@ -221,6 +222,12 @@ class OrderService
 
             $from = $locked->status;
 
+            if ($to === OrderStatus::Completed && $from === OrderStatus::Completed) {
+                $this->orderSales->syncFromCompletedOrder($company, $locked, $user);
+
+                return $locked->refresh()->load('items');
+            }
+
             if ($to === OrderStatus::Cancelled) {
                 if (! $locked->canCancel()) {
                     throw ValidationException::withMessages([
@@ -249,6 +256,10 @@ class OrderService
             $locked->save();
 
             $this->recordHistory($company, $locked, $from, $to, $user);
+
+            if ($to === OrderStatus::Completed) {
+                $this->orderSales->syncFromCompletedOrder($company, $locked, $user);
+            }
 
             DB::afterCommit(fn () => event(new OrderStatusChanged(
                 $locked->fresh(['items', 'company']) ?? $locked,

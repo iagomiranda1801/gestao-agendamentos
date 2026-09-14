@@ -44,6 +44,12 @@ class OrderInfolist
                 TextEntry::make('total_cents')
                     ->label('Total')
                     ->state(fn (Order $record): string => Money::formatCents((int) $record->total_cents)),
+                TextEntry::make('sale_id')
+                    ->label('Venda')
+                    ->placeholder('—')
+                    ->state(fn (Order $record): ?string => $record->sale_id
+                        ? '#'.$record->sale_id
+                        : null),
             ])->columns(3),
             Section::make('Cliente')->schema([
                 TextEntry::make('customer_name')->label('Nome'),
