@@ -157,6 +157,29 @@ class OrderWhatsAppLinkBotTest extends TestCase
         $this->assertNotNull($retry);
     }
 
+    public function test_stale_in_flight_claim_expires_before_queue_retry_after(): void
+    {
+        $this->assertLessThan(
+            (int) config('queue.connections.redis.retry_after'),
+            WhatsAppOrderLinkBotService::CLAIM_SECONDS,
+        );
+        $this->assertLessThan(
+            (int) config('horizon.defaults.supervisor-1.timeout'),
+            WhatsAppOrderLinkBotService::CLAIM_SECONDS,
+        );
+
+        $setup = $this->createRestaurantSetup();
+        $bot = app(WhatsAppOrderLinkBotService::class);
+        $phone = '5511922221111';
+
+        $this->assertNotNull($bot->handleIncoming($setup['company'], $phone, 'stale-1'));
+        $this->assertNull($bot->handleIncoming($setup['company'], $phone, 'stale-1'));
+
+        $this->travel(WhatsAppOrderLinkBotService::CLAIM_SECONDS + 1)->seconds();
+
+        $this->assertNotNull($bot->handleIncoming($setup['company'], $phone, 'stale-1'));
+    }
+
     public function test_salon_booking_bot_still_replies_to_inbound(): void
     {
         $setup = $this->createBookableSetup();

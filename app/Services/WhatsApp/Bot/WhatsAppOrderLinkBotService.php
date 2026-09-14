@@ -13,7 +13,12 @@ class WhatsAppOrderLinkBotService
 {
     public const RESEND_COOLDOWN_SECONDS = 600;
 
-    public const CLAIM_SECONDS = 120;
+    /**
+     * In-flight reservation while Evolution send is running.
+     * Must stay below Horizon job timeout (60s) and queue retry_after (90s)
+     * so a killed worker's retry can reclaim and deliver.
+     */
+    public const CLAIM_SECONDS = 45;
 
     public function __construct(
         protected CompanyModuleService $modules,
