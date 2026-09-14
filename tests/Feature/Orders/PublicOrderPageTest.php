@@ -167,4 +167,64 @@ class PublicOrderPageTest extends TestCase
         $this->assertSame(2500 + 800 + 800, $order->total_cents);
         $this->assertSame('Rua das Flores, 100', $order->delivery_address);
     }
+
+    public function test_fulfillment_step_shows_dine_in_when_enabled(): void
+    {
+        $setup = $this->createRestaurantSetup();
+
+        Livewire::test(OrderWizard::class, ['company' => $setup['company']])
+            ->call('addToCart', $setup['burger']->id)
+            ->call('goToFulfillment')
+            ->assertSee('Retirada', false)
+            ->assertSee('Entrega', false)
+            ->assertSee('Comer no local', false);
+    }
+
+    public function test_fulfillment_step_hides_dine_in_when_disabled(): void
+    {
+        $setup = $this->createRestaurantSetup(settingAttributes: [
+            'dine_in_enabled' => false,
+        ]);
+
+        Livewire::test(OrderWizard::class, ['company' => $setup['company']])
+            ->call('addToCart', $setup['burger']->id)
+            ->call('goToFulfillment')
+            ->assertSee('Retirada', false)
+            ->assertSee('Entrega', false)
+            ->assertDontSee('Comer no local', false)
+            ->call('selectFulfillment', OrderFulfillment::DineIn->value)
+            ->assertSet('step', OrderWizard::STEP_FULFILLMENT)
+            ->assertSet('errorMessage', 'Escolha uma opção disponível.');
+    }
+
+    public function test_livewire_wizard_completes_dine_in_order_without_address(): void
+    {
+        $setup = $this->createRestaurantSetup();
+
+        Livewire::test(OrderWizard::class, ['company' => $setup['company']])
+            ->call('addToCart', $setup['burger']->id)
+            ->call('goToFulfillment')
+            ->call('selectFulfillment', OrderFulfillment::DineIn->value)
+            ->assertSet('step', OrderWizard::STEP_CUSTOMER)
+            ->assertDontSee('Endereço', false)
+            ->set('customerName', 'Ana Local')
+            ->set('customerPhone', '34988887777')
+            ->call('goToReview')
+            ->assertSee('Comer no local', false)
+            ->assertSee('Pague no local.', false)
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('step', OrderWizard::STEP_CONFIRMATION);
+
+        $order = Order::query()->where('company_id', $setup['company']->id)->first();
+
+        $this->assertNotNull($order);
+        $this->assertSame(OrderFulfillment::DineIn, $order->fulfillment);
+        $this->assertSame(OrderStatus::Received, $order->status);
+        $this->assertSame('Ana Local', $order->customer_name);
+        $this->assertNull($order->table_id);
+        $this->assertNull($order->delivery_address);
+        $this->assertSame(0, $order->delivery_fee_cents);
+        $this->assertSame(2500, $order->total_cents);
+    }
 }

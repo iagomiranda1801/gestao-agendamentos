@@ -5,7 +5,7 @@
         <div class="booking-card__header">
             @if ($step === \App\Livewire\PublicOrders\OrderWizard::STEP_CONFIRMATION)
                 <h1 class="booking-title">Pedido enviado</h1>
-                <p class="booking-subtitle">Guarde o código para acompanhar na retirada ou entrega.</p>
+                <p class="booking-subtitle">Guarde o código para acompanhar o pedido.</p>
             @else
                 <h1 class="booking-title">{{ e($pageTitle) }}</h1>
                 @if (filled($settings?->page_description))
@@ -131,30 +131,26 @@
 
             @if ($step === \App\Livewire\PublicOrders\OrderWizard::STEP_FULFILLMENT)
                 <div class="booking-option-list">
-                    @if ($pickupEnabled)
-                        <button type="button" class="booking-option @if ($fulfillment === 'pickup') booking-option--selected @endif" wire:click="selectFulfillment('pickup')">
+                    @foreach ($fulfillmentOptions as $option)
+                        <button
+                            type="button"
+                            class="booking-option @if ($fulfillment === $option->value) booking-option--selected @endif"
+                            wire:click="selectFulfillment('{{ $option->value }}')"
+                        >
                             <div class="booking-option__content">
-                                <p class="booking-option__title">Retirada</p>
-                                <p class="booking-option__subtitle">Peça agora e retire no estabelecimento. Pagamento na retirada.</p>
-                            </div>
-                        </button>
-                    @endif
-                    @if ($deliveryEnabled)
-                        <button type="button" class="booking-option @if ($fulfillment === 'delivery') booking-option--selected @endif" wire:click="selectFulfillment('delivery')">
-                            <div class="booking-option__content">
-                                <p class="booking-option__title">Entrega</p>
+                                <p class="booking-option__title">{{ $option->label() }}</p>
                                 <p class="booking-option__subtitle">
-                                    Receba no endereço informado. Pagamento na entrega.
-                                    @if (($settings?->delivery_fee_cents ?? 0) > 0)
+                                    {{ $option->publicSubtitle() }}
+                                    @if ($option === \App\Enums\OrderFulfillment::Delivery && ($settings?->delivery_fee_cents ?? 0) > 0)
                                         Taxa {{ $this->formatMoneyCents((int) $settings->delivery_fee_cents) }}.
                                     @endif
                                 </p>
-                                @if (filled($settings?->delivery_radius_note))
+                                @if ($option === \App\Enums\OrderFulfillment::Delivery && filled($settings?->delivery_radius_note))
                                     <p class="booking-option__subtitle">{{ e($settings->delivery_radius_note) }}</p>
                                 @endif
                             </div>
                         </button>
-                    @endif
+                    @endforeach
                 </div>
                 <div class="booking-card__footer" style="margin-top: 1.25rem;">
                     <button type="button" class="booking-btn booking-btn--secondary" wire:click="backToMenu">Voltar ao cardápio</button>
@@ -220,7 +216,7 @@
                     @endforeach
                 </ul>
                 <p class="booking-subtitle" style="margin-top: 1rem;">
-                    {{ $fulfillment === 'delivery' ? 'Entrega' : 'Retirada' }}
+                    {{ $this->selectedFulfillment()?->label() }}
                     · {{ e($customerName) }} · {{ e($customerPhone) }}
                 </p>
                 @if ($fulfillment === 'delivery')
@@ -230,7 +226,7 @@
                 <p class="booking-title" style="font-size: 1.15rem; margin-top: 0.75rem;">
                     Total {{ $this->formatMoneyCents($this->cartTotalCents()) }}
                 </p>
-                <p class="booking-subtitle">Pagamento na {{ $fulfillment === 'delivery' ? 'entrega' : 'retirada' }}. Sem pagamento online.</p>
+                <p class="booking-subtitle">{{ $this->selectedFulfillment()?->paymentInstruction() }} Sem pagamento online.</p>
                 <div class="booking-card__footer" style="margin-top: 1.25rem;">
                     <button type="button" class="booking-btn booking-btn--secondary" wire:click="backToCustomer">Voltar</button>
                     <button

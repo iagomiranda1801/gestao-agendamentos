@@ -69,6 +69,7 @@ class OrderSettingsPage extends Page
             'online_ordering_enabled' => $setting->online_ordering_enabled,
             'pickup_enabled' => $setting->pickup_enabled,
             'delivery_enabled' => $setting->delivery_enabled,
+            'dine_in_enabled' => $setting->dine_in_enabled,
             'delivery_fee_reais' => number_format(((int) $setting->delivery_fee_cents) / 100, 2, '.', ''),
             'min_order_reais' => number_format(((int) $setting->min_order_cents) / 100, 2, '.', ''),
             'delivery_radius_note' => $setting->delivery_radius_note,
@@ -102,6 +103,10 @@ class OrderSettingsPage extends Page
                     ->label('Permitir retirada'),
                 Toggle::make('delivery_enabled')
                     ->label('Permitir entrega'),
+                Toggle::make('dine_in_enabled')
+                    ->label('Comer no local')
+                    ->helperText('Aceitar pedidos para consumo no local. Sem escolha de mesa.')
+                    ->columnSpanFull(),
                 TextInput::make('delivery_fee_reais')
                     ->label('Taxa de entrega')
                     ->numeric()
@@ -155,6 +160,7 @@ class OrderSettingsPage extends Page
             'online_ordering_enabled' => (bool) ($state['online_ordering_enabled'] ?? false),
             'pickup_enabled' => (bool) ($state['pickup_enabled'] ?? false),
             'delivery_enabled' => (bool) ($state['delivery_enabled'] ?? false),
+            'dine_in_enabled' => (bool) ($state['dine_in_enabled'] ?? false),
             'delivery_fee_cents' => (int) round(((float) ($state['delivery_fee_reais'] ?? 0)) * 100),
             'min_order_cents' => (int) round(((float) ($state['min_order_reais'] ?? 0)) * 100),
             'delivery_radius_note' => $state['delivery_radius_note'] ?? null,

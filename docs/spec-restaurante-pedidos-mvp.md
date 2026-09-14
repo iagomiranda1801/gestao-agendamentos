@@ -1,7 +1,7 @@
 # Especificação — Pedidos para restaurante (MVP)
 
 **Status:** implementada  
-**Versão:** 1.3  
+**Versão:** 1.4  
 **Data:** 14/09/2026  
 **Produto:** Agendaqui
 
@@ -12,7 +12,7 @@
 Uma empresa com perfil `restaurant` e módulo `orders` consegue:
 
 1. marcar produtos como itens de cardápio online;
-2. compartilhar o link público `/pedir/{company:slug}` para retirada ou entrega;
+2. compartilhar o link público `/pedir/{company:slug}` para retirada, entrega ou **comer no local**;
 3. ver os pedidos na tela da cozinha e avançar status até a conclusão;
 4. consultar o histórico no painel;
 5. configurar regras básicas de pedido.
@@ -26,12 +26,13 @@ O módulo é vendável no mesmo padrão de cobrança dos demais (`CompanyModule`
 3. Rota pública própria: `/pedir/{slug}`. Não reutiliza `/agendar/{slug}`.
 4. Entidade central é `Order` (comanda), não `Appointment`. Totais ficam no próprio pedido. Ao concluir, se o módulo **Vendas** estiver ativo, o pedido gera uma `Sale` e preenche `orders.sale_id`. `table_id` permanece nulo neste MVP.
 5. Tela da cozinha é página Filament/Livewire sempre aberta, com polling de 4s.
-6. Sem gateway de pagamento: o cliente paga na retirada ou na entrega.
-7. UI de mesas fica de fora. O schema já aceita `table_id` nulo e fulfillment `dine_in`.
+6. Sem gateway de pagamento: o cliente paga na retirada, na entrega ou no local.
+7. UI de mesas fica de fora. Pedidos `dine_in` entram pelo link público quando `dine_in_enabled` está ligado; `table_id` permanece nulo (sem mapa, reserva ou atribuição de mesa).
 
 ## 3. Status do pedido
 
 - Retirada: `received` → `preparing` → `ready` → `completed`
+- Comer no local: igual à retirada (`received` → `preparing` → `ready` → `completed`). Não usa `out_for_delivery`.
 - Entrega: `received` → `preparing` → `ready` → `out_for_delivery` → `completed`
 - `cancelled` exige motivo
 
@@ -39,11 +40,13 @@ O módulo é vendável no mesmo padrão de cobrança dos demais (`CompanyModule`
 
 ### 4.1 `company_order_settings`
 
-- `online_ordering_enabled`, `pickup_enabled`, `delivery_enabled`
+- `online_ordering_enabled`, `pickup_enabled`, `delivery_enabled`, `dine_in_enabled`
 - `delivery_fee_cents`, `min_order_cents`, `delivery_radius_note`
 - `orders_whatsapp_notify`
 - textos da página pública (`page_title`, `page_description`, `confirmation_message`, `primary_color`)
 - horário comercial reutilizado de `company_business_hours` quando existir (exibição no link público)
+
+`dine_in_enabled` **padrão `false` na coluna** (empresas já existentes não ganham a opção de surpresa). Em `CompanyOrderSettingService::getOrCreate`, restaurantes novos recebem `dine_in_enabled = true`; demais perfis, `false`. A cozinha e o histórico mostram o rótulo **Comer no local**.
 
 ### 4.2 Produtos e cardápio
 
@@ -85,7 +88,7 @@ Padrão: admin e gerente têm as três; recepção tem `view_orders` + `kitchen_
 Se o módulo WhatsApp estiver ativo, houver instância Evolution e `orders_whatsapp_notify` estiver ligado, o cliente recebe mensagem em:
 
 - pedido criado (`received`)
-- pedido pronto (`ready`)
+- pedido pronto (`ready`) — texto de retirada, consumo no local ou “logo sai para entrega”
 - saiu para entrega (`out_for_delivery`)
 
 O fluxo web funciona sem WhatsApp.
@@ -96,7 +99,7 @@ Empresas que não são restaurante (salão, clínica, etc.) continuam no bot de 
 
 ## 8. Fora do escopo (fase B)
 
-- mapa de mesas, reserva de mesa e `dine_in` no link público
+- mapa de mesas, reserva de mesa e atribuição de `table_id`
 - garçom / comanda presencial
 - iFood e outros marketplaces
 - modificadores/adicionais complexos (além de tamanhos/preço por tamanho)
@@ -111,13 +114,13 @@ A criação da venda acontece **somente** em `OrderService::transition` ao entra
 
 | Condição | Efeito |
 |---|---|
-| Módulo **Vendas** (`sales`) ativo | Cria `Sale` + itens, liga `orders.sale_id`, origem `online_order` (“Pedido online”). Sem pagamentos: conta a receber em aberto (cliente paga na retirada/entrega). |
+| Módulo **Vendas** (`sales`) ativo | Cria `Sale` + itens, liga `orders.sale_id`, origem `online_order` (“Pedido online”). Sem pagamentos: conta a receber em aberto (cliente paga na retirada, na entrega ou no local). |
 | Vendas **não** ativo | Pedido conclui normalmente; `sale_id` fica nulo; nenhum erro. |
 | Pedido já tem `sale_id` (ou `sales.reference_key` = `order:{id}`) | Não cria segunda venda. Reconcluir `completed → completed` é no-op idempotente. |
-| Retirada e entrega | Mesmo tratamento financeiro. Taxa de entrega vira item avulso “Taxa de entrega”. |
+| Retirada, entrega e comer no local | Mesmo tratamento financeiro. Taxa de entrega vira item avulso “Taxa de entrega” (só na entrega). |
 | Cancelar depois de concluído | **Não permitido** no MVP (`completed` é terminal). A venda e o recebível permanecem; não há estorno automático. |
 | Cancelar antes de concluir | Sem venda. |
 | Financeiro (`finance`) | Não é gate extra. O `SaleService` já abre o recebível como nas demais vendas do PDV. Caixa/ledger de entrada só quando alguém registrar o pagamento na conta a receber. |
 | Estoque | Sem caminho novo. Cardápio online nasce com `tracks_stock = false`. Se o produto controla estoque, vale a regra já existente do PDV (saldo insuficiente **impede** a conclusão). |
 | Sem usuário autenticado na transição | A conclusão do pedido não falha; a venda é adiada até uma transição idempotente com usuário (a cozinha sempre tem usuário). |
-| Configuração “exigir pagamento na finalização” do PDV | Pedido online ignora essa trava (`allow_unpaid`): o combinado do MVP é pagar na retirada/entrega. |
+| Configuração “exigir pagamento na finalização” do PDV | Pedido online ignora essa trava (`allow_unpaid`): o combinado do MVP é pagar na retirada, na entrega ou no local. |

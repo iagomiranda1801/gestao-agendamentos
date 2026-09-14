@@ -59,4 +59,14 @@ class OrderFactory extends Factory
             'total_cents' => ((int) ($attributes['subtotal_cents'] ?? 2000)) + 800,
         ]);
     }
+
+    public function dineIn(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'fulfillment' => OrderFulfillment::DineIn,
+            'delivery_fee_cents' => 0,
+            'total_cents' => (int) ($attributes['subtotal_cents'] ?? 2000),
+            'table_id' => null,
+        ]);
+    }
 }

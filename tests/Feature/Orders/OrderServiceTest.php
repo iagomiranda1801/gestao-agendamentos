@@ -215,6 +215,74 @@ class OrderServiceTest extends TestCase
         $this->assertSame(OrderStatus::Completed, $order->status);
     }
 
+    public function test_dine_in_status_path_matches_pickup(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $user = $this->createCompanyUser($setup['company']);
+        $service = app(OrderService::class);
+        $order = $service->createPublic($setup['company'], [
+            'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],
+            'fulfillment' => OrderFulfillment::DineIn,
+            'customer_name' => 'Ana Local',
+            'customer_phone' => '34988887777',
+        ]);
+
+        $this->assertSame(OrderFulfillment::DineIn, $order->fulfillment);
+        $this->assertNull($order->table_id);
+        $this->assertSame(0, $order->delivery_fee_cents);
+        $this->assertNull($order->delivery_address);
+
+        $order = $service->advance($setup['company'], $order, $user);
+        $this->assertSame(OrderStatus::Preparing, $order->status);
+
+        $order = $service->advance($setup['company'], $order, $user);
+        $this->assertSame(OrderStatus::Ready, $order->status);
+
+        $order = $service->advance($setup['company'], $order, $user);
+        $this->assertSame(OrderStatus::Completed, $order->status);
+        $this->assertNotNull($order->completed_at);
+        $this->assertNull($order->out_for_delivery_at);
+        $this->assertFalse($order->canAdvance());
+    }
+
+    public function test_creates_dine_in_order_when_enabled(): void
+    {
+        $setup = $this->createRestaurantSetup();
+
+        $order = app(OrderService::class)->createPublic($setup['company'], [
+            'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],
+            'fulfillment' => OrderFulfillment::DineIn,
+            'customer_name' => 'Ana Local',
+            'customer_phone' => '34988887777',
+        ]);
+
+        $this->assertSame(OrderFulfillment::DineIn, $order->fulfillment);
+        $this->assertSame(OrderStatus::Received, $order->status);
+        $this->assertNull($order->table_id);
+        $this->assertSame(0, $order->delivery_fee_cents);
+        $this->assertSame(2500, $order->total_cents);
+        $this->assertNull($order->delivery_address);
+    }
+
+    public function test_rejects_dine_in_when_disabled(): void
+    {
+        $setup = $this->createRestaurantSetup(settingAttributes: [
+            'dine_in_enabled' => false,
+        ]);
+
+        try {
+            app(OrderService::class)->createPublic($setup['company'], [
+                'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],
+                'fulfillment' => OrderFulfillment::DineIn,
+                'customer_name' => 'Ana Local',
+                'customer_phone' => '34988887777',
+            ]);
+            $this->fail('Expected validation exception');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('fulfillment', $exception->errors());
+        }
+    }
+
     public function test_cancel_requires_reason_and_is_terminal(): void
     {
         $setup = $this->createRestaurantSetup();
@@ -268,6 +336,22 @@ class OrderServiceTest extends TestCase
         app(CompanyOrderSettingService::class)->update($setup['company'], [
             'pickup_enabled' => false,
             'delivery_enabled' => false,
+            'dine_in_enabled' => false,
         ]);
+    }
+
+    public function test_settings_allow_dine_in_as_only_fulfillment(): void
+    {
+        $setup = $this->createRestaurantSetup();
+
+        $setting = app(CompanyOrderSettingService::class)->update($setup['company'], [
+            'pickup_enabled' => false,
+            'delivery_enabled' => false,
+            'dine_in_enabled' => true,
+        ]);
+
+        $this->assertFalse($setting->pickup_enabled);
+        $this->assertFalse($setting->delivery_enabled);
+        $this->assertTrue($setting->dine_in_enabled);
     }
 }

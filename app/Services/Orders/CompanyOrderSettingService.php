@@ -24,6 +24,7 @@ class CompanyOrderSettingService
             'online_ordering_enabled' => false,
             'pickup_enabled' => true,
             'delivery_enabled' => true,
+            'dine_in_enabled' => $company->isRestaurant(),
             'delivery_fee_cents' => 0,
             'min_order_cents' => 0,
             'orders_whatsapp_notify' => true,
@@ -99,9 +100,13 @@ class CompanyOrderSettingService
      */
     protected function validatePayload(array $payload): void
     {
-        if (! ($payload['pickup_enabled'] ?? false) && ! ($payload['delivery_enabled'] ?? false)) {
+        $hasFulfillment = ($payload['pickup_enabled'] ?? false)
+            || ($payload['delivery_enabled'] ?? false)
+            || ($payload['dine_in_enabled'] ?? false);
+
+        if (! $hasFulfillment) {
             throw ValidationException::withMessages([
-                'pickup_enabled' => 'Habilite retirada ou entrega para receber pedidos online.',
+                'pickup_enabled' => 'Habilite retirada, entrega ou consumo no local para receber pedidos online.',
             ]);
         }
     }
