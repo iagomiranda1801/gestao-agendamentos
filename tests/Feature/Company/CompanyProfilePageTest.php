@@ -2,14 +2,24 @@
 
 namespace Tests\Feature\Company;
 
+use App\Enums\CompanyModule;
+use App\Enums\CompanyProfile;
 use App\Enums\CompanyRole;
 use App\Filament\App\Pages\CompanyProfilePage;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class CompanyProfilePageTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withoutVite();
+    }
+
     public function test_company_admin_can_render_company_profile_page(): void
     {
         $company = $this->createCompany();
@@ -104,5 +114,87 @@ class CompanyProfilePageTest extends TestCase
             ->assertOk()
             ->assertSee('storage/company-logos/1/logo.png', false)
             ->assertDontSee('booking-brand__logo--platform', false);
+    }
+
+    public function test_restaurant_company_profile_page_shows_public_orders_link_and_pedidos_copy(): void
+    {
+        $company = $this->createCompany([
+            'name' => 'Petiscaria do Tio Wesley',
+            'slug' => 'petiscaria-do-tio-wesley',
+            'business_profile' => CompanyProfile::Restaurant,
+            'enabled_modules' => [CompanyModule::Orders->value, CompanyModule::WhatsApp->value],
+        ]);
+        $admin = $this->createCompanyUser($company, [], CompanyRole::CompanyAdmin);
+
+        $this->authenticateForAppTenant($admin, $company);
+
+        $this->get(route('filament.app.pages.minha-empresa', ['tenant' => $company]))
+            ->assertOk()
+            ->assertSee('Pedidos online')
+            ->assertSee('página pública de cardápio e pedidos online')
+            ->assertSee('/pedir/petiscaria-do-tio-wesley')
+            ->assertSee(route('public.orders.show', ['company' => $company->slug]))
+            ->assertSee('Abrir configurações de pedidos')
+            ->assertDontSee('Agendamento público')
+            ->assertDontSee('/agendar/petiscaria-do-tio-wesley')
+            ->assertDontSee('página pública de agendamento');
+    }
+
+    public function test_restaurant_with_scheduling_module_still_shows_public_orders_link(): void
+    {
+        $company = $this->createCompany([
+            'slug' => 'cantina-mista',
+            'business_profile' => CompanyProfile::Restaurant,
+            'enabled_modules' => [
+                CompanyModule::Orders->value,
+                CompanyModule::Scheduling->value,
+                CompanyModule::WhatsApp->value,
+            ],
+        ]);
+        $admin = $this->createCompanyUser($company, [], CompanyRole::CompanyAdmin);
+
+        $this->authenticateForAppTenant($admin, $company);
+
+        $this->get(route('filament.app.pages.minha-empresa', ['tenant' => $company]))
+            ->assertOk()
+            ->assertSee('Pedidos online')
+            ->assertSee('/pedir/cantina-mista')
+            ->assertDontSee('/agendar/cantina-mista');
+    }
+
+    #[DataProvider('schedulingCompanyProfiles')]
+    public function test_scheduling_company_profile_page_shows_public_booking_link(
+        CompanyProfile $profile,
+        string $slug,
+    ): void {
+        $company = $this->createCompany([
+            'slug' => $slug,
+            'business_profile' => $profile,
+            'enabled_modules' => [CompanyModule::Scheduling->value, CompanyModule::WhatsApp->value],
+        ]);
+        $admin = $this->createCompanyUser($company, [], CompanyRole::CompanyAdmin);
+
+        $this->authenticateForAppTenant($admin, $company);
+
+        $this->get(route('filament.app.pages.minha-empresa', ['tenant' => $company]))
+            ->assertOk()
+            ->assertSee('Agendamento público')
+            ->assertSee('página pública de agendamento')
+            ->assertSee('/agendar/'.$slug)
+            ->assertSee(route('public.booking.show', ['company' => $company->slug]))
+            ->assertDontSee('Pedidos online')
+            ->assertDontSee('/pedir/'.$slug)
+            ->assertDontSee('página pública de cardápio e pedidos online');
+    }
+
+    /**
+     * @return array<string, array{0: CompanyProfile, 1: string}>
+     */
+    public static function schedulingCompanyProfiles(): array
+    {
+        return [
+            'salon' => [CompanyProfile::Salon, 'salao-beleza'],
+            'clinic' => [CompanyProfile::Clinic, 'clinica-vida'],
+        ];
     }
 }
