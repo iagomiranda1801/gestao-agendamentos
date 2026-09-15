@@ -28,10 +28,17 @@ Menus numerados, um passo por vez. Espelha o wizard do `BookingWizard` em `app/L
 9. `confirming` — resumo + "1 - Confirmar / 2 - Cancelar"
 10. `done` — chama `OnlineBookingService::create()`, envia código + link de gestão
 
-Comandos globais aceitos em qualquer estado:
+Comandos globais aceitos em qualquer estado **do wizard** (não na saudação já enviada):
 
-- `menu`, `oi`, `olá`, `início` → reseta e volta para `greeting`
+- `menu`, `início` → reseta e volta para `greeting`
+- `oi` / `olá` na tela de saudação **não** reenviam o menu (a conversa já está no início)
 - `sair`, `parar`, `cancelar tudo` → encerra a conversa com motivo `exit`
+
+**Anti-spam (clínica / salão):** o bot não dispara a saudação de novo em toda mensagem.
+
+- Conversa **ativa**: segue o passo a passo. Texto livre na saudação (sem ser `1`/`0`) fica em silêncio — não responde “Não entendi” a cada “ok” ou pergunta para o atendente.
+- Conversa **encerrada ou expirada** (30 min): mensagem casual **não** reabre o bot. `oi`/`olá` só reabrem no **dia civil seguinte** (fuso da empresa). `menu` / `agendar` / `marcar` podem reabrir depois do cooldown de 15 min.
+- Webhooks com o mesmo `message_id` continuam ignorados. Grupos (`@g.us`) e `fromMe` continuam ignorados.
 
 ## Gates de habilitação
 
@@ -44,7 +51,7 @@ O job só responde quando **todos** verdadeiros:
 - `CompanySchedulingSetting::whatsapp_bot_enabled`
 - `instance_name` do payload existe em `CompanyWhatsAppInstance`
 
-**Restaurantes / módulo Pedidos sem Agenda:** o job **não** chama o bot de agendamento. Se o cardápio online e o toggle `whatsapp_order_link_bot_enabled` estiverem ligados, responde só com o link `/pedir/{slug}`. Ver `docs/spec-restaurante-pedidos-mvp.md` §7.
+**Restaurantes / módulo Pedidos sem Agenda:** o job **não** chama o bot de agendamento. Se o cardápio online e o toggle `whatsapp_order_link_bot_enabled` estiverem ligados, responde só com o link `/pedir/{slug}` — no máximo uma vez por telefone/empresa/dia civil (fuso da empresa), e só se o texto parecer saudação ou pedido de cardápio. Ver `docs/spec-restaurante-pedidos-mvp.md` §7.
 
 Grupos (`@g.us`), mensagens do próprio número (`fromMe`) e mensagens sem texto são ignoradas.
 
@@ -75,7 +82,7 @@ O lock `wa:bot:{company}:{phone}` no `WhatsAppBookingBotService` já impede proc
 
 ## Timeout / limpeza
 
-- `expires_at` = `last_activity_at + 30 min`. Ao receber nova mensagem depois disso, uma nova conversa é iniciada com estado limpo.
+- `expires_at` = `last_activity_at + 30 min`. Ao receber nova mensagem depois disso, a conversa antiga é marcada `expired`. Uma saudação nova **não** é enviada automaticamente (ver anti-spam acima).
 - Command `whatsapp:cleanup-bot-conversations` (agendado hourly em `routes/console.php`) marca conversas inativas como `finished_reason = 'expired'` e apaga conversas finalizadas há mais de 7 dias.
 
 ## UI
