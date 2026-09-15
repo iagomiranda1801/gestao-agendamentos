@@ -12,7 +12,6 @@ use App\Models\Company;
 use App\Models\CompanyWhatsAppInstance;
 use App\Models\WhatsAppBotConversation;
 use App\Services\WhatsApp\Bot\WhatsAppBookingBotService;
-use App\Support\CompanyDateTime;
 use Tests\Concerns\CreatesPublicBookingFixtures;
 use Tests\Concerns\CreatesSchedulingFixtures;
 use Tests\TestCase;
@@ -210,7 +209,11 @@ class BookingBotFlowTest extends TestCase
         $jid = "{$phone}@s.whatsapp.net";
 
         $bot->handleIncoming($company, null, $jid, $phone, 'oi', 'i-1');
-        $reply = $bot->handleIncoming($company, null, $jid, $phone, 'abc', 'i-2');
+        $ignored = $bot->handleIncoming($company, null, $jid, $phone, 'abc', 'i-2');
+        $this->assertNull($ignored);
+
+        $bot->handleIncoming($company, null, $jid, $phone, '1', 'i-3');
+        $reply = $bot->handleIncoming($company, null, $jid, $phone, 'abc', 'i-4');
 
         $this->assertStringContainsString('Não entendi', (string) $reply);
 
@@ -219,7 +222,7 @@ class BookingBotFlowTest extends TestCase
             ->where('phone_normalized', $phone)
             ->firstOrFail();
 
-        $this->assertSame(WhatsAppBotConversationState::Greeting, $conversation->state);
+        $this->assertSame(WhatsAppBotConversationState::ChoosingService, $conversation->state);
     }
 
     /**

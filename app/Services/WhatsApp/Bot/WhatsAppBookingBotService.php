@@ -16,14 +16,36 @@ use App\Services\WhatsApp\Bot\Steps\CollectEmailStep;
 use App\Services\WhatsApp\Bot\Steps\CollectNameStep;
 use App\Services\WhatsApp\Bot\Steps\ConfirmStep;
 use App\Services\WhatsApp\Bot\Steps\GreetingStep;
+use App\Support\CompanyDateTime;
 use App\Support\PhoneNormalizer;
+use App\Support\WhatsAppInboundText;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class WhatsAppBookingBotService
 {
     public const CONVERSATION_TTL_MINUTES = 30;
+
+    public const GREETING_REPEAT_COOLDOWN_SECONDS = 900;
+
+    public const SENT_KEY_GRACE_MINUTES = 30;
+
+    /**
+     * @var list<string>
+     */
+    public const STRONG_RESTART_PHRASES = [
+        'menu',
+        'inicio',
+        'início',
+        'comecar',
+        'começar',
+        'agendar',
+        'agendamento',
+        'marcar',
+    ];
 
     public function __construct(
         protected CompanySchedulingSettingService $settingsService,
@@ -43,7 +65,7 @@ class WhatsAppBookingBotService
      * Processa uma mensagem recebida.
      *
      * Retorna a resposta a enviar, ou null se a mensagem deve ser ignorada
-     * (duplicada ou sem texto útil).
+     * (duplicada, cooldown, ou sem texto útil).
      */
     public function handleIncoming(
         Company $company,
@@ -78,9 +100,29 @@ class WhatsAppBookingBotService
         string $text,
         ?string $messageId,
     ): ?string {
-        $conversation = $this->loadOrCreateConversation($company, $instance, $phone, $remoteJid);
+        if ($messageId !== null && $messageId !== '') {
+            $messageKey = "wa:bot-msgid:{$company->getKey()}:{$messageId}";
 
-        if ($messageId !== null && $messageId !== '' && $conversation->last_incoming_message_id === $messageId) {
+            if (! Cache::add($messageKey, true, now()->addMinutes(30))) {
+                Log::info('WhatsApp booking bot: suppressed (duplicate message id).', [
+                    'company_id' => $company->getKey(),
+                    'phone' => $phone,
+                    'message_id' => $messageId,
+                ]);
+
+                return null;
+            }
+        }
+
+        $conversation = $this->findActiveConversation($company, $instance, $phone, $remoteJid);
+
+        if ($conversation === null) {
+            if (! $this->shouldStartNewConversation($company, $phone, $text)) {
+                return null;
+            }
+
+            $conversation = $this->createConversation($company, $instance, $phone, $remoteJid);
+        } elseif ($messageId !== null && $messageId !== '' && $conversation->last_incoming_message_id === $messageId) {
             return null;
         }
 
@@ -89,13 +131,17 @@ class WhatsAppBookingBotService
         $trimmed = trim($text);
 
         if ($trimmed === '') {
-            return $this->applyReply($conversation, $messageId, $this->messages->unsupportedMedia(), null);
+            $this->persistConversation($conversation, $messageId);
+            Log::info('WhatsApp booking bot: suppressed (empty text).', [
+                'company_id' => $company->getKey(),
+                'phone' => $phone,
+            ]);
+
+            return null;
         }
 
-        if ($this->isGlobalReset($trimmed)) {
-            $reply = $this->resetConversation($conversation, $context);
-
-            return $this->applyReply($conversation, $messageId, $reply, WhatsAppBotConversationState::Greeting);
+        if ($this->isGlobalReset($trimmed) || ($conversation->wasRecentlyCreated && $this->isExplicitBookingIntent($trimmed))) {
+            return $this->handleGlobalReset($company, $phone, $conversation, $context, $messageId);
         }
 
         if ($this->isExitCommand($trimmed)) {
@@ -105,13 +151,47 @@ class WhatsAppBookingBotService
             $conversation->last_activity_at = now();
             $conversation->save();
 
-            return "Ok, encerrei o atendimento pelo bot. Envie qualquer mensagem para começar novamente.";
+            return 'Ok, encerrei o atendimento pelo bot. Envie *menu* ou *agendar* para começar novamente.';
         }
 
-        $step = $this->stepFor($conversation->state ?? WhatsAppBotConversationState::Greeting);
+        $currentState = $conversation->state ?? WhatsAppBotConversationState::Greeting;
+        $step = $this->stepFor($currentState);
         $action = $step->process($context, $trimmed);
 
+        if ($currentState === WhatsAppBotConversationState::Greeting && $action->kind === 'stay') {
+            $this->persistConversation($conversation, $messageId);
+            Log::info('WhatsApp booking bot: suppressed (unrecognized text at greeting).', [
+                'company_id' => $company->getKey(),
+                'phone' => $phone,
+            ]);
+
+            return null;
+        }
+
         return $this->applyAction($conversation, $context, $action, $messageId);
+    }
+
+    protected function handleGlobalReset(
+        Company $company,
+        string $phone,
+        WhatsAppBotConversation $conversation,
+        BotContext $context,
+        ?string $messageId,
+    ): ?string {
+        if ($this->alreadyShowingGreeting($conversation)) {
+            $this->persistConversation($conversation, $messageId);
+            Log::info('WhatsApp booking bot: suppressed (already at greeting).', [
+                'company_id' => $company->getKey(),
+                'phone' => $phone,
+            ]);
+
+            return null;
+        }
+
+        $reply = $this->resetConversation($conversation, $context);
+        $this->markGreetingSent($conversation, $company, $phone);
+
+        return $this->applyReply($conversation, $messageId, $reply, WhatsAppBotConversationState::Greeting);
     }
 
     protected function applyAction(
@@ -212,12 +292,12 @@ class WhatsAppBookingBotService
         ));
     }
 
-    protected function loadOrCreateConversation(
+    protected function findActiveConversation(
         Company $company,
         ?CompanyWhatsAppInstance $instance,
         string $phone,
         string $remoteJid,
-    ): WhatsAppBotConversation {
+    ): ?WhatsAppBotConversation {
         $active = WhatsAppBotConversation::query()
             ->where('company_id', $company->getKey())
             ->where('phone_normalized', $phone)
@@ -225,29 +305,29 @@ class WhatsAppBookingBotService
             ->orderByDesc('id')
             ->first();
 
-        if ($active !== null) {
-            if ($active->expires_at !== null && $active->expires_at->isPast()) {
-                $active->finished_at = now();
-                $active->finished_reason = 'expired';
-                $active->save();
-
-                return $this->createConversation($company, $instance, $phone, $remoteJid);
-            }
-
-            if ($instance !== null && $active->company_whatsapp_instance_id === null) {
-                $active->company_whatsapp_instance_id = $instance->getKey();
-                $active->save();
-            }
-
-            if ($remoteJid !== '' && $active->remote_jid === null) {
-                $active->remote_jid = $remoteJid;
-                $active->save();
-            }
-
-            return $active;
+        if ($active === null) {
+            return null;
         }
 
-        return $this->createConversation($company, $instance, $phone, $remoteJid);
+        if ($active->expires_at !== null && $active->expires_at->isPast()) {
+            $active->finished_at = now();
+            $active->finished_reason = 'expired';
+            $active->save();
+
+            return null;
+        }
+
+        if ($instance !== null && $active->company_whatsapp_instance_id === null) {
+            $active->company_whatsapp_instance_id = $instance->getKey();
+            $active->save();
+        }
+
+        if ($remoteJid !== '' && $active->remote_jid === null) {
+            $active->remote_jid = $remoteJid;
+            $active->save();
+        }
+
+        return $active;
     }
 
     protected function createConversation(
@@ -275,6 +355,152 @@ class WhatsAppBookingBotService
         return $conversation->refresh();
     }
 
+    protected function shouldStartNewConversation(Company $company, string $phone, string $text): bool
+    {
+        $trimmed = trim($text);
+        $hasPrior = $this->latestConversation($company, $phone) !== null;
+        $isNumericOption = in_array($trimmed, ['0', '1'], true);
+        $isStartIntent = $this->isGlobalReset($trimmed) || $this->isExplicitBookingIntent($trimmed);
+
+        if (! $hasPrior) {
+            if ($isStartIntent || $isNumericOption) {
+                return true;
+            }
+
+            Log::info('WhatsApp booking bot: suppressed (not a start intent).', [
+                'company_id' => $company->getKey(),
+                'phone' => $phone,
+            ]);
+
+            return false;
+        }
+
+        if ($this->greetedRecently($company, $phone)) {
+            Log::info('WhatsApp booking bot: suppressed (greeting cooldown).', [
+                'company_id' => $company->getKey(),
+                'phone' => $phone,
+            ]);
+
+            return false;
+        }
+
+        if ($this->isStrongRestartCommand($trimmed)) {
+            return true;
+        }
+
+        if ($this->isGlobalReset($trimmed) && ! $this->alreadyGreetedToday($company, $phone)) {
+            return true;
+        }
+
+        Log::info('WhatsApp booking bot: suppressed (already greeted today or casual inbound).', [
+            'company_id' => $company->getKey(),
+            'phone' => $phone,
+            'local_date' => CompanyDateTime::nowLocal($company)->toDateString(),
+            'timezone' => CompanyDateTime::timezone($company),
+        ]);
+
+        return false;
+    }
+
+    protected function latestConversation(Company $company, string $phone): ?WhatsAppBotConversation
+    {
+        return WhatsAppBotConversation::query()
+            ->where('company_id', $company->getKey())
+            ->where('phone_normalized', $phone)
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    protected function alreadyShowingGreeting(WhatsAppBotConversation $conversation): bool
+    {
+        $state = $conversation->state ?? WhatsAppBotConversationState::Greeting;
+        $data = is_array($conversation->data) ? $conversation->data : [];
+
+        return $state === WhatsAppBotConversationState::Greeting
+            && filled($data['greeting_sent_at'] ?? null);
+    }
+
+    protected function markGreetingSent(WhatsAppBotConversation $conversation, Company $company, string $phone): void
+    {
+        $data = is_array($conversation->data) ? $conversation->data : [];
+        $data['greeting_sent_at'] = now()->toIso8601String();
+        $conversation->data = $data;
+
+        $this->rememberGreeting($company, $phone);
+    }
+
+    protected function rememberGreeting(Company $company, string $phone): void
+    {
+        $localNow = CompanyDateTime::nowLocal($company);
+        $localDate = $localNow->toDateString();
+
+        Cache::put(
+            $this->dailyGreetingKey($company, $phone, $localDate),
+            true,
+            $localNow->endOfDay()->addMinutes(self::SENT_KEY_GRACE_MINUTES),
+        );
+        Cache::put(
+            $this->recentGreetingKey($company, $phone),
+            true,
+            now()->addSeconds(self::GREETING_REPEAT_COOLDOWN_SECONDS),
+        );
+    }
+
+    protected function alreadyGreetedToday(Company $company, string $phone): bool
+    {
+        $localNow = CompanyDateTime::nowLocal($company);
+        $localDate = $localNow->toDateString();
+
+        if (Cache::has($this->dailyGreetingKey($company, $phone, $localDate))) {
+            return true;
+        }
+
+        $sentAt = $this->latestGreetingSentAt($company, $phone);
+
+        if ($sentAt === null) {
+            return false;
+        }
+
+        return CompanyDateTime::utcToLocal($company, $sentAt)->toDateString() === $localDate;
+    }
+
+    protected function greetedRecently(Company $company, string $phone): bool
+    {
+        if (Cache::has($this->recentGreetingKey($company, $phone))) {
+            return true;
+        }
+
+        $sentAt = $this->latestGreetingSentAt($company, $phone);
+
+        if ($sentAt === null) {
+            return false;
+        }
+
+        return $sentAt->gte(now()->subSeconds(self::GREETING_REPEAT_COOLDOWN_SECONDS));
+    }
+
+    protected function latestGreetingSentAt(Company $company, string $phone): ?CarbonImmutable
+    {
+        $latest = $this->latestConversation($company, $phone);
+        $sentAt = is_array($latest?->data) ? ($latest->data['greeting_sent_at'] ?? null) : null;
+
+        if (! is_string($sentAt) || $sentAt === '') {
+            return null;
+        }
+
+        return CarbonImmutable::parse($sentAt);
+    }
+
+    protected function dailyGreetingKey(Company $company, string $phone, string $localDate): string
+    {
+        return "wa:bot-greeted:{$company->getKey()}:{$phone}:{$localDate}";
+    }
+
+    protected function recentGreetingKey(Company $company, string $phone): string
+    {
+        return "wa:bot-greeted-recent:{$company->getKey()}:{$phone}";
+    }
+
     protected function stepFor(WhatsAppBotConversationState $state): BotStep
     {
         return match ($state) {
@@ -293,14 +519,31 @@ class WhatsAppBookingBotService
 
     protected function isGlobalReset(string $text): bool
     {
-        $lower = mb_strtolower($text);
+        return WhatsAppInboundText::containsAnyPhrase($text, [
+            'menu',
+            'inicio',
+            'início',
+            'comecar',
+            'começar',
+            'oi',
+            'olá',
+            'ola',
+        ]);
+    }
 
-        return in_array($lower, ['menu', 'início', 'inicio', 'começar', 'comecar', 'oi', 'olá', 'ola'], true);
+    protected function isExplicitBookingIntent(string $text): bool
+    {
+        return WhatsAppInboundText::containsAnyPhrase($text, ['agendar', 'agendamento', 'marcar', 'horario', 'horário', 'agenda']);
+    }
+
+    protected function isStrongRestartCommand(string $text): bool
+    {
+        return WhatsAppInboundText::containsAnyPhrase($text, self::STRONG_RESTART_PHRASES);
     }
 
     protected function isExitCommand(string $text): bool
     {
-        $lower = mb_strtolower($text);
+        $lower = mb_strtolower(trim($text));
 
         return in_array($lower, ['sair', 'cancelar tudo', 'parar'], true);
     }

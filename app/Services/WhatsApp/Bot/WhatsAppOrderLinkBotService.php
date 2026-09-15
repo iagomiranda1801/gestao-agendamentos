@@ -8,9 +8,9 @@ use App\Services\Company\CompanyModuleService;
 use App\Services\Orders\CompanyOrderSettingService;
 use App\Support\CompanyDateTime;
 use App\Support\PhoneNormalizer;
+use App\Support\WhatsAppInboundText;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class WhatsAppOrderLinkBotService
 {
@@ -144,31 +144,7 @@ class WhatsAppOrderLinkBotService
 
     public function looksLikeMenuLinkTrigger(string $text): bool
     {
-        $normalized = $this->normalizeTriggerText($text);
-
-        if ($normalized === '') {
-            return false;
-        }
-
-        foreach (self::TRIGGER_PHRASES as $phrase) {
-            $phrase = $this->normalizeTriggerText($phrase);
-
-            if ($phrase === '') {
-                continue;
-            }
-
-            if ($normalized === $phrase) {
-                return true;
-            }
-
-            $pattern = '/(?:^|\s)'.preg_quote($phrase, '/').'(?:\s|$)/u';
-
-            if (preg_match($pattern, $normalized) === 1) {
-                return true;
-            }
-        }
-
-        return false;
+        return WhatsAppInboundText::containsAnyPhrase($text, self::TRIGGER_PHRASES);
     }
 
     public function composeMessage(Company $company): string
@@ -181,14 +157,5 @@ class WhatsAppOrderLinkBotService
     protected function sentCacheKey(Company $company, string $phone, string $localDate): string
     {
         return "wa:order-link-sent:{$company->getKey()}:{$phone}:{$localDate}";
-    }
-
-    protected function normalizeTriggerText(string $text): string
-    {
-        $normalized = Str::lower(Str::ascii(trim($text)));
-        $normalized = preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $normalized) ?? '';
-        $normalized = preg_replace('/\s+/u', ' ', $normalized) ?? '';
-
-        return trim($normalized);
     }
 }

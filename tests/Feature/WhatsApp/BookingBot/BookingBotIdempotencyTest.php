@@ -53,16 +53,17 @@ class BookingBotIdempotencyTest extends TestCase
         $jid = "{$phone}@s.whatsapp.net";
 
         $bot->handleIncoming($company, null, $jid, $phone, 'oi', 'a-1');
-        $bot->handleIncoming($company, null, $jid, $phone, 'abc', 'a-2');
+        $this->assertNull($bot->handleIncoming($company, null, $jid, $phone, 'abc', 'a-2'));
         $reply = $bot->handleIncoming($company, null, $jid, $phone, 'xyz', 'a-3');
 
-        $this->assertStringContainsString('Não entendi', (string) $reply);
+        $this->assertNull($reply);
 
         $conversation = WhatsAppBotConversation::query()
             ->where('company_id', $company->getKey())
             ->where('phone_normalized', $phone)
             ->firstOrFail();
 
+        $this->assertSame(WhatsAppBotConversationState::Greeting, $conversation->state);
         $this->assertSame('a-3', $conversation->last_incoming_message_id);
     }
 
