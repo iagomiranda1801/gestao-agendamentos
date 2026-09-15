@@ -22,15 +22,14 @@ class OrderWhatsAppMessageBuilder
         $lines[] = '';
         $lines[] = match ($eventStatus) {
             OrderStatus::Received => "Recebemos o seu pedido {$order->displayNumber()} em {$company?->name}.",
-            OrderStatus::Ready => $order->fulfillment === OrderFulfillment::Delivery
-                ? "Seu pedido {$order->displayNumber()} está pronto e logo sai para entrega."
-                : "Seu pedido {$order->displayNumber()} está pronto para retirada.",
+            OrderStatus::Ready => ($order->fulfillment ?? OrderFulfillment::Pickup)
+                ->readyWhatsAppLine($order->displayNumber()),
             OrderStatus::OutForDelivery => "Seu pedido {$order->displayNumber()} saiu para entrega.",
             default => "Atualização do pedido {$order->displayNumber()}.",
         };
         $lines[] = "Código: {$order->public_code}";
         $lines[] = 'Total: '.Money::formatCents((int) $order->total_cents);
-        $lines[] = 'Pagamento no momento da '.($order->fulfillment?->label() ?? 'retirada').'.';
+        $lines[] = $order->fulfillment?->paymentInstruction() ?? 'Pague na retirada.';
 
         return implode("\n", $lines);
     }

@@ -81,6 +81,29 @@ class OrderCompletionSaleTest extends TestCase
         $this->assertSame(3300, $order->total_cents);
     }
 
+    public function test_completing_dine_in_order_creates_sale_without_delivery_fee(): void
+    {
+        $setup = $this->createRestaurantSetupWithSales();
+        $user = $this->createCompanyUser($setup['company']);
+        $order = $this->completeOrder($setup, $user, [
+            'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],
+            'fulfillment' => OrderFulfillment::DineIn,
+        ]);
+
+        $this->assertSame(OrderStatus::Completed, $order->status);
+        $this->assertNull($order->out_for_delivery_at);
+        $this->assertNotNull($order->sale_id);
+
+        $sale = $order->sale()->with('items')->first();
+
+        $this->assertNotNull($sale);
+        $this->assertSame(SaleOrigin::OnlineOrder, $sale->origin);
+        $this->assertSame('25.00', $sale->final_amount);
+        $this->assertSame(1, $sale->items->count());
+        $this->assertNull($sale->items->firstWhere('name_snapshot', 'Taxa de entrega'));
+        $this->assertStringContainsString('Comer no local', (string) $sale->notes);
+    }
+
     public function test_completing_without_sales_module_does_not_create_a_sale(): void
     {
         $setup = $this->createRestaurantSetup();

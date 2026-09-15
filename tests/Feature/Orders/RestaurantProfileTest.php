@@ -45,6 +45,7 @@ class RestaurantProfileTest extends TestCase
         $this->assertTrue(app(CompanyModuleService::class)->hasModule($company, CompanyModule::Orders));
         $this->assertTrue(app(CompanyModuleService::class)->hasModule($company, CompanyModule::WhatsApp));
         $this->assertNotNull($company->orderSetting);
+        $this->assertTrue($company->orderSetting->dine_in_enabled);
         $this->assertSame(
             ['Lanches', 'Bebidas', 'Sobremesas', 'Combos', 'Outros'],
             $company->menuCategories()->orderBy('sort_order')->pluck('name')->all(),

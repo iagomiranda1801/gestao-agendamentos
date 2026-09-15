@@ -39,7 +39,7 @@ enum CompanyProfile: string
             self::Store => 'Para empresas focadas em produtos, estoque, vendas e financeiro.',
             self::ServicesAndProducts => 'Para quem agenda serviços e também vende produtos.',
             self::CarWash => 'Para lava jatos e estética automotiva: pacotes de lavagem, agenda, PDV e retorno do cliente no WhatsApp.',
-            self::Restaurant => 'Para restaurantes, lanchonetes e food service: cardápio online, pedidos para retirada ou entrega e tela da cozinha.',
+            self::Restaurant => 'Para restaurantes, lanchonetes e food service: cardápio online, pedidos para retirada, entrega ou consumo no local e tela da cozinha.',
             self::Custom => 'Escolha manualmente os recursos que a empresa utilizará.',
         };
     }

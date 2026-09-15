@@ -23,6 +23,7 @@ class CompanyOrderSettingFactory extends Factory
             'online_ordering_enabled' => false,
             'pickup_enabled' => true,
             'delivery_enabled' => true,
+            'dine_in_enabled' => false,
             'delivery_fee_cents' => 0,
             'min_order_cents' => 0,
             'delivery_radius_note' => null,

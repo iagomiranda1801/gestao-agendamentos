@@ -22,6 +22,14 @@ class OrderStatusTest extends TestCase
         $this->assertSame(OrderStatus::Completed, OrderStatus::OutForDelivery->next(OrderFulfillment::Delivery));
     }
 
+    public function test_dine_in_skips_out_for_delivery(): void
+    {
+        $this->assertSame(OrderStatus::Preparing, OrderStatus::Received->next(OrderFulfillment::DineIn));
+        $this->assertSame(OrderStatus::Ready, OrderStatus::Preparing->next(OrderFulfillment::DineIn));
+        $this->assertSame(OrderStatus::Completed, OrderStatus::Ready->next(OrderFulfillment::DineIn));
+        $this->assertNull(OrderStatus::Completed->next(OrderFulfillment::DineIn));
+    }
+
     public function test_cancelled_and_completed_are_terminal(): void
     {
         $this->assertTrue(OrderStatus::Cancelled->isTerminal());

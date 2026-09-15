@@ -27,6 +27,7 @@ trait CreatesOrderFixtures
             'online_ordering_enabled' => true,
             'pickup_enabled' => true,
             'delivery_enabled' => true,
+            'dine_in_enabled' => true,
             'delivery_fee_cents' => 800,
             'min_order_cents' => 0,
         ], $settingAttributes));

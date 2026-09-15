@@ -105,4 +105,22 @@ class OrderWhatsAppNotificationTest extends TestCase
 
         Http::assertSent(fn ($request): bool => str_contains($request->url(), '/message/sendText/loja-1'));
     }
+
+    public function test_dine_in_ready_message_uses_consumo_no_local(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $order = app(OrderService::class)->createPublic($setup['company'], [
+            'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],
+            'fulfillment' => OrderFulfillment::DineIn,
+            'customer_name' => 'Ana Local',
+            'customer_phone' => '34988887777',
+        ]);
+
+        $message = app(OrderWhatsAppMessageBuilder::class)->build($order, OrderStatus::Ready);
+
+        $this->assertStringContainsString('pronto para consumo no local', $message);
+        $this->assertStringContainsString('Pague no local.', $message);
+        $this->assertStringNotContainsString('retirada', $message);
+        $this->assertStringNotContainsString('entrega', $message);
+    }
 }

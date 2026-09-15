@@ -62,21 +62,15 @@ class OrderService
             ? $data['fulfillment']
             : OrderFulfillment::tryFrom((string) $data['fulfillment']);
 
-        if ($fulfillment === null || $fulfillment === OrderFulfillment::DineIn) {
+        if ($fulfillment === null) {
             throw ValidationException::withMessages([
-                'fulfillment' => 'Escolha retirada ou entrega.',
+                'fulfillment' => 'Escolha retirada, entrega ou consumo no local.',
             ]);
         }
 
-        if ($fulfillment === OrderFulfillment::Pickup && ! $setting->pickup_enabled) {
+        if (! $fulfillment->isEnabled($setting)) {
             throw ValidationException::withMessages([
-                'fulfillment' => 'Retirada não está disponível no momento.',
-            ]);
-        }
-
-        if ($fulfillment === OrderFulfillment::Delivery && ! $setting->delivery_enabled) {
-            throw ValidationException::withMessages([
-                'fulfillment' => 'Entrega não está disponível no momento.',
+                'fulfillment' => $fulfillment->label().' não está disponível no momento.',
             ]);
         }
 

@@ -206,6 +206,16 @@ class OrderWizard extends Component
     public function selectFulfillment(string $fulfillment): void
     {
         $this->errorMessage = null;
+        $option = OrderFulfillment::tryFrom($fulfillment);
+        $setting = $this->company->orderSetting
+            ?? app(CompanyOrderSettingService::class)->getOrCreate($this->company);
+
+        if ($option === null || ! $option->isEnabled($setting)) {
+            $this->errorMessage = 'Escolha uma opção disponível.';
+
+            return;
+        }
+
         $this->fulfillment = $fulfillment;
         $this->step = self::STEP_CUSTOMER;
     }
@@ -286,7 +296,7 @@ class OrderWizard extends Component
             $this->confirmationNumber = $order->displayNumber();
             $this->confirmationMessage = filled($settings?->confirmation_message)
                 ? $settings->confirmation_message
-                : 'Pedido enviado. Pague na '.$order->fulfillment->label().'.';
+                : 'Pedido enviado. '.$order->fulfillment->paymentInstruction();
             $this->step = self::STEP_CONFIRMATION;
         } catch (ValidationException $exception) {
             $this->errorMessage = collect($exception->errors())->flatten()->first();
@@ -305,12 +315,18 @@ class OrderWizard extends Component
      */
     protected function customerRules(): array
     {
+        $setting = $this->company->orderSetting
+            ?? app(CompanyOrderSettingService::class)->getOrCreate($this->company);
+        $allowed = collect(OrderFulfillment::enabledPublicOptions($setting))
+            ->map(fn (OrderFulfillment $fulfillment): string => $fulfillment->value)
+            ->implode(',');
+
         $rules = [
             'customerName' => ['required', 'string', 'max:255'],
             'customerPhone' => ['required', 'string', 'min:10', 'max:40'],
             'customerEmail' => ['nullable', 'email', 'max:255'],
             'notes' => ['nullable', 'string', 'max:500'],
-            'fulfillment' => ['required', 'in:pickup,delivery'],
+            'fulfillment' => ['required', 'in:'.$allowed],
         ];
 
         if ($this->fulfillment === OrderFulfillment::Delivery->value) {
@@ -330,7 +346,7 @@ class OrderWizard extends Component
     {
         $steps = [
             ['key' => self::STEP_MENU, 'label' => 'Cardápio'],
-            ['key' => self::STEP_FULFILLMENT, 'label' => 'Retirada ou entrega'],
+            ['key' => self::STEP_FULFILLMENT, 'label' => 'Como pedir'],
             ['key' => self::STEP_CUSTOMER, 'label' => 'Seus dados'],
             ['key' => self::STEP_REVIEW, 'label' => 'Revisão'],
         ];
@@ -375,6 +391,11 @@ class OrderWizard extends Component
     public function cartTotalCents(): int
     {
         return $this->cartSubtotalCents() + $this->deliveryFeeCents();
+    }
+
+    public function selectedFulfillment(): ?OrderFulfillment
+    {
+        return OrderFulfillment::tryFrom($this->fulfillment);
     }
 
     public function formatMoneyCents(int $cents): string
@@ -548,8 +569,7 @@ class OrderWizard extends Component
             'cartLines' => $this->cartLines(),
             'pageTitle' => $pageTitle,
             'steps' => $this->visibleSteps(),
-            'pickupEnabled' => (bool) $setting->pickup_enabled,
-            'deliveryEnabled' => (bool) $setting->delivery_enabled,
+            'fulfillmentOptions' => OrderFulfillment::enabledPublicOptions($setting),
             'hours' => $this->businessHoursSummary(),
             'nowLocal' => CompanyDateTime::nowLocal($this->company)->format('H:i'),
             'phoneNormalized' => PhoneNormalizer::normalize($this->customerPhone),

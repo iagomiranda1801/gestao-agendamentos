@@ -169,6 +169,34 @@ class KitchenDisplayTest extends TestCase
         $this->assertSame(OrderStatus::Completed, $order->fresh()->status);
     }
 
+    public function test_kitchen_can_complete_dine_in_path_and_shows_label(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $admin = $this->createCompanyUser($setup['company']);
+        $service = app(OrderService::class);
+        $order = $service->createPublic($setup['company'], [
+            'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],
+            'fulfillment' => OrderFulfillment::DineIn,
+            'customer_name' => 'Ana Local',
+            'customer_phone' => '34988887777',
+        ]);
+
+        $this->authenticateForAppTenant($admin, $setup['company']);
+
+        $page = Livewire::test(KitchenDisplayPage::class)
+            ->assertSuccessful()
+            ->assertSee('Ana Local', false)
+            ->assertSee('Comer no local', false);
+
+        $page->call('advanceOrder', $order->id);
+        $page->call('advanceOrder', $order->id);
+        $this->assertSame(OrderStatus::Ready, $order->fresh()->status);
+
+        $page->call('advanceOrder', $order->id);
+        $this->assertSame(OrderStatus::Completed, $order->fresh()->status);
+        $this->assertNull($order->fresh()->out_for_delivery_at);
+    }
+
     public function test_kitchen_cancel_requires_reason(): void
     {
         $setup = $this->createRestaurantSetup();
@@ -208,6 +236,25 @@ class KitchenDisplayTest extends TestCase
         Livewire::test(ListOrders::class)
             ->assertSuccessful()
             ->assertSee('Maria Histórico', false);
+    }
+
+    public function test_order_history_shows_dine_in_label(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $admin = $this->createCompanyUser($setup['company']);
+        app(OrderService::class)->createPublic($setup['company'], [
+            'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],
+            'fulfillment' => OrderFulfillment::DineIn,
+            'customer_name' => 'Ana Histórico',
+            'customer_phone' => '34988887777',
+        ]);
+
+        $this->authenticateForAppTenant($admin, $setup['company']);
+
+        Livewire::test(ListOrders::class)
+            ->assertSuccessful()
+            ->assertSee('Ana Histórico', false)
+            ->assertSee('Comer no local', false);
     }
 
     public function test_employee_cannot_cancel_from_kitchen(): void
