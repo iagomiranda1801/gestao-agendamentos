@@ -124,7 +124,7 @@ class OrderSettingsPage extends Page
                     ->label('Avisar o cliente no WhatsApp (se o módulo estiver conectado)'),
                 Toggle::make('whatsapp_order_link_bot_enabled')
                     ->label('Enviar link do cardápio no WhatsApp')
-                    ->helperText('Quando alguém mandar mensagem no WhatsApp da empresa, o bot responde só com o link do cardápio. Não inicia conversa de agendamento.')
+                    ->helperText('Quando alguém mandar um oi, olá ou pedir o cardápio no WhatsApp, o bot envia o link no máximo uma vez por dia (fuso da empresa). Não inicia conversa de agendamento.')
                     ->columnSpanFull(),
             ])->columns(2),
             Section::make('Página pública')->schema([

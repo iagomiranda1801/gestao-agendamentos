@@ -90,7 +90,14 @@ Se o módulo WhatsApp estiver ativo, houver instância Evolution e `orders_whats
 
 O fluxo web funciona sem WhatsApp.
 
-Restaurantes **não** usam o bot de agendamento. Com módulo WhatsApp, pedidos online ligados e “Enviar link do cardápio no WhatsApp” (padrão ligado), uma mensagem recebida no WhatsApp da empresa recebe só o link `/pedir/{slug}`. Sem conversa de horários. Se o cardápio online estiver desligado, o bot não responde e também não cai no agendamento.
+Restaurantes **não** usam o bot de agendamento. Com módulo WhatsApp, pedidos online ligados e “Enviar link do cardápio no WhatsApp” (padrão ligado), o bot responde só com o link `/pedir/{slug}` — sem conversa de horários. Regras do auto-reply:
+
+- no máximo **um link por telefone, por empresa, por dia civil** no fuso da empresa (webhooks duplicados também são ignorados);
+- só responde a texto que parece saudação ou pedido de cardápio (`oi`, `olá`, `cardápio`, `menu`, `pedir`, `pedido`, `bom dia`, etc.);
+- grupos (`@g.us`) e mensagens `fromMe` continuam ignorados;
+- o toggle desliga o recurso por completo.
+
+Se o cardápio online estiver desligado, o bot não responde e também não cai no agendamento.
 
 Empresas que não são restaurante (salão, clínica, etc.) continuam no bot de agendamento existente.
 

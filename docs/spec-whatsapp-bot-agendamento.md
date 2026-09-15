@@ -44,7 +44,7 @@ O job só responde quando **todos** verdadeiros:
 - `CompanySchedulingSetting::whatsapp_bot_enabled`
 - `instance_name` do payload existe em `CompanyWhatsAppInstance`
 
-**Restaurantes / módulo Pedidos sem Agenda:** o job **não** chama o bot de agendamento. Se o cardápio online e o toggle `whatsapp_order_link_bot_enabled` estiverem ligados, responde só com o link `/pedir/{slug}`. Ver `docs/spec-restaurante-pedidos-mvp.md` §7.
+**Restaurantes / módulo Pedidos sem Agenda:** o job **não** chama o bot de agendamento. Se o cardápio online e o toggle `whatsapp_order_link_bot_enabled` estiverem ligados, responde só com o link `/pedir/{slug}` — no máximo uma vez por telefone/empresa/dia civil (fuso da empresa), e só se o texto parecer saudação ou pedido de cardápio. Ver `docs/spec-restaurante-pedidos-mvp.md` §7.
 
 Grupos (`@g.us`), mensagens do próprio número (`fromMe`) e mensagens sem texto são ignoradas.
 

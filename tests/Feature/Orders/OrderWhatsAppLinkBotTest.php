@@ -12,7 +12,11 @@ use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\Bot\WhatsAppBookingBotService;
 use App\Services\WhatsApp\Bot\WhatsAppOrderLinkBotService;
 use App\Services\WhatsApp\EvolutionApiClient;
+use Carbon\Carbon;
+use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Tests\Concerns\CreatesOrderFixtures;
 use Tests\Concerns\CreatesPublicBookingFixtures;
 use Tests\Concerns\CreatesSchedulingFixtures;
@@ -104,6 +108,8 @@ class OrderWhatsAppLinkBotTest extends TestCase
 
     public function test_duplicate_restaurant_messages_do_not_resend_the_link(): void
     {
+        $this->travelTo(Carbon::parse('2026-09-15 12:00:00', 'America/Sao_Paulo'));
+
         $setup = $this->createRestaurantSetup();
         $instance = $this->createInstance($setup['company']);
 
@@ -113,6 +119,70 @@ class OrderWhatsAppLinkBotTest extends TestCase
 
         Http::assertSentCount(1);
         $this->assertSame(0, WhatsAppBotConversation::query()->count());
+    }
+
+    public function test_same_calendar_day_does_not_resend_after_former_ten_minute_window(): void
+    {
+        $logged = $this->captureLogMessages();
+        $this->travelTo(Carbon::parse('2026-09-15 12:00:00', 'America/Sao_Paulo'));
+
+        $setup = $this->createRestaurantSetup();
+        $instance = $this->createInstance($setup['company']);
+
+        $this->runInbound($instance, 'oi', 'rest-day-1');
+        $this->travelTo(Carbon::parse('2026-09-15 12:15:00', 'America/Sao_Paulo'));
+        $this->runInbound($instance, 'cardápio', 'rest-day-2');
+
+        Http::assertSentCount(1);
+        $this->assertTrue(
+            $logged->contains(fn (string $message): bool => str_contains($message, 'WhatsApp order-link bot: suppressed (already sent today)')),
+            'Expected a cooldown suppression log. Got: '.$logged->implode(' | '),
+        );
+    }
+
+    public function test_next_calendar_day_in_company_timezone_can_send_the_link_again(): void
+    {
+        $this->travelTo(Carbon::parse('2026-09-15 23:50:00', 'America/Sao_Paulo'));
+
+        $setup = $this->createRestaurantSetup();
+        $instance = $this->createInstance($setup['company']);
+
+        $this->runInbound($instance, 'oi', 'rest-next-1');
+        $this->travelTo(Carbon::parse('2026-09-16 00:05:00', 'America/Sao_Paulo'));
+        $this->runInbound($instance, 'bom dia', 'rest-next-2');
+
+        Http::assertSentCount(2);
+    }
+
+    public function test_non_greeting_inbound_does_not_send_the_link(): void
+    {
+        $logged = $this->captureLogMessages();
+        $this->travelTo(Carbon::parse('2026-09-15 12:00:00', 'America/Sao_Paulo'));
+
+        $setup = $this->createRestaurantSetup();
+        $instance = $this->createInstance($setup['company']);
+
+        $this->runInbound($instance, 'ok, obrigado', 'rest-thanks-1');
+        $this->runInbound($instance, 'status', 'rest-status-1');
+
+        Http::assertNothingSent();
+        $this->assertTrue(
+            $logged->contains(fn (string $message): bool => str_contains($message, 'WhatsApp order-link bot: suppressed (not a greeting/menu request)')),
+            'Expected a non-greeting suppression log. Got: '.$logged->implode(' | '),
+        );
+    }
+
+    public function test_non_greeting_does_not_consume_the_daily_link_slot(): void
+    {
+        $this->travelTo(Carbon::parse('2026-09-15 12:00:00', 'America/Sao_Paulo'));
+
+        $setup = $this->createRestaurantSetup();
+        $instance = $this->createInstance($setup['company']);
+
+        $this->runInbound($instance, 'ok, obrigado', 'rest-thanks-slot');
+        $this->runInbound($instance, 'oi', 'rest-oi-after-thanks');
+
+        Http::assertSentCount(1);
     }
 
     public function test_salon_booking_bot_still_replies_to_inbound(): void
@@ -132,6 +202,20 @@ class OrderWhatsAppLinkBotTest extends TestCase
 
         $this->assertSame(1, WhatsAppBotConversation::query()->where('company_id', $company->id)->count());
         Http::assertSent(fn ($request): bool => str_contains((string) ($request['text'] ?? ''), 'Agendar um horário'));
+    }
+
+    /**
+     * @return Collection<int, string>
+     */
+    protected function captureLogMessages(): Collection
+    {
+        $logged = collect();
+
+        Log::listen(function (MessageLogged $event) use ($logged): void {
+            $logged->push((string) $event->message);
+        });
+
+        return $logged;
     }
 
     protected function runInbound(
