@@ -446,6 +446,10 @@ class WhatsAppAutomationService
             return false;
         }
 
+        if ($type->requiresConfirmationOptIn() && ! $client->acceptsWhatsAppConfirmations()) {
+            return false;
+        }
+
         if (in_array($type, [WhatsAppAutomationType::AfterSales, WhatsAppAutomationType::WinBack], true)
             && $this->hasFutureAppointment($company, $client, $appointment)) {
             return false;

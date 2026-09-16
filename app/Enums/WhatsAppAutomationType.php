@@ -22,6 +22,11 @@ enum WhatsAppAutomationType: string
         return $this === self::WinBack;
     }
 
+    public function requiresConfirmationOptIn(): bool
+    {
+        return $this === self::Reminder;
+    }
+
     public function delayUnitLabel(): string
     {
         return match ($this) {

@@ -12,9 +12,9 @@ Vale para qualquer perfil (salão, clínica, lava jato). O perfil lava jato só 
 
 ## 2. Tipos
 
-| Tipo | Gatilho | Natureza | Opt-in de marketing |
-|------|---------|----------|---------------------|
-| `reminder` | Agendamento **confirmado** ou **em atendimento**, quando faltar `delay_value` horas para `start_at` | Operacional | Não. Exige telefone, módulo WhatsApp e confirmações WhatsApp ligadas |
+| Tipo | Gatilho | Natureza | Opt-in |
+|------|---------|----------|--------|
+| `reminder` | Agendamento **confirmado** ou **em atendimento**, quando faltar `delay_value` horas para `start_at` | Operacional | **Não** usa marketing. Exige telefone, módulo WhatsApp, confirmações WhatsApp da empresa ligadas e `whatsapp_confirmation_opt_in` do cliente (padrão **ligado**) |
 | `after_sales` | Atendimento concluído + atraso de `delay_value` horas | Relacionamento (obrigado + CTA) | Não, se o texto for neutro. Reconquista promocional usa `win_back` |
 | `win_back` | Último atendimento há `delay_value` dias, sem agendamento futuro | Marketing | **Sempre** `whatsapp_marketing_opt_in` |
 
@@ -51,8 +51,9 @@ Warm-up sugerido (ainda não automático): 20/dia na 1ª semana, 40 na 2ª, 80 d
 
 ## 6. LGPD
 
-- Lembrete e pós-venda neutro: ligados ao serviço já contratado.
-- Reconquista e campanha de inativos: somente com aceite explícito. Origem WhatsApp **não** concede aceite.
+- Confirmação de agendamento e lembrete: ligados ao serviço já contratado, mas o cadastro do cliente tem aceite separado (`whatsapp_confirmation_opt_in`, padrão ligado) para a equipe registrar recusa ou autorização explícita.
+- Pós-venda neutro: ligado ao serviço já contratado.
+- Reconquista e campanha de inativos: somente com aceite explícito de marketing (`whatsapp_marketing_opt_in`). Origem WhatsApp **não** concede aceite de marketing.
 - Sem lista comprada.
 
 ## 7. Fora de escopo (v1)

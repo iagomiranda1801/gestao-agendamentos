@@ -109,6 +109,40 @@ class WhatsAppAutomationTest extends TestCase
         $this->assertDatabaseCount('whatsapp_automation_sends', 0);
     }
 
+    public function test_reminder_does_not_send_when_client_opted_out_of_whatsapp_confirmations(): void
+    {
+        $setup = $this->createBookableSetup();
+        $this->enableOperationalWhatsApp($setup['company']);
+        $setup['client']->update([
+            'phone' => '(11) 99999-0001',
+            'whatsapp_confirmation_opt_in' => false,
+        ]);
+
+        $this->enableAutomation($setup['company'], WhatsAppAutomationType::Reminder, [
+            'is_enabled' => true,
+            'delay_value' => 24,
+        ]);
+
+        Appointment::factory()
+            ->forCompany($setup['company'])
+            ->confirmed()
+            ->create([
+                'client_id' => $setup['client']->getKey(),
+                'professional_id' => $setup['professional']->getKey(),
+                'service_id' => $setup['service']->getKey(),
+                'start_at' => now()->addHours(10),
+                'end_at' => now()->addHours(11),
+                'client_name_snapshot' => $setup['client']->name,
+                'client_phone_snapshot' => $setup['client']->phone,
+                'created_by' => $setup['admin']->getKey(),
+            ]);
+
+        $queued = app(WhatsAppAutomationService::class)->processCompany($setup['company']);
+
+        $this->assertSame(0, $queued);
+        $this->assertDatabaseCount('whatsapp_automation_sends', 0);
+    }
+
     public function test_win_back_requires_marketing_opt_in(): void
     {
         $setup = $this->createInactiveVisitSetup(optIn: false);

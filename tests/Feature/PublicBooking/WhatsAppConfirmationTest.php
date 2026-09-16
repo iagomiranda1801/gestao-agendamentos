@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\PublicBooking;
 
-use App\Events\OnlineAppointmentCreated;
 use App\Enums\AppointmentStatus;
+use App\Events\OnlineAppointmentCreated;
 use App\Jobs\NotifyStaffOfOnlineBookingJob;
 use App\Jobs\SendAppointmentCreatedEmailJob;
 use App\Jobs\SendWhatsAppAppointmentConfirmationJob;
@@ -182,6 +182,56 @@ class WhatsAppConfirmationTest extends TestCase
         );
 
         $this->assertFalse($result->whatsappQueued);
+
+        (new SendWhatsAppAppointmentConfirmationJob(
+            $result->appointment->getKey(),
+            $result->manageUrl,
+        ))->handle(
+            app(EvolutionApiClient::class),
+            app(WhatsAppConfirmationMessageBuilder::class),
+            app(CompanyWhatsAppInstanceService::class),
+        );
+
+        Http::assertNothingSent();
+    }
+
+    public function test_job_is_noop_when_client_opted_out_of_whatsapp_confirmations(): void
+    {
+        config([
+            'services.evolution.url' => 'https://evolution.test',
+            'services.evolution.key' => 'test-key',
+            'services.evolution.instance' => 'default',
+        ]);
+
+        Http::fake();
+
+        $setup = $this->createBookableSetup();
+        $setup['client']->update([
+            'whatsapp_confirmation_opt_in' => false,
+            'phone' => '(11) 91234-5678',
+        ]);
+
+        $this->enablePublicBooking($setup['company'], [
+            'whatsapp_notifications_enabled' => true,
+            'whatsapp_instance' => 'loja-1',
+            'whatsapp_sender_phone' => '11988887777',
+        ]);
+
+        $result = app(OnlineBookingService::class)->create(
+            $this->makeOnlineBookingData(
+                $setup['company'],
+                $setup['service']->getKey(),
+                $setup['professional']->getKey(),
+                $setup['localStart'],
+                [
+                    'clientName' => $setup['client']->name,
+                    'clientPhone' => $setup['client']->phone,
+                ],
+            ),
+        );
+
+        $this->assertFalse($result->whatsappQueued);
+        $this->assertFalse($result->appointment->client?->acceptsWhatsAppConfirmations());
 
         (new SendWhatsAppAppointmentConfirmationJob(
             $result->appointment->getKey(),

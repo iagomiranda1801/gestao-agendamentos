@@ -7,6 +7,7 @@ use App\Enums\CompanyProfile;
 use App\Enums\CompanyRole;
 use App\Filament\App\Resources\Clients\ClientResource;
 use App\Filament\App\Resources\Clients\Pages\CreateClient;
+use App\Filament\App\Resources\Clients\Pages\EditClient;
 use App\Filament\App\Resources\Clients\Pages\ListClients;
 use App\Filament\App\Resources\Clients\Pages\ViewPatientRecord;
 use App\Models\Client;
@@ -187,6 +188,108 @@ class ClientResourceTest extends TestCase
         app(ClientService::class)->changeStatus($company, $client, false);
 
         $this->assertFalse($client->fresh()->is_active);
+    }
+
+    public function test_new_client_defaults_whatsapp_confirmation_opt_in_on(): void
+    {
+        $company = $this->createCompany();
+
+        $client = app(ClientService::class)->create($company, [
+            'name' => 'Maria',
+            'phone' => '(34) 99999-0001',
+            'is_active' => true,
+        ]);
+
+        $this->assertTrue($client->whatsapp_confirmation_opt_in);
+        $this->assertTrue($client->acceptsWhatsAppConfirmations());
+        $this->assertFalse($client->whatsapp_marketing_opt_in);
+    }
+
+    public function test_client_whatsapp_confirmation_opt_in_is_independent_of_marketing(): void
+    {
+        $company = $this->createCompany();
+        $client = app(ClientService::class)->create($company, [
+            'name' => 'Maria',
+            'phone' => '(34) 99999-0001',
+            'is_active' => true,
+            'whatsapp_confirmation_opt_in' => true,
+            'whatsapp_marketing_opt_in' => false,
+        ]);
+
+        $updated = app(ClientService::class)->update($company, $client, [
+            'name' => 'Maria',
+            'phone' => '(34) 99999-0001',
+            'whatsapp_confirmation_opt_in' => false,
+            'whatsapp_marketing_opt_in' => true,
+        ]);
+
+        $this->assertFalse($updated->whatsapp_confirmation_opt_in);
+        $this->assertFalse($updated->acceptsWhatsAppConfirmations());
+        $this->assertTrue($updated->whatsapp_marketing_opt_in);
+    }
+
+    public function test_create_client_form_defaults_confirmation_opt_in_on(): void
+    {
+        $company = $this->createCompany(['slug' => 'estudio-ana']);
+        $admin = $this->createCompanyUser($company);
+        $this->authenticateForAppTenant($admin, $company);
+
+        Livewire::test(CreateClient::class)
+            ->assertFormFieldExists('whatsapp_confirmation_opt_in')
+            ->assertFormFieldExists('whatsapp_marketing_opt_in')
+            ->assertSee('Aceita confirmações no WhatsApp')
+            ->assertSee('Aceita campanhas no WhatsApp')
+            ->assertFormSet([
+                'whatsapp_confirmation_opt_in' => true,
+                'whatsapp_marketing_opt_in' => false,
+            ]);
+    }
+
+    public function test_create_client_form_persists_whatsapp_confirmation_acceptance(): void
+    {
+        $company = $this->createCompany(['slug' => 'estudio-ana']);
+        $admin = $this->createCompanyUser($company);
+        $this->authenticateForAppTenant($admin, $company);
+
+        Livewire::test(CreateClient::class)
+            ->fillForm([
+                'name' => 'Cliente Confirmacao',
+                'phone' => '(34) 99999-0001',
+                'is_active' => true,
+                'whatsapp_confirmation_opt_in' => true,
+                'whatsapp_marketing_opt_in' => false,
+            ])
+            ->call('create');
+
+        $client = Client::query()->where('company_id', $company->id)->firstOrFail();
+
+        $this->assertTrue($client->whatsapp_confirmation_opt_in);
+        $this->assertFalse($client->whatsapp_marketing_opt_in);
+    }
+
+    public function test_edit_client_form_can_mark_whatsapp_confirmation_acceptance(): void
+    {
+        $company = $this->createCompany(['slug' => 'estudio-ana']);
+        $admin = $this->createCompanyUser($company);
+        $client = Client::factory()->forCompany($company)->create([
+            'whatsapp_confirmation_opt_in' => false,
+            'whatsapp_marketing_opt_in' => false,
+        ]);
+
+        $this->authenticateForAppTenant($admin, $company);
+
+        Livewire::test(EditClient::class, ['record' => $client->getKey()])
+            ->assertFormFieldExists('whatsapp_confirmation_opt_in')
+            ->assertSee('Aceita confirmações no WhatsApp')
+            ->assertFormSet(['whatsapp_confirmation_opt_in' => false])
+            ->fillForm([
+                'whatsapp_confirmation_opt_in' => true,
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertTrue($client->fresh()->whatsapp_confirmation_opt_in);
+        $this->assertFalse($client->fresh()->whatsapp_marketing_opt_in);
     }
 
     public function test_client_resource_has_no_delete_action(): void

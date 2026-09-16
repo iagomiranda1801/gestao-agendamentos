@@ -31,6 +31,7 @@ class ClientFactory extends Factory
             'vehicle_model' => null,
             'is_active' => true,
             'whatsapp_marketing_opt_in' => false,
+            'whatsapp_confirmation_opt_in' => true,
         ];
     }
 
@@ -59,6 +60,13 @@ class ClientFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'whatsapp_marketing_opt_in' => true,
+        ]);
+    }
+
+    public function optedOutOfWhatsAppConfirmations(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'whatsapp_confirmation_opt_in' => false,
         ]);
     }
 }

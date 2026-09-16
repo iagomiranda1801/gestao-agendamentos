@@ -49,7 +49,8 @@ O comportamento atual deve ser preservado:
 - preencher nome e telefone a partir do contato;
 - manter o cadastro ativo;
 - registrar `imported_as_client_at`;
-- manter `whatsapp_marketing_opt_in = false`, exceto na ação explícita de autorização de campanhas.
+- manter `whatsapp_marketing_opt_in = false`, exceto na ação explícita de autorização de campanhas;
+- manter `whatsapp_confirmation_opt_in = true` (confirmações e lembretes de horário são operacionais; a equipe pode desligar no cadastro).
 
 ### 4.3 Importação em clínica odontológica
 
@@ -63,7 +64,7 @@ Ao escolher importar um contato em uma empresa odontológica, o sistema deve:
 6. apresentar o resultado como **Paciente criado** ou **Paciente vinculado**;
 7. marcar o cadastro como **dados pendentes** quando ainda não houver os dados clínicos/administrativos recomendados.
 
-O cadastro mínimo importado terá nome, telefone, status ativo e opção de marketing desmarcada. CPF, nascimento, responsável, convênio, endereço e anamnese não devem ser inferidos a partir do WhatsApp.
+O cadastro mínimo importado terá nome, telefone, status ativo, opção de marketing desmarcada e aceite de confirmações WhatsApp ligado (padrão operacional). CPF, nascimento, responsável, convênio, endereço e anamnese não devem ser inferidos a partir do WhatsApp.
 
 ### 4.4 Garantia de perfil odontológico
 

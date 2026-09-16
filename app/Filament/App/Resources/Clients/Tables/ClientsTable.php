@@ -58,6 +58,14 @@ class ClientsTable
                     ->falseIcon('heroicon-o-x-circle')
                     ->trueColor('success')
                     ->falseColor('danger'),
+                IconColumn::make('whatsapp_confirmation_opt_in')
+                    ->label('Confirmações WhatsApp')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('gray')
+                    ->toggleable(),
                 IconColumn::make('whatsapp_marketing_opt_in')
                     ->label('Marketing WhatsApp')
                     ->boolean()
@@ -77,6 +85,11 @@ class ClientsTable
                     ->label('Status')
                     ->trueLabel('Ativos')
                     ->falseLabel('Inativos')
+                    ->placeholder('Todos'),
+                TernaryFilter::make('whatsapp_confirmation_opt_in')
+                    ->label('Confirmações WhatsApp')
+                    ->trueLabel('Com aceite')
+                    ->falseLabel('Sem aceite')
                     ->placeholder('Todos'),
                 TernaryFilter::make('whatsapp_marketing_opt_in')
                     ->label('Marketing WhatsApp')

@@ -23,6 +23,18 @@ enum AppointmentStatus: string
         };
     }
 
+    public function color(): string
+    {
+        return match ($this) {
+            self::Pending => 'warning',
+            self::Confirmed => 'warning',
+            self::InProgress => 'info',
+            self::Completed => 'success',
+            self::Cancelled => 'gray',
+            self::NoShow => 'danger',
+        };
+    }
+
     public function blocksTime(): bool
     {
         return in_array($this, [

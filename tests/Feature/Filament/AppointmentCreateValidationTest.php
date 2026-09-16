@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Enums\AppointmentStatus;
 use App\Filament\App\Pages\CalendarPage;
 use App\Filament\App\Resources\Appointments\Pages\CreateAppointment;
+use App\Filament\App\Resources\Appointments\Pages\ListAppointments;
 use App\Models\Appointment;
+use App\Services\Scheduling\AppointmentService;
 use Livewire\Livewire;
 use Tests\Concerns\CreatesSchedulingFixtures;
 use Tests\TestCase;
@@ -93,5 +96,28 @@ class AppointmentCreateValidationTest extends TestCase
             ->assertNotified();
 
         $this->assertSame(1, Appointment::query()->count());
+    }
+
+    public function test_appointments_list_shows_confirmed_status_as_warning_badge(): void
+    {
+        $setup = $this->createBookableSetup();
+        $this->authenticateForAppTenant($setup['admin'], $setup['company']);
+
+        $appointment = app(AppointmentService::class)->createInternalAppointment(
+            $setup['company'],
+            $setup['admin'],
+            $setup['client'],
+            $setup['professional'],
+            $setup['service'],
+            $setup['localStart'],
+        );
+
+        $this->assertSame(AppointmentStatus::Confirmed, $appointment->status);
+        $this->assertSame('warning', $appointment->status->color());
+
+        Livewire::test(ListAppointments::class)
+            ->assertSuccessful()
+            ->assertCanSeeTableRecords([$appointment])
+            ->assertSee('Confirmado');
     }
 }

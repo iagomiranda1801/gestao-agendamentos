@@ -65,14 +65,7 @@ class AppointmentsTable
                     ->label('Status')
                     ->badge()
                     ->formatStateUsing(fn (AppointmentStatus $state): string => $state->label())
-                    ->color(fn (AppointmentStatus $state): string => match ($state) {
-                        AppointmentStatus::Pending => 'warning',
-                        AppointmentStatus::Confirmed => 'success',
-                        AppointmentStatus::InProgress => 'info',
-                        AppointmentStatus::Completed => 'success',
-                        AppointmentStatus::Cancelled => 'gray',
-                        AppointmentStatus::NoShow => 'danger',
-                    }),
+                    ->color(fn (AppointmentStatus $state): string => $state->color()),
                 TextColumn::make('origin')
                     ->label('Origem')
                     ->badge()
