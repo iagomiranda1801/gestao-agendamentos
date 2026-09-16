@@ -272,6 +272,8 @@ class ClientResourceTest extends TestCase
         $company = $this->createCompany(['slug' => 'estudio-ana']);
         $admin = $this->createCompanyUser($company);
         $client = Client::factory()->forCompany($company)->create([
+            'phone' => '(34) 99999-0001',
+            'document' => null,
             'whatsapp_confirmation_opt_in' => false,
             'whatsapp_marketing_opt_in' => false,
         ]);

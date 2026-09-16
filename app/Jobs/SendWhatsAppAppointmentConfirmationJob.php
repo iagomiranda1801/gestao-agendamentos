@@ -87,13 +87,13 @@ class SendWhatsAppAppointmentConfirmationJob implements ShouldBeUnique, ShouldQu
             return;
         }
 
-        $client = $appointment->client;
+        $appointmentClient = $appointment->client;
 
-        if ($client !== null && ! $client->acceptsWhatsAppConfirmations()) {
+        if ($appointmentClient !== null && ! $appointmentClient->acceptsWhatsAppConfirmations()) {
             Log::info('WhatsApp confirmation skipped.', [
                 'reason' => 'client_opted_out',
                 'appointment_id' => $appointment->getKey(),
-                'client_id' => $client->getKey(),
+                'client_id' => $appointmentClient->getKey(),
             ]);
 
             return;

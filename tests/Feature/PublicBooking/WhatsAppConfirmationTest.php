@@ -204,6 +204,7 @@ class WhatsAppConfirmationTest extends TestCase
         ]);
 
         Http::fake();
+        Queue::fake();
 
         $setup = $this->createBookableSetup();
         $setup['client']->update([

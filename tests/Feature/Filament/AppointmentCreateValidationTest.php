@@ -16,6 +16,13 @@ class AppointmentCreateValidationTest extends TestCase
 {
     use CreatesSchedulingFixtures;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withoutVite();
+    }
+
     public function test_calendar_create_shows_error_for_unaligned_time(): void
     {
         $setup = $this->createBookableSetup();
