@@ -67,7 +67,7 @@ class AppointmentsTable
                     ->formatStateUsing(fn (AppointmentStatus $state): string => $state->label())
                     ->color(fn (AppointmentStatus $state): string => match ($state) {
                         AppointmentStatus::Pending => 'warning',
-                        AppointmentStatus::Confirmed => 'success',
+                        AppointmentStatus::Confirmed => 'warning',
                         AppointmentStatus::InProgress => 'info',
                         AppointmentStatus::Completed => 'success',
                         AppointmentStatus::Cancelled => 'gray',

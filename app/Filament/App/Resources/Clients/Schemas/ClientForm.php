@@ -63,9 +63,13 @@ class ClientForm
                         Toggle::make('is_active')
                             ->label(CompanyTerminology::client().' ativo')
                             ->default(true),
+                        Toggle::make('whatsapp_confirmation_opt_in')
+                            ->label('Aceita confirmações no WhatsApp')
+                            ->helperText('Confirmação de agendamento e avisos de alteração de horário. Já vem ligado; desligue se '.CompanyTerminology::client(capitalized: false).' não autorizar.')
+                            ->default(true),
                         Toggle::make('whatsapp_marketing_opt_in')
                             ->label('Aceita campanhas no WhatsApp')
-                            ->helperText('Use somente quando '.CompanyTerminology::client(capitalized: false).' autorizou receber mensagens promocionais. Lembretes de horário não dependem deste aceite.')
+                            ->helperText('Somente mensagens promocionais. Confirmações usam o aceite acima.')
                             ->default(false),
                     ]),
                 Section::make('Veículo')

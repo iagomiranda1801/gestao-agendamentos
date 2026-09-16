@@ -87,6 +87,17 @@ class SendWhatsAppAppointmentConfirmationJob implements ShouldBeUnique, ShouldQu
             return;
         }
 
+        $appointmentClient = $appointment->client;
+        if ($appointmentClient !== null && ! (bool) $appointmentClient->whatsapp_confirmation_opt_in) {
+            Log::info('WhatsApp confirmation skipped.', [
+                'reason' => 'client_opt_out',
+                'appointment_id' => $appointment->getKey(),
+                'client_id' => $appointmentClient->getKey(),
+            ]);
+
+            return;
+        }
+
         if (! $this->deferUntilOutboundSlot($company, WhatsAppOutboundKind::Confirmation)) {
             Log::info('WhatsApp confirmation waiting for outbound slot.', [
                 'reason' => 'deferred',

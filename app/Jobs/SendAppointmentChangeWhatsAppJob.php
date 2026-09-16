@@ -104,7 +104,10 @@ class SendAppointmentChangeWhatsAppJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        if (filled($clientPhone)) {
+        $appointmentClient = $appointment->client;
+        $clientAllowsConfirmation = $appointmentClient === null || (bool) $appointmentClient->whatsapp_confirmation_opt_in;
+
+        if (filled($clientPhone) && $clientAllowsConfirmation) {
             $this->send($client, $instance, $clientPhone, $clientMessage, 'client', $appointment);
         }
 

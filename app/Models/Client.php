@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'vehicle_model',
     'is_active',
     'whatsapp_marketing_opt_in',
+    'whatsapp_confirmation_opt_in',
     'source',
     'source_imported_at',
 ])]
@@ -55,6 +56,7 @@ class Client extends Model
             'birth_date' => 'date',
             'is_active' => 'boolean',
             'whatsapp_marketing_opt_in' => 'boolean',
+            'whatsapp_confirmation_opt_in' => 'boolean',
             'source_imported_at' => 'datetime',
         ];
     }
@@ -179,5 +181,10 @@ class Client extends Model
     public function scopeWhatsappMarketingOptedIn(Builder $query): Builder
     {
         return $query->where('whatsapp_marketing_opt_in', true);
+    }
+
+    public function scopeWhatsappConfirmationOptedIn(Builder $query): Builder
+    {
+        return $query->where('whatsapp_confirmation_opt_in', true);
     }
 }
