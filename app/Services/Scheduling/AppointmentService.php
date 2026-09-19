@@ -70,6 +70,7 @@ class AppointmentService
             $appointment = new Appointment([
                 'status' => AppointmentStatus::Confirmed,
                 'origin' => AppointmentOrigin::Internal,
+                'send_whatsapp_confirmation' => (bool) ($data['send_whatsapp_confirmation'] ?? true),
                 'service_selection_mode' => $isOpenService ? 'to_be_defined' : 'defined',
                 'start_at' => $startUtc,
                 'end_at' => $endUtc,

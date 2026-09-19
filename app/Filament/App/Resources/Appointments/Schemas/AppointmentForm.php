@@ -22,6 +22,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -158,6 +159,11 @@ class AppointmentForm
                             ->disabled()
                             ->dehydrated(false)
                             ->visible(fn (?string $operation): bool => $operation !== 'create'),
+                        Toggle::make('send_whatsapp_confirmation')
+                            ->label('Enviar confirmação ao cliente por WhatsApp')
+                            ->helperText('A mensagem será enviada após salvar o agendamento.')
+                            ->default(true)
+                            ->visible(fn (?string $operation): bool => $operation === 'create'),
                     ])
                     ->columns(2),
                 Section::make('Alertas clínicos')

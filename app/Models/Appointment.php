@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'service_selection_mode',
     'status',
     'origin',
+    'send_whatsapp_confirmation',
     'reference_key',
     'appointment_reason',
     'start_at',
@@ -68,6 +69,7 @@ class Appointment extends Model
         return [
             'status' => AppointmentStatus::class,
             'origin' => AppointmentOrigin::class,
+            'send_whatsapp_confirmation' => 'boolean',
             'start_at' => 'datetime',
             'end_at' => 'datetime',
             'price_snapshot' => 'decimal:2',

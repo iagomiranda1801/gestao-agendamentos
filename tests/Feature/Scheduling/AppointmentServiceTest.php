@@ -58,6 +58,26 @@ class AppointmentServiceTest extends TestCase
         Queue::assertPushed(SendAppointmentCreatedEmailJob::class);
     }
 
+    public function test_internal_appointment_can_skip_initial_whatsapp_confirmation(): void
+    {
+        Queue::fake();
+        $setup = $this->createBookableSetup();
+
+        $appointment = app(AppointmentService::class)->createInternalAppointment(
+            $setup['company'],
+            $setup['admin'],
+            $setup['client'],
+            $setup['professional'],
+            $setup['service'],
+            $setup['localStart'],
+            ['send_whatsapp_confirmation' => false],
+        );
+
+        $this->assertFalse($appointment->send_whatsapp_confirmation);
+        Queue::assertNotPushed(SendWhatsAppAppointmentConfirmationJob::class);
+        Queue::assertPushed(SendAppointmentCreatedEmailJob::class);
+    }
+
     public function test_end_at_is_calculated_by_backend(): void
     {
         $setup = $this->createBookableSetup();

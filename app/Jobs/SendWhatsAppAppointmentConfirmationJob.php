@@ -48,6 +48,15 @@ class SendWhatsAppAppointmentConfirmationJob implements ShouldBeUnique, ShouldQu
             return;
         }
 
+        if (! $appointment->send_whatsapp_confirmation) {
+            Log::info('WhatsApp confirmation skipped.', [
+                'reason' => 'not_requested',
+                'appointment_id' => $appointment->getKey(),
+            ]);
+
+            return;
+        }
+
         if ($this->skipStaleCreation($appointment)) {
             return;
         }

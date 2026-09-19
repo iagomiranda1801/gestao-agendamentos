@@ -34,6 +34,7 @@ class AppointmentFactory extends Factory
             'service_id' => Service::factory(),
             'status' => AppointmentStatus::Confirmed,
             'origin' => AppointmentOrigin::Internal,
+            'send_whatsapp_confirmation' => true,
             'reference_key' => null,
             'start_at' => $start,
             'end_at' => $start->copy()->addMinutes($duration),

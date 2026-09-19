@@ -409,6 +409,10 @@ class CalendarPage extends Page
                         ->rows(2)
                         ->visible(fn (callable $get): bool => blank($get('service_id')))
                         ->columnSpanFull(),
+                    Toggle::make('send_whatsapp_confirmation')
+                        ->label('Enviar confirmação ao cliente por WhatsApp')
+                        ->helperText('A mensagem será enviada após salvar o agendamento.')
+                        ->default(true),
                 ])
                 ->action(function (array $data): void {
                     $this->createFromSelection($data);
