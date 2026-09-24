@@ -7,10 +7,12 @@ use App\Enums\CompanyProfile;
 use App\Enums\WhatsAppAutomationSendStatus;
 use App\Enums\WhatsAppAutomationType;
 use App\Enums\WhatsAppCampaignAudience;
+use App\Events\AppointmentRescheduled;
 use App\Jobs\SendWhatsAppAfterSalesJob;
 use App\Models\Appointment;
 use App\Models\Attendance;
 use App\Models\Client;
+use App\Models\WhatsAppAutomationSend;
 use App\Services\Client\ClientService;
 use App\Services\Company\CompanyModuleService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
@@ -53,7 +55,7 @@ class WhatsAppAutomationTest extends TestCase
 
         $this->enableAutomation($setup['company'], WhatsAppAutomationType::Reminder, [
             'is_enabled' => true,
-            'delay_value' => 24,
+            'delay_value' => 12,
         ]);
 
         Appointment::factory()
@@ -63,8 +65,8 @@ class WhatsAppAutomationTest extends TestCase
                 'client_id' => $setup['client']->getKey(),
                 'professional_id' => $setup['professional']->getKey(),
                 'service_id' => $setup['service']->getKey(),
-                'start_at' => now()->addHours(10),
-                'end_at' => now()->addHours(11),
+                'start_at' => now()->addHours(12)->subMinutes(5),
+                'end_at' => now()->addHours(13)->subMinutes(5),
                 'client_name_snapshot' => $setup['client']->name,
                 'client_phone_snapshot' => $setup['client']->phone,
                 'created_by' => $setup['admin']->getKey(),
@@ -81,6 +83,45 @@ class WhatsAppAutomationTest extends TestCase
         ]);
     }
 
+    public function test_appointment_receives_one_reminder_at_twenty_four_and_another_at_twelve_hours(): void
+    {
+        $setup = $this->createBookableSetup();
+        $this->enableOperationalWhatsApp($setup['company']);
+        $setup['client']->update(['phone' => '(11) 99999-0001']);
+        $this->enableAutomation($setup['company'], WhatsAppAutomationType::Reminder, [
+            'is_enabled' => true,
+        ]);
+
+        $appointment = Appointment::factory()->forCompany($setup['company'])->confirmed()->create([
+            'client_id' => $setup['client']->getKey(),
+            'professional_id' => $setup['professional']->getKey(),
+            'service_id' => $setup['service']->getKey(),
+            'start_at' => now()->addHours(24),
+            'end_at' => now()->addHours(25),
+            'created_by' => $setup['admin']->getKey(),
+        ]);
+
+        $service = app(WhatsAppAutomationService::class);
+        $this->assertSame(1, $service->processCompany($setup['company']));
+        $this->assertSame(0, $service->processCompany($setup['company']));
+        $this->assertDatabaseHas('whatsapp_automation_sends', [
+            'appointment_id' => $appointment->getKey(),
+            'reminder_hours' => 24,
+            'status' => WhatsAppAutomationSendStatus::Sent->value,
+        ]);
+
+        Carbon::setTestNow(now()->addHours(12));
+        $this->assertSame(1, $service->processCompany($setup['company']));
+        $this->assertSame(0, $service->processCompany($setup['company']));
+        $this->assertDatabaseHas('whatsapp_automation_sends', [
+            'appointment_id' => $appointment->getKey(),
+            'reminder_hours' => 12,
+            'status' => WhatsAppAutomationSendStatus::Sent->value,
+        ]);
+        $this->assertSame(2, WhatsAppAutomationSend::query()->where('appointment_id', $appointment->getKey())->count());
+        Http::assertSentCount(2);
+    }
+
     public function test_reminder_does_not_send_when_operational_whatsapp_is_disabled(): void
     {
         $setup = $this->createBookableSetup();
@@ -88,7 +129,6 @@ class WhatsAppAutomationTest extends TestCase
 
         $this->enableAutomation($setup['company'], WhatsAppAutomationType::Reminder, [
             'is_enabled' => true,
-            'delay_value' => 24,
         ]);
 
         Appointment::factory()
@@ -98,8 +138,8 @@ class WhatsAppAutomationTest extends TestCase
                 'client_id' => $setup['client']->getKey(),
                 'professional_id' => $setup['professional']->getKey(),
                 'service_id' => $setup['service']->getKey(),
-                'start_at' => now()->addHours(10),
-                'end_at' => now()->addHours(11),
+                'start_at' => now()->addHours(24),
+                'end_at' => now()->addHours(25),
                 'created_by' => $setup['admin']->getKey(),
             ]);
 
@@ -107,6 +147,119 @@ class WhatsAppAutomationTest extends TestCase
 
         $this->assertSame(0, $queued);
         $this->assertDatabaseCount('whatsapp_automation_sends', 0);
+    }
+
+    public function test_reminder_waits_until_twelve_hours_before_and_ignores_late_bookings(): void
+    {
+        $setup = $this->createBookableSetup();
+        $this->enableOperationalWhatsApp($setup['company']);
+        $setup['client']->update(['phone' => '(11) 99999-0001']);
+        $this->enableAutomation($setup['company'], WhatsAppAutomationType::Reminder, [
+            'is_enabled' => true,
+            'delay_value' => 12,
+        ]);
+
+        $appointment = Appointment::factory()->forCompany($setup['company'])->confirmed()->create([
+            'client_id' => $setup['client']->getKey(),
+            'professional_id' => $setup['professional']->getKey(),
+            'service_id' => $setup['service']->getKey(),
+            'start_at' => now()->addHours(12)->addMinute(),
+            'end_at' => now()->addHours(13)->addMinute(),
+            'created_by' => $setup['admin']->getKey(),
+        ]);
+
+        $service = app(WhatsAppAutomationService::class);
+        $this->assertSame(0, $service->processCompany($setup['company']));
+
+        Carbon::setTestNow(now()->addMinutes(6));
+        $this->assertSame(1, $service->processCompany($setup['company']));
+        $this->assertSame(0, $service->processCompany($setup['company']));
+
+        $late = Appointment::factory()->forCompany($setup['company'])->confirmed()->create([
+            'client_id' => $setup['client']->getKey(),
+            'professional_id' => $setup['professional']->getKey(),
+            'service_id' => $setup['service']->getKey(),
+            'start_at' => now()->addHours(11),
+            'end_at' => now()->addHours(12),
+            'created_by' => $setup['admin']->getKey(),
+        ]);
+
+        $this->assertSame(0, $service->processCompany($setup['company']));
+        $this->assertDatabaseMissing('whatsapp_automation_sends', ['appointment_id' => $late->getKey()]);
+        $this->assertDatabaseHas('whatsapp_automation_sends', ['appointment_id' => $appointment->getKey()]);
+    }
+
+    public function test_pending_reminder_is_not_sent_after_appointment_changes(): void
+    {
+        Queue::fake();
+        $setup = $this->createBookableSetup();
+        $this->enableOperationalWhatsApp($setup['company']);
+        $setup['client']->update(['phone' => '(11) 99999-0001']);
+        $this->enableAutomation($setup['company'], WhatsAppAutomationType::Reminder, [
+            'is_enabled' => true,
+            'delay_value' => 12,
+        ]);
+
+        $appointment = Appointment::factory()->forCompany($setup['company'])->confirmed()->create([
+            'client_id' => $setup['client']->getKey(),
+            'professional_id' => $setup['professional']->getKey(),
+            'service_id' => $setup['service']->getKey(),
+            'start_at' => now()->addHours(12),
+            'end_at' => now()->addHours(13),
+            'created_by' => $setup['admin']->getKey(),
+        ]);
+
+        $service = app(WhatsAppAutomationService::class);
+        $this->assertSame(1, $service->processCompany($setup['company']));
+        $send = WhatsAppAutomationSend::query()->sole();
+
+        $appointment->update(['status' => 'cancelled']);
+        $service->deliver($send);
+        $this->assertSame(WhatsAppAutomationSendStatus::Skipped, $send->refresh()->status);
+
+        $appointment->update(['status' => 'confirmed']);
+        $send->update(['status' => 'pending']);
+        $appointment->update([
+            'start_at' => now()->addHours(12)->subMinutes(5),
+            'end_at' => now()->addHours(13)->subMinutes(5),
+        ]);
+        event(new AppointmentRescheduled($appointment));
+
+        $this->assertDatabaseMissing('whatsapp_automation_sends', ['id' => $send->getKey()]);
+        $this->assertSame(1, $service->processCompany($setup['company']));
+        $this->assertDatabaseHas('whatsapp_automation_sends', [
+            'appointment_id' => $appointment->getKey(),
+            'status' => WhatsAppAutomationSendStatus::Pending->value,
+        ]);
+    }
+
+    public function test_reminder_is_skipped_if_queue_delivers_too_late(): void
+    {
+        Queue::fake();
+        $setup = $this->createBookableSetup();
+        $this->enableOperationalWhatsApp($setup['company']);
+        $setup['client']->update(['phone' => '(11) 99999-0001']);
+        $this->enableAutomation($setup['company'], WhatsAppAutomationType::Reminder, [
+            'is_enabled' => true,
+        ]);
+
+        Appointment::factory()->forCompany($setup['company'])->confirmed()->create([
+            'client_id' => $setup['client']->getKey(),
+            'professional_id' => $setup['professional']->getKey(),
+            'service_id' => $setup['service']->getKey(),
+            'start_at' => now()->addHours(12),
+            'end_at' => now()->addHours(13),
+            'created_by' => $setup['admin']->getKey(),
+        ]);
+
+        $service = app(WhatsAppAutomationService::class);
+        $this->assertSame(1, $service->processCompany($setup['company']));
+
+        Carbon::setTestNow(now()->addMinutes(16));
+        $send = WhatsAppAutomationSend::query()->sole();
+        $service->deliver($send);
+
+        $this->assertSame(WhatsAppAutomationSendStatus::Skipped, $send->refresh()->status);
     }
 
     public function test_win_back_requires_marketing_opt_in(): void
@@ -339,7 +492,7 @@ class WhatsAppAutomationTest extends TestCase
         $this->assertSame('ABC-1234', VehiclePlate::format('ABC1234'));
     }
 
-    public function test_quiet_hours_skip_without_recording_send(): void
+    public function test_reminder_is_sent_twelve_hours_before_even_at_night(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-09-02 02:00:00', 'UTC'));
 
@@ -349,7 +502,7 @@ class WhatsAppAutomationTest extends TestCase
 
         $this->enableAutomation($setup['company'], WhatsAppAutomationType::Reminder, [
             'is_enabled' => true,
-            'delay_value' => 24,
+            'delay_value' => 12,
             'quiet_hours_start' => '08:00',
             'quiet_hours_end' => '20:00',
         ]);
@@ -361,15 +514,18 @@ class WhatsAppAutomationTest extends TestCase
                 'client_id' => $setup['client']->getKey(),
                 'professional_id' => $setup['professional']->getKey(),
                 'service_id' => $setup['service']->getKey(),
-                'start_at' => now()->addHours(10),
-                'end_at' => now()->addHours(11),
+                'start_at' => now()->addHours(12),
+                'end_at' => now()->addHours(13),
                 'created_by' => $setup['admin']->getKey(),
             ]);
 
         $queued = app(WhatsAppAutomationService::class)->processCompany($setup['company']);
 
-        $this->assertSame(0, $queued);
-        $this->assertDatabaseCount('whatsapp_automation_sends', 0);
+        $this->assertSame(1, $queued);
+        $this->assertDatabaseHas('whatsapp_automation_sends', [
+            'type' => WhatsAppAutomationType::Reminder->value,
+            'status' => WhatsAppAutomationSendStatus::Sent->value,
+        ]);
     }
 
     /**

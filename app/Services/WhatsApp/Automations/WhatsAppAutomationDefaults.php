@@ -42,9 +42,7 @@ class WhatsAppAutomationDefaults
         if ($carWash) {
             return match ($type) {
                 WhatsAppAutomationType::Reminder => <<<'TXT'
-Olá {nome}, sua lavagem {servico} é amanhã às {hora}.
-
-Se precisar remarcar: {link}
+Olá {nome}, sua lavagem {servico} está marcada para {data} às {hora}.
 TXT,
                 WhatsAppAutomationType::AfterSales => <<<'TXT'
 Obrigado, {nome}! Seu {placa} ficou pronto.
@@ -66,8 +64,6 @@ Olá, {nome}! Lembrete do seu horário em {empresa}.
 Serviço: {servico}
 Data: {data}
 Horário: {hora}
-
-Se precisar remarcar: {link}
 TXT,
             WhatsAppAutomationType::AfterSales => <<<'TXT'
 Obrigado, {nome}! Foi um prazer atender você na {empresa}.

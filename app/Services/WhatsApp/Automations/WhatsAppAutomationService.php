@@ -25,6 +25,10 @@ use Throwable;
 
 class WhatsAppAutomationService
 {
+    private const REMINDER_GRACE_MINUTES = 15;
+
+    private const REMINDER_HOURS = [24, 12];
+
     public function __construct(
         protected WhatsAppAutomationMessageBuilder $messages,
         protected InactiveClientQuery $inactiveClients,
@@ -79,7 +83,9 @@ class WhatsAppAutomationService
     {
         $automation = $this->getOrCreate($company, $type);
 
-        $delay = (int) ($data['delay_value'] ?? $automation->delay_value);
+        $delay = $type === WhatsAppAutomationType::Reminder
+            ? 24
+            : (int) ($data['delay_value'] ?? $automation->delay_value);
         $cooldown = (int) ($data['cooldown_days'] ?? $automation->cooldown_days);
         $template = trim((string) ($data['message_template'] ?? $automation->message_template));
 
@@ -185,12 +191,14 @@ class WhatsAppAutomationService
             return false;
         }
 
-        return $this->queueCandidate(
-            $this->getOrCreate($company, WhatsAppAutomationType::Reminder),
-            $appointment->client,
-            $appointment,
-            null,
-        );
+        $automation = $this->getOrCreate($company, WhatsAppAutomationType::Reminder);
+        $queued = false;
+
+        foreach (self::REMINDER_HOURS as $hours) {
+            $queued = $this->queueCandidate($automation, $appointment->client, $appointment, null, $hours) || $queued;
+        }
+
+        return $queued;
     }
 
     public function sendAfterSales(Attendance $attendance): bool
@@ -237,7 +245,28 @@ class WhatsAppAutomationService
             return;
         }
 
-        if ($this->isQuietHours($company, $automation)) {
+        if ($send->type === WhatsAppAutomationType::Reminder) {
+            $appointment = $send->appointment;
+
+            if (! $automation->is_enabled
+                || ! $company->is_active
+                || ! $this->operationalChannelReady($company)
+                || $appointment === null
+                || $appointment->status !== AppointmentStatus::Confirmed
+                || $send->appointment_start_at === null
+                || ! in_array($send->reminder_hours, self::REMINDER_HOURS, true)
+                || ! $appointment->start_at->equalTo($send->appointment_start_at)
+                || ! $this->reminderIsDue($appointment, (int) $send->reminder_hours)) {
+                $send->forceFill([
+                    'status' => WhatsAppAutomationSendStatus::Skipped,
+                    'skip_reason' => 'Agendamento alterado ou fora do horário do lembrete.',
+                ])->save();
+
+                return;
+            }
+        }
+
+        if ($send->type !== WhatsAppAutomationType::Reminder && $this->isQuietHours($company, $automation)) {
             return;
         }
 
@@ -295,30 +324,31 @@ class WhatsAppAutomationService
             return 0;
         }
 
-        if ($this->isQuietHours($company, $automation)) {
-            return 0;
-        }
-
-        $windowEnd = now()->addHours((int) $automation->delay_value);
         $queued = 0;
 
-        Appointment::query()
-            ->with('client')
-            ->where('company_id', $company->getKey())
-            ->whereIn('status', [AppointmentStatus::Confirmed, AppointmentStatus::InProgress])
-            ->where('start_at', '>', now())
-            ->where('start_at', '<=', $windowEnd)
-            ->whereDoesntHave('whatsappAutomationSends', function ($query) use ($automation): void {
-                $query->where('whatsapp_automation_id', $automation->getKey());
-            })
-            ->orderBy('start_at')
-            ->limit(8)
-            ->get()
-            ->each(function (Appointment $appointment) use ($automation, &$queued): void {
-                if ($this->queueCandidate($automation, $appointment->client, $appointment, null)) {
-                    $queued++;
-                }
-            });
+        foreach (self::REMINDER_HOURS as $hours) {
+            $windowEnd = now()->addHours($hours);
+            $windowStart = $windowEnd->copy()->subMinutes(self::REMINDER_GRACE_MINUTES);
+
+            Appointment::query()
+                ->with('client')
+                ->where('company_id', $company->getKey())
+                ->where('status', AppointmentStatus::Confirmed)
+                ->where('start_at', '>=', $windowStart)
+                ->where('start_at', '<=', $windowEnd)
+                ->whereDoesntHave('whatsappAutomationSends', function ($query) use ($automation, $hours): void {
+                    $query->where('whatsapp_automation_id', $automation->getKey())
+                        ->where('reminder_hours', $hours);
+                })
+                ->orderBy('start_at')
+                ->limit(8)
+                ->get()
+                ->each(function (Appointment $appointment) use ($automation, $hours, &$queued): void {
+                    if ($this->queueCandidate($automation, $appointment->client, $appointment, null, $hours)) {
+                        $queued++;
+                    }
+                });
+        }
 
         return $queued;
     }
@@ -406,6 +436,7 @@ class WhatsAppAutomationService
         ?Client $client,
         ?Appointment $appointment,
         ?Attendance $attendance,
+        ?int $reminderHours = null,
     ): bool {
         $company = $automation->company ?? $appointment?->company ?? $attendance?->company ?? $client?->company;
 
@@ -413,11 +444,16 @@ class WhatsAppAutomationService
             return false;
         }
 
-        if ($this->isQuietHours($company, $automation)) {
+        if ($automation->type !== WhatsAppAutomationType::Reminder && $this->isQuietHours($company, $automation)) {
             return false;
         }
 
         $type = $automation->type;
+
+        if ($type === WhatsAppAutomationType::Reminder
+            && ($appointment === null || $reminderHours === null || ! $this->reminderIsDue($appointment, $reminderHours))) {
+            return false;
+        }
 
         if (in_array($type, [WhatsAppAutomationType::Reminder, WhatsAppAutomationType::AfterSales], true)
             && ! $this->operationalChannelReady($company)) {
@@ -455,7 +491,8 @@ class WhatsAppAutomationService
             ->where('whatsapp_automation_id', $automation->getKey())
             ->when(
                 $type === WhatsAppAutomationType::Reminder && $appointment !== null,
-                fn ($query) => $query->where('appointment_id', $appointment->getKey()),
+                fn ($query) => $query->where('appointment_id', $appointment->getKey())
+                    ->where('reminder_hours', $reminderHours),
             )
             ->when(
                 $type === WhatsAppAutomationType::AfterSales && $attendance !== null,
@@ -484,6 +521,8 @@ class WhatsAppAutomationService
         $send = new WhatsAppAutomationSend([
             'client_id' => $client->getKey(),
             'appointment_id' => $type === WhatsAppAutomationType::WinBack ? null : $appointment?->getKey(),
+            'appointment_start_at' => $type === WhatsAppAutomationType::Reminder ? $appointment?->start_at : null,
+            'reminder_hours' => $type === WhatsAppAutomationType::Reminder ? $reminderHours : null,
             'attendance_id' => $type === WhatsAppAutomationType::WinBack ? null : $attendance?->getKey(),
             'type' => $type,
             'phone' => $phone,
@@ -508,6 +547,27 @@ class WhatsAppAutomationService
         SendWhatsAppAutomationJob::dispatch($send->getKey());
 
         return true;
+    }
+
+    public function clearPendingReminder(Appointment $appointment): void
+    {
+        WhatsAppAutomationSend::query()
+            ->where('appointment_id', $appointment->getKey())
+            ->where('type', WhatsAppAutomationType::Reminder->value)
+            ->where('status', WhatsAppAutomationSendStatus::Pending->value)
+            ->delete();
+    }
+
+    private function reminderIsDue(Appointment $appointment, int $hours): bool
+    {
+        $target = now()->addHours($hours);
+
+        return in_array($hours, self::REMINDER_HOURS, true)
+            && $appointment->status === AppointmentStatus::Confirmed
+            && $appointment->start_at->betweenIncluded(
+                $target->copy()->subMinutes(self::REMINDER_GRACE_MINUTES),
+                $target,
+            );
     }
 
     protected function hasFutureAppointment(Company $company, Client $client, ?Appointment $except = null): bool

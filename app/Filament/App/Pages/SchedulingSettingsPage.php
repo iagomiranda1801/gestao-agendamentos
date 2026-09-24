@@ -142,7 +142,7 @@ class SchedulingSettingsPage extends Page
         $automationPayload = [
             'reminder' => [
                 'is_enabled' => (bool) ($data['reminder_enabled'] ?? false),
-                'delay_value' => (int) ($data['reminder_delay_value'] ?? 24),
+                'delay_value' => 24,
                 'message_template' => $data['reminder_template'] ?? '',
                 'quiet_hours_start' => $data['reminder_quiet_hours_start'] ?? '08:00',
                 'quiet_hours_end' => $data['reminder_quiet_hours_end'] ?? '20:00',
@@ -396,23 +396,17 @@ class SchedulingSettingsPage extends Page
                         app(CompanySchedulingSettingService::class)->getOrCreate(Filament::getTenant()),
                     )),
                 Section::make('Lembrete e pós-venda no WhatsApp')
-                    ->description('Mensagens operacionais. Lembrete exige confirmação WhatsApp ligada. Reconquista fica em Marketing.')
+                    ->description('Envia dois avisos: cerca de 24 e 12 horas antes, inclusive à noite. Exige confirmação WhatsApp ligada. Reconquista fica em Marketing.')
                     ->schema([
                         Toggle::make('reminder_enabled')
-                            ->label('Enviar lembrete antes do horário')
+                            ->label('Enviar avisos 24 e 12 horas antes do horário')
                             ->live(),
-                        TextInput::make('reminder_delay_value')
-                            ->label('Horas de antecedência')
-                            ->numeric()
-                            ->minValue(1)
-                            ->maxValue(168)
-                            ->required(fn (Get $get): bool => (bool) $get('reminder_enabled')),
                         TimePicker::make('reminder_quiet_hours_start')
-                            ->label('Não enviar antes das')
+                            ->label('Pós-venda: não enviar antes das')
                             ->seconds(false)
                             ->required(),
                         TimePicker::make('reminder_quiet_hours_end')
-                            ->label('Não enviar depois das')
+                            ->label('Pós-venda: não enviar depois das')
                             ->seconds(false)
                             ->required(),
                         Textarea::make('reminder_template')

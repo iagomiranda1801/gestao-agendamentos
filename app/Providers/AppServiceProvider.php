@@ -17,6 +17,7 @@ use App\Listeners\SendProfessionalAppointmentNotifications;
 use App\Models\Company;
 use App\Models\User;
 use App\Observers\AdminAuditObserver;
+use App\Services\WhatsApp\Automations\WhatsAppAutomationService;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -53,6 +54,9 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(AppointmentCreated::class, SendProfessionalAppointmentNotifications::class);
         Event::listen(AppointmentConfirmed::class, SendProfessionalAppointmentNotifications::class);
         Event::listen(AppointmentRescheduled::class, SendProfessionalAppointmentNotifications::class);
+        Event::listen(AppointmentRescheduled::class, function (AppointmentRescheduled $event): void {
+            app(WhatsAppAutomationService::class)->clearPendingReminder($event->appointment);
+        });
         Event::listen(AppointmentCancelled::class, SendProfessionalAppointmentNotifications::class);
 
         Event::listen(

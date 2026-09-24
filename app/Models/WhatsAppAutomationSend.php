@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'client_id',
     'appointment_id',
+    'appointment_start_at',
+    'reminder_hours',
     'attendance_id',
     'type',
     'phone',
@@ -39,6 +41,8 @@ class WhatsAppAutomationSend extends Model
         return [
             'type' => WhatsAppAutomationType::class,
             'status' => WhatsAppAutomationSendStatus::class,
+            'appointment_start_at' => 'datetime',
+            'reminder_hours' => 'integer',
             'sent_at' => 'datetime',
         ];
     }
