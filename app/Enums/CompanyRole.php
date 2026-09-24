@@ -19,9 +19,11 @@ enum CompanyRole: string
             self::Manager => 'Gerente',
             self::Employee => 'Colaborador',
             self::Receptionist => 'Recepção / Secretária',
-            self::Dentist => $company instanceof Company && ! $company->isDentalClinic()
-                ? 'Profissional clínico'
-                : 'Dentista',
+            self::Dentist => match (true) {
+                $company instanceof Company && $company->isPsychiatrist() => 'Psiquiatra',
+                $company instanceof Company && ! $company->isDentalClinic() => 'Profissional clínico',
+                default => 'Dentista',
+            },
         };
     }
 

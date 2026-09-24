@@ -22,6 +22,7 @@ class CompanyTerminology
         $company ??= Filament::getTenant();
         $word = match (true) {
             $company instanceof Company && $company->isDentalClinic() => $plural ? 'dentistas' : 'dentista',
+            $company instanceof Company && $company->isPsychiatrist() => $plural ? 'psiquiatras' : 'psiquiatra',
             $company instanceof Company && $company->isCarWash() => $plural ? 'lavadores' : 'lavador',
             $company instanceof Company && $company->usesClinicalChart() => $plural ? 'profissionais clínicos' : 'profissional clínico',
             default => $plural ? 'profissionais' : 'profissional',

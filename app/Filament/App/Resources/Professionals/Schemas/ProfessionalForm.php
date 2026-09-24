@@ -35,9 +35,23 @@ class ProfessionalForm
                             ->native(false)
                             ->nullable()
                             ->visible(fn (): bool => ($company = Filament::getTenant()) instanceof Company && $company->usesClinicalChart())
-                            ->default(fn (): ?string => ($company = Filament::getTenant()) instanceof Company && $company->isDentalClinic()
-                                ? ClinicalSpecialty::Dentistry->value
-                                : null)
+                            ->default(function (): ?string {
+                                $company = Filament::getTenant();
+
+                                if (! $company instanceof Company) {
+                                    return null;
+                                }
+
+                                if ($company->isDentalClinic()) {
+                                    return ClinicalSpecialty::Dentistry->value;
+                                }
+
+                                if ($company->isPsychiatrist()) {
+                                    return ClinicalSpecialty::Psychiatry->value;
+                                }
+
+                                return null;
+                            })
                             ->helperText('Define o questionário de anamnese deste profissional.'),
                         TextInput::make('phone')
                             ->label('Telefone')

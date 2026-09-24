@@ -122,6 +122,12 @@ class CompanyProvisioningService
                 $this->dentalClinicSettingService->getOrCreate($company);
             }
 
+            if ($profile === CompanyProfile::Psychiatrist) {
+                $this->dentalClinicSettingService->update($company, [
+                    'professional_record_scope' => 'related',
+                ]);
+            }
+
             if ($modules->contains(CompanyModule::Orders)) {
                 $this->orderSettingService->getOrCreate($company);
                 app(MenuCategoryService::class)->ensureDefaults($company);

@@ -6,6 +6,7 @@ enum ClinicalSpecialty: string
 {
     case Psychology = 'psychology';
     case Medicine = 'medicine';
+    case Psychiatry = 'psychiatry';
     case Nutrition = 'nutrition';
     case Dentistry = 'dentistry';
 
@@ -14,6 +15,7 @@ enum ClinicalSpecialty: string
         return match ($this) {
             self::Psychology => 'Psicologia',
             self::Medicine => 'Medicina',
+            self::Psychiatry => 'Psiquiatria',
             self::Nutrition => 'Nutrição',
             self::Dentistry => 'Odontologia',
         };
@@ -24,6 +26,7 @@ enum ClinicalSpecialty: string
         return match ($this) {
             self::Psychology => 'Psicólogo',
             self::Medicine => 'Médico',
+            self::Psychiatry => 'Psiquiatra',
             self::Nutrition => 'Nutricionista',
             self::Dentistry => 'Dentista',
         };

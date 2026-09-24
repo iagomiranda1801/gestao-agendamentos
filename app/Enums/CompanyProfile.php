@@ -6,6 +6,7 @@ enum CompanyProfile: string
 {
     case Professional = 'professional';
     case Clinic = 'clinic';
+    case Psychiatrist = 'psychiatrist';
     case DentalClinic = 'dental_clinic';
     case Salon = 'salon';
     case Store = 'store';
@@ -19,6 +20,7 @@ enum CompanyProfile: string
         return match ($this) {
             self::Professional => 'Profissional autônomo',
             self::Clinic => 'Clínica ou empresa de atendimentos',
+            self::Psychiatrist => 'Psiquiatra',
             self::DentalClinic => 'Clínica odontológica',
             self::Salon => 'Salão, estética ou bem-estar',
             self::Store => 'Loja de produtos',
@@ -34,6 +36,7 @@ enum CompanyProfile: string
         return match ($this) {
             self::Professional => 'Para psicólogos, médicos, nutricionistas, terapeutas e profissionais que trabalham com horário marcado. O prontuário clínico pode ser ligado à parte.',
             self::Clinic => 'Para operações com equipe, pacientes, agenda, financeiro e, se quiser, prontuário clínico compartilhado.',
+            self::Psychiatrist => 'Para consultório de psiquiatria: agenda, prontuário do paciente e WhatsApp, sem odontograma.',
             self::DentalClinic => 'Para clínicas com recepção, dentistas, pacientes, prontuário, agenda e gestão financeira.',
             self::Salon => 'Para negócios de beleza, estética, saúde e bem-estar que também controlam vendas ou consumo.',
             self::Store => 'Para empresas focadas em produtos, estoque, vendas e financeiro.',
@@ -56,6 +59,7 @@ enum CompanyProfile: string
         return match ($this) {
             self::Professional => [CompanyModule::Scheduling, CompanyModule::WhatsApp],
             self::Clinic => [CompanyModule::Scheduling, CompanyModule::Finance, CompanyModule::WhatsApp],
+            self::Psychiatrist => [CompanyModule::Scheduling, CompanyModule::ClinicalRecords, CompanyModule::WhatsApp, CompanyModule::Finance],
             self::DentalClinic => [CompanyModule::Scheduling, CompanyModule::ClinicalRecords, CompanyModule::Finance, CompanyModule::WhatsApp],
             self::Salon => [CompanyModule::Scheduling, CompanyModule::Sales, CompanyModule::Stock, CompanyModule::Finance, CompanyModule::WhatsApp],
             self::Store => [CompanyModule::Sales, CompanyModule::Stock, CompanyModule::Finance],
