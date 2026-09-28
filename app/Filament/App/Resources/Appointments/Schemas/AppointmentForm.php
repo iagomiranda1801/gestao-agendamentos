@@ -5,6 +5,7 @@ namespace App\Filament\App\Resources\Appointments\Schemas;
 use App\Enums\AppointmentOrigin;
 use App\Enums\CompanyPermission;
 use App\Enums\CompanyRole;
+use App\Filament\App\Resources\TattooRequests\TattooRequestResource;
 use App\Filament\App\Support\AppointmentSchedulingForm;
 use App\Filament\App\Support\QuickCreateFields;
 use App\Models\Appointment;
@@ -242,6 +243,18 @@ class AppointmentForm
                             ->disabled($readOnly)
                             ->visible(fn (): bool => self::canViewInternalNotes()),
                     ]),
+                Section::make('Origem do agendamento')->schema([
+                    Placeholder::make('tattoo_request_link')->label('Pedido de tatuagem')
+                        ->content(function (?Appointment $record): HtmlString {
+                            $request = $record?->tattooRequest;
+                            if (! $request || ! auth()->user()?->can('view', $request)) {
+                                return new HtmlString('—');
+                            }
+                            $url = TattooRequestResource::getUrl('edit', ['record' => $request]);
+
+                            return new HtmlString('<a href="'.e($url).'">Abrir pedido e orçamento</a>');
+                        }),
+                ])->visible(fn (?Appointment $record): bool => $record?->tattooRequest()->exists() ?? false),
             ]);
     }
 

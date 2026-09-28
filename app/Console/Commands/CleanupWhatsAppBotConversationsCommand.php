@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\TattooRequest;
 use App\Models\WhatsAppBotConversation;
 use App\Services\WhatsApp\Bot\WhatsAppBookingBotService;
 use Illuminate\Console\Command;
@@ -23,6 +24,10 @@ class CleanupWhatsAppBotConversationsCommand extends Command
                 'finished_at' => now(),
                 'finished_reason' => 'expired',
             ]);
+
+        TattooRequest::query()->where('status', 'collecting')
+            ->where('created_at', '<', $threshold)
+            ->update(['status' => 'cancelled']);
 
         $purged = WhatsAppBotConversation::query()
             ->whereNotNull('finished_at')

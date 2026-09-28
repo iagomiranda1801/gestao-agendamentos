@@ -2,6 +2,7 @@
 
 namespace App\Services\WhatsApp;
 
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -84,6 +85,26 @@ class EvolutionApiClient
         return $response->json() ?? [];
     }
 
+    public function getMediaBase64(string $instance, string $messageId): string
+    {
+        $response = $this->http()->acceptJson()->timeout(45)
+            ->post($this->url('/chat/getBase64FromMediaMessage/'.$this->resolveInstance($instance)), [
+                'message' => ['key' => ['id' => $messageId]],
+                'convertToMp4' => false,
+            ]);
+
+        if ($response->failed()) {
+            throw new RequestException($response);
+        }
+
+        $base64 = $response->json('base64');
+        if (! is_string($base64) || $base64 === '') {
+            throw new RuntimeException('A Evolution não retornou o conteúdo da imagem.');
+        }
+
+        return str_contains($base64, ',') ? explode(',', $base64, 2)[1] : $base64;
+    }
+
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -122,10 +143,10 @@ class EvolutionApiClient
             ->acceptJson()
             ->timeout(30)
             ->post($this->url("/chat/findContacts/{$instance}"), [
-                'where' => new \stdClass(),
+                'where' => new \stdClass,
                 'take' => $take,
                 'skip' => $skip,
-                'orderBy' => new \stdClass(),
+                'orderBy' => new \stdClass,
             ]);
 
         if ($response->failed()) {
@@ -236,7 +257,7 @@ class EvolutionApiClient
         return $baseUrl.'/'.ltrim($path, '/');
     }
 
-    protected function http(): \Illuminate\Http\Client\PendingRequest
+    protected function http(): PendingRequest
     {
         $apiKey = (string) config('services.evolution.key');
 

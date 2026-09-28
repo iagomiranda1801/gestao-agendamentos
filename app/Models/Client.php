@@ -85,6 +85,11 @@ class Client extends Model
         return $this->hasMany(Attendance::class);
     }
 
+    public function tattooRequests(): HasMany
+    {
+        return $this->hasMany(TattooRequest::class);
+    }
+
     public function dentalProfile(): HasOne
     {
         return $this->hasOne(DentalPatientProfile::class);

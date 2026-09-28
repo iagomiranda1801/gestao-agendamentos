@@ -152,6 +152,11 @@ class Appointment extends Model
         return $this->hasOne(Attendance::class);
     }
 
+    public function tattooRequest(): HasOne
+    {
+        return $this->hasOne(TattooRequest::class);
+    }
+
     /**
      * @return HasMany<WhatsAppAutomationSend, $this>
      */

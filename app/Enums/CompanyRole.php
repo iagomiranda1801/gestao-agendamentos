@@ -17,7 +17,7 @@ enum CompanyRole: string
         return match ($this) {
             self::CompanyAdmin => 'Administrador',
             self::Manager => 'Gerente',
-            self::Employee => 'Colaborador',
+            self::Employee => $company instanceof Company && $company->isTattooStudio() ? 'Tatuador / colaborador' : 'Colaborador',
             self::Receptionist => 'Recepção / Secretária',
             self::Dentist => match (true) {
                 $company instanceof Company && $company->isPsychiatrist() => 'Psiquiatra',

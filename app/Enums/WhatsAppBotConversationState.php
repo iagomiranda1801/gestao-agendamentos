@@ -14,6 +14,12 @@ enum WhatsAppBotConversationState: string
     case AcceptingTerms = 'accepting_terms';
     case Confirming = 'confirming';
     case Done = 'done';
+    case TattooName = 'tattoo_name';
+    case TattooDescription = 'tattoo_description';
+    case TattooPlacement = 'tattoo_placement';
+    case TattooSize = 'tattoo_size';
+    case TattooPhoto = 'tattoo_photo';
+    case TattooConfirm = 'tattoo_confirm';
 
     public function label(): string
     {
@@ -28,6 +34,12 @@ enum WhatsAppBotConversationState: string
             self::AcceptingTerms => 'Aceitando termos',
             self::Confirming => 'Confirmando',
             self::Done => 'Finalizado',
+            self::TattooName => 'Nome para orçamento',
+            self::TattooDescription => 'Desenho da tatuagem',
+            self::TattooPlacement => 'Local da tatuagem',
+            self::TattooSize => 'Tamanho da tatuagem',
+            self::TattooPhoto => 'Foto de referência',
+            self::TattooConfirm => 'Confirmando pedido',
         };
     }
 }

@@ -71,6 +71,7 @@ class EvolutionWebhookService
             phone: $phone,
             text: $text,
             messageId: (string) ($event->message_id ?? ''),
+            imageMime: $this->imageMime($payload),
         );
     }
 
@@ -101,6 +102,8 @@ class EvolutionWebhookService
             'data.message.conversation',
             'data.0.message.conversation',
             'data.message.extendedTextMessage.text',
+            'data.message.imageMessage.caption',
+            'data.0.message.imageMessage.caption',
             'data.0.message.extendedTextMessage.text',
             'data.message.buttonsResponseMessage.selectedDisplayText',
             'data.message.listResponseMessage.title',
@@ -118,6 +121,14 @@ class EvolutionWebhookService
         }
 
         return '';
+    }
+
+    protected function imageMime(array $payload): ?string
+    {
+        $mime = Arr::get($payload, 'data.message.imageMessage.mimetype')
+            ?? Arr::get($payload, 'data.0.message.imageMessage.mimetype');
+
+        return is_string($mime) ? $mime : null;
     }
 
     protected function extractPhone(string $remoteJid): string

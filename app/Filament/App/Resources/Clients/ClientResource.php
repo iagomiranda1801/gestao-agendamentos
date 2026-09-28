@@ -6,6 +6,7 @@ use App\Filament\App\Resources\Clients\Pages\CreateClient;
 use App\Filament\App\Resources\Clients\Pages\EditClient;
 use App\Filament\App\Resources\Clients\Pages\ListClients;
 use App\Filament\App\Resources\Clients\Pages\ViewPatientRecord;
+use App\Filament\App\Resources\Clients\RelationManagers\TattooRequestsRelationManager;
 use App\Filament\App\Resources\Clients\Schemas\ClientForm;
 use App\Filament\App\Resources\Clients\Tables\ClientsTable;
 use App\Models\Client;
@@ -82,7 +83,7 @@ class ClientResource extends Resource
 
     public static function getRelations(): array
     {
-        return [];
+        return [TattooRequestsRelationManager::class];
     }
 
     public static function getPages(): array

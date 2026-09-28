@@ -382,12 +382,16 @@ class SchedulingSettingsPage extends Page
                         auth()->user(),
                         app(CompanySchedulingSettingService::class)->getOrCreate(Filament::getTenant()),
                     )),
-                Section::make('Bot de agendamento no WhatsApp')
-                    ->description('Quando ativado, o próprio WhatsApp responde ao cliente com um menu numerado e cria o agendamento pelo chat. Requer agendamento online habilitado e a conexão WhatsApp da empresa conectada.')
+                Section::make(fn (): string => Filament::getTenant()?->isTattooStudio() ? 'Bot de orçamentos no WhatsApp' : 'Bot de agendamento no WhatsApp')
+                    ->description(fn (): string => Filament::getTenant()?->isTattooStudio()
+                        ? 'Coleta descrição, local, tamanho e foto de referência para o tatuador preparar um orçamento. Requer a conexão WhatsApp da empresa.'
+                        : 'Quando ativado, o próprio WhatsApp responde ao cliente com um menu numerado e cria o agendamento pelo chat. Requer agendamento online habilitado e a conexão WhatsApp da empresa conectada.')
                     ->schema([
                         Toggle::make('whatsapp_bot_enabled')
-                            ->label('Atender agendamento pelo WhatsApp automaticamente')
-                            ->helperText('Ao receber uma mensagem do cliente, o bot conduz o agendamento (serviço, profissional, data, horário e confirmação) sem sair do WhatsApp.')
+                            ->label(fn (): string => Filament::getTenant()?->isTattooStudio() ? 'Receber pedidos de orçamento pelo WhatsApp' : 'Atender agendamento pelo WhatsApp automaticamente')
+                            ->helperText(fn (): string => Filament::getTenant()?->isTattooStudio()
+                                ? 'O bot coleta os detalhes da tatuagem e encaminha o pedido para análise no painel.'
+                                : 'Ao receber uma mensagem do cliente, o bot conduz o agendamento (serviço, profissional, data, horário e confirmação) sem sair do WhatsApp.')
                             ->columnSpanFull(),
                     ])
                     ->columns(1)

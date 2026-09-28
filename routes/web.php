@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\EvolutionWebhookController;
 use App\Http\Controllers\PrintDentalTreatmentPlanController;
+use App\Http\Controllers\TattooImageController;
 use App\Livewire\PublicBooking\BookingWizard;
 use App\Livewire\PublicBooking\ManageAppointment;
 use App\Livewire\PublicOrders\OrderWizard;
@@ -23,3 +24,7 @@ Route::post('/webhooks/evolution/{instance?}', EvolutionWebhookController::class
 Route::get('/app/empresa/{company:slug}/clinico/planos/{plan}/imprimir', PrintDentalTreatmentPlanController::class)
     ->middleware('auth')
     ->name('dental.treatment-plan.print');
+
+Route::get('/app/empresa/{company:slug}/tatuagem/fotos/{image}', TattooImageController::class)
+    ->middleware('auth')
+    ->name('tattoo.images.download');

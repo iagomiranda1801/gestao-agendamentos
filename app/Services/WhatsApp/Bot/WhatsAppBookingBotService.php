@@ -514,6 +514,7 @@ class WhatsAppBookingBotService
             WhatsAppBotConversationState::AcceptingTerms => $this->acceptTermsStep,
             WhatsAppBotConversationState::Confirming => $this->confirmStep,
             WhatsAppBotConversationState::Done => $this->greetingStep,
+            default => $this->greetingStep,
         };
     }
 

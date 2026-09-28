@@ -26,6 +26,7 @@ use App\Filament\App\Resources\ScheduleBlocks\ScheduleBlockResource;
 use App\Filament\App\Resources\StockAdjustments\StockAdjustmentResource;
 use App\Filament\App\Resources\StockMovements\StockMovementResource;
 use App\Filament\App\Resources\Suppliers\SupplierResource;
+use App\Filament\App\Resources\TattooRequests\TattooRequestResource;
 use App\Filament\App\Resources\Transfers\TransferResource;
 
 return [
@@ -35,6 +36,7 @@ return [
         AppointmentResource::class,
         ScheduleBlockResource::class,
         AttendanceResource::class,
+        TattooRequestResource::class,
     ],
 
     CompanyModule::Stock->value => [

@@ -127,6 +127,11 @@ class Company extends Model
         return $this->business_profile === CompanyProfile::Restaurant;
     }
 
+    public function isTattooStudio(): bool
+    {
+        return $this->business_profile === CompanyProfile::TattooStudio;
+    }
+
     public function hasActiveAdmin(): bool
     {
         return $this->users()

@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\CompanyWhatsAppInstance;
 use App\Services\Company\CompanyModuleService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
+use App\Services\Tattoo\TattooWhatsAppBotService;
 use App\Services\WhatsApp\Bot\WhatsAppBookingBotService;
 use App\Services\WhatsApp\Bot\WhatsAppOrderLinkBotService;
 use App\Services\WhatsApp\EvolutionApiClient;
@@ -28,6 +29,7 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
         public string $phone,
         public string $text,
         public ?string $messageId = null,
+        public ?string $imageMime = null,
     ) {}
 
     public function handle(
@@ -67,6 +69,19 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
             }
 
             $reply = $orderLinkBot->handleIncoming($company, $this->phone, $this->text, $this->messageId);
+            $this->sendReply($company, $client, $reply);
+
+            return;
+        }
+
+        if ($company->isTattooStudio()) {
+            if (! $company->is_active
+                || ! $modules->hasModule($company, CompanyModule::WhatsApp)
+                || ! $modules->hasModule($company, CompanyModule::Scheduling)
+                || ! (bool) $settingsService->getOrCreate($company)->whatsapp_bot_enabled) {
+                return;
+            }
+            $reply = app(TattooWhatsAppBotService::class)->handleIncoming($company, $instance, $this->remoteJid, $this->phone, $this->text, $this->messageId, $this->imageMime);
             $this->sendReply($company, $client, $reply);
 
             return;
