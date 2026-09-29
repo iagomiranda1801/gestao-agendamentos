@@ -11,6 +11,7 @@ use App\Services\PublicBooking\OnlineBookingService;
 use App\Services\PublicBooking\PublicBookingRateLimiter;
 use App\Services\PublicBooking\PublicClientLookupService;
 use App\Support\CompanyDateTime;
+use App\Support\CompanyTerminology;
 use App\Support\PhoneNormalizer;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -665,7 +666,7 @@ class BookingWizard extends Component
         ];
 
         if ($this->shouldShowProfessionalStep()) {
-            $steps[] = ['key' => self::STEP_PROFESSIONAL, 'label' => 'Profissional'];
+            $steps[] = ['key' => self::STEP_PROFESSIONAL, 'label' => CompanyTerminology::professional($this->company)];
         }
 
         $steps[] = ['key' => self::STEP_SCHEDULE, 'label' => 'Data e horário'];

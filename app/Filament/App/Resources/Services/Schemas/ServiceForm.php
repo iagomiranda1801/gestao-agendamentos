@@ -6,6 +6,7 @@ use App\Enums\CompanyModule;
 use App\Models\Company;
 use App\Models\Professional;
 use App\Services\Company\CompanyModuleService;
+use App\Support\CompanyTerminology;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Select;
@@ -98,7 +99,8 @@ class ServiceForm
                             ->label('Serviço ativo')
                             ->default(true),
                         Select::make('professional_ids')
-                            ->label('Profissionais que realizam este serviço')
+                            ->label(fn (): string => CompanyTerminology::professional(plural: true).' que realizam este serviço')
+                            ->default(fn (): array => self::defaultPersonalProfessionalIds())
                             ->multiple()
                             ->searchable()
                             ->preload()
@@ -151,5 +153,25 @@ class ServiceForm
         }
 
         return app(CompanyModuleService::class)->hasModule($company, CompanyModule::Sales);
+    }
+
+    /** @return list<int> */
+    protected static function defaultPersonalProfessionalIds(): array
+    {
+        $company = Filament::getTenant();
+
+        if (! $company instanceof Company || ! $company->isPersonalTrainer()) {
+            return [];
+        }
+
+        $id = Professional::query()
+            ->where('company_id', $company->getKey())
+            ->where('is_active', true)
+            ->where('is_bookable', true)
+            ->whereHas('workingHours', fn ($hours) => $hours->active())
+            ->orderBy('id')
+            ->value('id');
+
+        return $id ? [(int) $id] : [];
     }
 }

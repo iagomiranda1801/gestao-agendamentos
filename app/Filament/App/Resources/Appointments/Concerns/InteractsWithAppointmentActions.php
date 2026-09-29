@@ -22,6 +22,7 @@ use App\Services\PublicBooking\PublicAppointmentTokenService;
 use App\Services\Scheduling\AppointmentService;
 use App\Services\Scheduling\AppointmentStatusService;
 use App\Support\CompanyDateTime;
+use App\Support\CompanyTerminology;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Component;
@@ -117,7 +118,7 @@ trait InteractsWithAppointmentActions
                 ->visible(fn (): bool => $this->getRecord()->canBeRescheduled() && Gate::allows('reschedule', $this->getRecord()))
                 ->schema([
                     Select::make('professional_id')
-                        ->label('Profissional')
+                        ->label(CompanyTerminology::professional())
                         ->options(fn (): array => self::rescheduleProfessionalOptions($this->getRecord()))
                         ->default(fn (): int => $this->getRecord()->professional_id)
                         ->native(false),
@@ -290,7 +291,7 @@ trait InteractsWithAppointmentActions
     {
         return [
             Placeholder::make('summary_client')
-                ->label('Cliente')
+                ->label(CompanyTerminology::client())
                 ->content(fn (): string => $this->getRecord()->client_name_snapshot
                     ?? $this->getRecord()->client?->name
                     ?? '—'),
@@ -298,7 +299,7 @@ trait InteractsWithAppointmentActions
                 ->label('Serviço')
                 ->content(fn (): string => $this->getRecord()->service_name_snapshot),
             Placeholder::make('summary_professional')
-                ->label('Profissional')
+                ->label(CompanyTerminology::professional())
                 ->content(fn (): string => $this->getRecord()->professional?->name ?? '—'),
             Placeholder::make('summary_datetime')
                 ->label('Data e hora')

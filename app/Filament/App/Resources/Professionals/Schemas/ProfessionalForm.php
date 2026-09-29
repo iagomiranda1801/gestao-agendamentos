@@ -5,6 +5,7 @@ namespace App\Filament\App\Resources\Professionals\Schemas;
 use App\Enums\ClinicalSpecialty;
 use App\Models\Company;
 use App\Models\User;
+use App\Support\CompanyTerminology;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Select;
@@ -25,6 +26,7 @@ class ProfessionalForm
                         TextInput::make('name')
                             ->label('Nome')
                             ->required()
+                            ->default(fn (): ?string => self::initialPersonalUser()?->name)
                             ->maxLength(255),
                         TextInput::make('specialty')
                             ->label('Especialidade (livre)')
@@ -56,10 +58,12 @@ class ProfessionalForm
                         TextInput::make('phone')
                             ->label('Telefone')
                             ->tel()
+                            ->default(fn (): ?string => self::initialPersonalUser() ? Filament::getTenant()?->phone : null)
                             ->maxLength(255),
                         TextInput::make('email')
                             ->label('E-mail')
                             ->email()
+                            ->default(fn (): ?string => self::initialPersonalUser()?->email)
                             ->maxLength(255),
                         TextInput::make('document')
                             ->label('Documento')
@@ -77,6 +81,7 @@ class ProfessionalForm
                     ->schema([
                         Select::make('user_id')
                             ->label('Usuário vinculado')
+                            ->default(fn (): ?int => self::initialPersonalUser()?->getKey())
                             ->searchable()
                             ->preload()
                             ->nullable()
@@ -90,7 +95,7 @@ class ProfessionalForm
                             ->label('Disponível para agendamento')
                             ->default(true),
                         Toggle::make('is_active')
-                            ->label('Profissional ativo')
+                            ->label(fn (): string => CompanyTerminology::professional().' ativo')
                             ->default(true),
                         Textarea::make('notes')
                             ->label('Observações')
@@ -124,5 +129,19 @@ class ProfessionalForm
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();
+    }
+
+    protected static function initialPersonalUser(): ?User
+    {
+        $company = Filament::getTenant();
+        $user = auth()->user();
+
+        if (! $company instanceof Company || ! $company->isPersonalTrainer() || ! $user instanceof User
+            || $company->professionals()->exists()
+            || ! $user->hasActiveCompanyMembershipWith($company)) {
+            return null;
+        }
+
+        return $user;
     }
 }

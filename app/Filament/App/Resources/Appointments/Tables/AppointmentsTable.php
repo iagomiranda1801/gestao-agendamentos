@@ -115,7 +115,7 @@ class AppointmentsTable
                         ->where('start_at', '>=', now())
                         ->where('start_at', '<=', now()->addDays(7))),
                 SelectFilter::make('professional_id')
-                    ->label('Profissional')
+                    ->label(CompanyTerminology::professional())
                     ->relationship('professional', 'name', fn (Builder $query): Builder => $query->where(
                         'company_id',
                         Filament::getTenant()?->getKey(),

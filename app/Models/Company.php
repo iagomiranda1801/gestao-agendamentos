@@ -106,6 +106,11 @@ class Company extends Model
         return $this->business_profile === CompanyProfile::Psychiatrist;
     }
 
+    public function isPersonalTrainer(): bool
+    {
+        return $this->business_profile === CompanyProfile::PersonalTrainer;
+    }
+
     public function usesClinicalChart(): bool
     {
         if ($this->isDentalClinic()) {

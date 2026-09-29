@@ -10,9 +10,8 @@ use App\Filament\App\Resources\Clients\RelationManagers\TattooRequestsRelationMa
 use App\Filament\App\Resources\Clients\Schemas\ClientForm;
 use App\Filament\App\Resources\Clients\Tables\ClientsTable;
 use App\Models\Client;
-use App\Models\Company;
+use App\Support\CompanyTerminology;
 use BackedEnum;
-use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -48,24 +47,17 @@ class ClientResource extends Resource
 
     public static function getModelLabel(): string
     {
-        return static::isClinicalTenant() ? 'paciente' : 'cliente';
+        return CompanyTerminology::client(capitalized: false);
     }
 
     public static function getPluralModelLabel(): string
     {
-        return static::isClinicalTenant() ? 'pacientes' : 'clientes';
+        return CompanyTerminology::client(plural: true, capitalized: false);
     }
 
     public static function getNavigationLabel(): string
     {
-        return static::isClinicalTenant() ? 'Pacientes' : 'Clientes';
-    }
-
-    protected static function isClinicalTenant(): bool
-    {
-        $company = Filament::getTenant();
-
-        return $company instanceof Company && $company->usesClinicalChart();
+        return CompanyTerminology::client(plural: true);
     }
 
     public static function table(Table $table): Table

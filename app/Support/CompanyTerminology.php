@@ -10,9 +10,11 @@ class CompanyTerminology
     public static function client(?Company $company = null, bool $plural = false, bool $capitalized = true): string
     {
         $company ??= Filament::getTenant();
-        $word = $company instanceof Company && $company->usesClinicalChart()
-            ? ($plural ? 'pacientes' : 'paciente')
-            : ($plural ? 'clientes' : 'cliente');
+        $word = match (true) {
+            $company instanceof Company && $company->isPersonalTrainer() => $plural ? 'alunos' : 'aluno',
+            $company instanceof Company && $company->usesClinicalChart() => $plural ? 'pacientes' : 'paciente',
+            default => $plural ? 'clientes' : 'cliente',
+        };
 
         return $capitalized ? ucfirst($word) : $word;
     }
@@ -25,6 +27,7 @@ class CompanyTerminology
             $company instanceof Company && $company->isPsychiatrist() => $plural ? 'psiquiatras' : 'psiquiatra',
             $company instanceof Company && $company->isCarWash() => $plural ? 'lavadores' : 'lavador',
             $company instanceof Company && $company->isTattooStudio() => $plural ? 'tatuadores' : 'tatuador',
+            $company instanceof Company && $company->isPersonalTrainer() => $plural ? 'personal trainers' : 'personal trainer',
             $company instanceof Company && $company->usesClinicalChart() => $plural ? 'profissionais clínicos' : 'profissional clínico',
             default => $plural ? 'profissionais' : 'profissional',
         };

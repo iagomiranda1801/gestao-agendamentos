@@ -125,24 +125,29 @@ class OnlineBookingCatalogService
         $this->assertServiceBelongsToCompany($company, $service);
 
         if ($professionalId === null) {
-            return $this->getAvailableSlotsForNoPreference($company, $service, $localDate);
+            $slots = $this->getAvailableSlotsForNoPreference($company, $service, $localDate);
+        } else {
+            $professional = Professional::query()
+                ->where('company_id', $company->getKey())
+                ->whereKey($professionalId)
+                ->first();
+
+            if ($professional === null) {
+                return collect();
+            }
+
+            $slots = $this->availabilityService->getAvailableSlots(
+                $company,
+                $professional,
+                $service,
+                $localDate,
+            );
         }
 
-        $professional = Professional::query()
-            ->where('company_id', $company->getKey())
-            ->whereKey($professionalId)
-            ->first();
+        $settings = $this->settingsService->getOrCreate($company);
+        $earliest = CompanyDateTime::nowLocal($company)->addMinutes((int) $settings->minimum_advance_minutes);
 
-        if ($professional === null) {
-            return collect();
-        }
-
-        return $this->availabilityService->getAvailableSlots(
-            $company,
-            $professional,
-            $service,
-            $localDate,
-        );
+        return $slots->filter(fn (CarbonImmutable $slot): bool => $slot->gte($earliest))->values();
     }
 
     /**

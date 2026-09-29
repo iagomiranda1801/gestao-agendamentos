@@ -76,7 +76,7 @@
                         >
                             <div class="booking-option__content">
                                 <p class="booking-option__title">Sem preferência</p>
-                                <p class="booking-option__subtitle">Escolheremos o profissional disponível</p>
+                                <p class="booking-option__subtitle">Escolheremos o {{ \App\Support\CompanyTerminology::professional($company, capitalized: false) }} disponível</p>
                             </div>
                             @if ($professionalSelection === \App\Livewire\PublicBooking\BookingWizard::NO_PREFERENCE)
                                 <span class="booking-option__check" aria-hidden="true">✓</span>
@@ -178,7 +178,7 @@
                             aria-live="polite"
                         >Buscando...</span>
                     </div>
-                    <p class="booking-step-hint">Digite seu telefone: se já for cliente, preenchemos nome e e-mail automaticamente.</p>
+                    <p class="booking-step-hint">Digite seu telefone: se já for {{ \App\Support\CompanyTerminology::client($company, capitalized: false) }}, preenchemos nome e e-mail automaticamente.</p>
                     @error('clientPhone')
                         <p class="booking-field-error">{{ $message }}</p>
                     @enderror

@@ -5,6 +5,7 @@ namespace App\Enums;
 enum CompanyProfile: string
 {
     case Professional = 'professional';
+    case PersonalTrainer = 'personal_trainer';
     case Clinic = 'clinic';
     case Psychiatrist = 'psychiatrist';
     case DentalClinic = 'dental_clinic';
@@ -20,6 +21,7 @@ enum CompanyProfile: string
     {
         return match ($this) {
             self::Professional => 'Profissional autônomo',
+            self::PersonalTrainer => 'Personal trainer',
             self::Clinic => 'Clínica ou empresa de atendimentos',
             self::Psychiatrist => 'Psiquiatra',
             self::DentalClinic => 'Clínica odontológica',
@@ -37,6 +39,7 @@ enum CompanyProfile: string
     {
         return match ($this) {
             self::Professional => 'Para psicólogos, médicos, nutricionistas, terapeutas e profissionais que trabalham com horário marcado. O prontuário clínico pode ser ligado à parte.',
+            self::PersonalTrainer => 'Para personal autônomo que atende alunos em sessões individuais com horário marcado.',
             self::Clinic => 'Para operações com equipe, pacientes, agenda, financeiro e, se quiser, prontuário clínico compartilhado.',
             self::Psychiatrist => 'Para consultório de psiquiatria: agenda, prontuário do paciente e WhatsApp, sem odontograma.',
             self::DentalClinic => 'Para clínicas com recepção, dentistas, pacientes, prontuário, agenda e gestão financeira.',
@@ -61,6 +64,7 @@ enum CompanyProfile: string
     {
         return match ($this) {
             self::Professional => [CompanyModule::Scheduling, CompanyModule::WhatsApp],
+            self::PersonalTrainer => [CompanyModule::Scheduling, CompanyModule::WhatsApp, CompanyModule::Finance],
             self::Clinic => [CompanyModule::Scheduling, CompanyModule::Finance, CompanyModule::WhatsApp],
             self::Psychiatrist => [CompanyModule::Scheduling, CompanyModule::ClinicalRecords, CompanyModule::WhatsApp, CompanyModule::Finance],
             self::DentalClinic => [CompanyModule::Scheduling, CompanyModule::ClinicalRecords, CompanyModule::Finance, CompanyModule::WhatsApp],

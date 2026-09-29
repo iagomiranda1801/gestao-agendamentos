@@ -63,20 +63,20 @@ class ConfirmStep implements BotStep
 
         if ($serviceId <= 0 || $date === '' || $slot === '' || $name === '') {
             return BotAction::abandon(
-                "Não consegui recuperar seus dados. Envie *menu* para começar de novo.",
+                'Não consegui recuperar seus dados. Envie *menu* para começar de novo.',
                 'invalid_state',
             );
         }
 
         try {
-            $localStart = CarbonImmutable::createFromFormat('Y-m-d H:i', $slot);
+            $localStart = CarbonImmutable::createFromFormat('Y-m-d H:i', $slot, $context->company->timezone);
         } catch (\Throwable) {
             $localStart = null;
         }
 
         if (! $localStart instanceof CarbonImmutable) {
             return BotAction::abandon(
-                "Não consegui interpretar o horário escolhido. Envie *menu* para tentar de novo.",
+                'Não consegui interpretar o horário escolhido. Envie *menu* para tentar de novo.',
                 'invalid_slot',
             );
         }

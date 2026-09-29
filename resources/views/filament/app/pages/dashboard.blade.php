@@ -334,6 +334,38 @@
         <p class="agendaqui-dashboard__subtitle">Aqui está o resumo da operação de hoje.</p>
     </div>
 
+    @if (! empty($personalTrainerSetup['steps']))
+        <section class="agendaqui-dashboard-panel" aria-label="Configuração do personal trainer">
+            <div class="agendaqui-dashboard-panel__header">
+                <h3 class="agendaqui-dashboard-panel__title">Configure seus atendimentos</h3>
+            </div>
+            <div class="agendaqui-dashboard-list">
+                @foreach ($personalTrainerSetup['steps'] as $step)
+                    <a href="{{ $step['url'] }}" class="agendaqui-dashboard-list__item agendaqui-dashboard-list__item--link">
+                        <div>
+                            <p class="agendaqui-dashboard-list__title">{{ $step['complete'] ? '✓' : '○' }} {{ $step['label'] }}</p>
+                            <p class="agendaqui-dashboard-list__description">{{ $step['description'] }}</p>
+                        </div>
+                    </a>
+                @endforeach
+                <div class="agendaqui-dashboard-list__item">
+                    <div>
+                        <p class="agendaqui-dashboard-list__title">Modelos de serviço</p>
+                        <p class="agendaqui-dashboard-list__description">Informe preço e duração antes de salvar.</p>
+                        @foreach ($personalTrainerSetup['templates'] as $template)
+                            <a href="{{ $template['url'] }}">{{ $template['label'] }}</a>@if (! $loop->last)<span> · </span>@endif
+                        @endforeach
+                    </div>
+                </div>
+                @if ($personalTrainerSetup['booking_url'])
+                    <a href="{{ $personalTrainerSetup['booking_url'] }}" class="agendaqui-dashboard-list__item agendaqui-dashboard-list__item--link" target="_blank" rel="noopener noreferrer">
+                        <div><p class="agendaqui-dashboard-list__title">Abrir link de agendamento</p></div>
+                    </a>
+                @endif
+            </div>
+        </section>
+    @endif
+
     @if (filled($dashboard['quickActions'] ?? []))
         <section class="agendaqui-dashboard-actions" aria-label="Ações rápidas">
             @foreach ($dashboard['quickActions'] as $action)
@@ -398,7 +430,7 @@
                             </p>
                             <span class="agendaqui-dashboard-list__meta">{{ $appointment->status->label() }}</span>
                         </div>
-                        <p class="agendaqui-dashboard-list__description agendaqui-dashboard-list__description--strong">{{ $appointment->client_name_snapshot ?? $appointment->client?->name ?? 'Cliente' }}</p>
+                        <p class="agendaqui-dashboard-list__description agendaqui-dashboard-list__description--strong">{{ $appointment->client_name_snapshot ?? $appointment->client?->name ?? \App\Support\CompanyTerminology::client($company) }}</p>
                         <p class="agendaqui-dashboard-list__meta">{{ $appointment->service_name_snapshot ?? $appointment->service?->name ?? 'Serviço' }}</p>
                     </div>
                 @empty

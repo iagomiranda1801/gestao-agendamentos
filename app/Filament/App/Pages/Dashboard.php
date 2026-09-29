@@ -2,12 +2,14 @@
 
 namespace App\Filament\App\Pages;
 
+use App\Enums\CompanyRole;
+use App\Models\Company;
+use App\Services\Company\PersonalTrainerSetupService;
+use App\Services\Dashboard\OperationalDashboardAggregator;
 use Filament\Facades\Filament;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Schemas\Components\View as ViewComponent;
 use Filament\Schemas\Schema;
-use App\Models\Company;
-use App\Services\Dashboard\OperationalDashboardAggregator;
 
 class Dashboard extends BaseDashboard
 {
@@ -33,6 +35,13 @@ class Dashboard extends BaseDashboard
                             ? app(OperationalDashboardAggregator::class)->aggregate($company)
                             : [],
                         'userName' => auth()->user()?->name ?? 'Usuário',
+                        'personalTrainerSetup' => $company && auth()->user()?->hasActiveRoleInCompany(
+                            $company,
+                            CompanyRole::CompanyAdmin,
+                            CompanyRole::Manager,
+                        )
+                            ? app(PersonalTrainerSetupService::class)->summary($company)
+                            : ['steps' => [], 'templates' => [], 'booking_url' => null],
                     ]),
             ]);
     }

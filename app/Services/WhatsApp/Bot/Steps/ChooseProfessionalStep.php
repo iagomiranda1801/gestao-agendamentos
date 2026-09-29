@@ -10,6 +10,7 @@ use App\Services\WhatsApp\Bot\BotAction;
 use App\Services\WhatsApp\Bot\BotContext;
 use App\Services\WhatsApp\Bot\BotStep;
 use App\Services\WhatsApp\Bot\WhatsAppBookingBotMessageBuilder;
+use App\Support\CompanyTerminology;
 use Illuminate\Support\Collection;
 
 class ChooseProfessionalStep implements BotStep
@@ -31,7 +32,9 @@ class ChooseProfessionalStep implements BotStep
         $allowNoPreference = (bool) $context->settings->allow_no_professional_preference;
 
         if ($professionals->isEmpty()) {
-            return "Nenhum profissional disponível para este serviço. Envie *menu* para escolher outro serviço.";
+            $name = CompanyTerminology::professional($context->company, capitalized: false);
+
+            return "Nenhum {$name} disponível para este serviço. Envie *menu* para escolher outro serviço.";
         }
 
         if (! (bool) $context->settings->allow_professional_selection) {
@@ -40,7 +43,7 @@ class ChooseProfessionalStep implements BotStep
             return "Vou agendar com *{$professional->name}*. Digite *1* para continuar.";
         }
 
-        return $this->messages->professionalMenu($professionals, $allowNoPreference);
+        return $this->messages->professionalMenu($professionals, $allowNoPreference, $context->company);
     }
 
     public function process(BotContext $context, string $input): BotAction

@@ -4,7 +4,10 @@ namespace App\Services\WhatsApp\Bot;
 
 use App\Models\Appointment;
 use App\Models\Company;
+use App\Models\Professional;
+use App\Models\Service;
 use App\Services\Company\CompanySubscriptionService;
+use App\Support\CompanyTerminology;
 use Illuminate\Support\Collection;
 
 class WhatsAppBookingBotMessageBuilder
@@ -17,15 +20,15 @@ class WhatsAppBookingBotMessageBuilder
             ."O que deseja fazer?\n"
             ."1 - Agendar um horário\n"
             ."0 - Falar com um atendente\n\n"
-            ."Digite o número da opção. Envie *menu* a qualquer momento para reiniciar.";
+            .'Digite o número da opção. Envie *menu* a qualquer momento para reiniciar.';
     }
 
     /**
-     * @param  Collection<int, \App\Models\Service>  $services
+     * @param  Collection<int, Service>  $services
      */
     public function serviceMenu(Collection $services, bool $showPrice, bool $showDuration): string
     {
-        $lines = ["Escolha o *serviço* digitando o número:"];
+        $lines = ['Escolha o *serviço* digitando o número:'];
 
         foreach ($services as $index => $service) {
             $extras = [];
@@ -50,11 +53,12 @@ class WhatsAppBookingBotMessageBuilder
     }
 
     /**
-     * @param  Collection<int, \App\Models\Professional>  $professionals
+     * @param  Collection<int, Professional>  $professionals
      */
-    public function professionalMenu(Collection $professionals, bool $allowNoPreference): string
+    public function professionalMenu(Collection $professionals, bool $allowNoPreference, ?Company $company = null): string
     {
-        $lines = ["Escolha o *profissional* digitando o número:"];
+        $name = CompanyTerminology::professional($company, capitalized: false);
+        $lines = ["Escolha o *{$name}* digitando o número:"];
 
         foreach ($professionals as $index => $professional) {
             $number = $index + 1;
@@ -76,7 +80,7 @@ class WhatsAppBookingBotMessageBuilder
      */
     public function dateMenu(array $dates, bool $hasMore): string
     {
-        $lines = ["Escolha a *data* digitando o número:"];
+        $lines = ['Escolha a *data* digitando o número:'];
 
         foreach ($dates as $index => $date) {
             $number = $index + 1;
@@ -96,7 +100,7 @@ class WhatsAppBookingBotMessageBuilder
     public function noDatesAvailable(): string
     {
         return "Sem horários disponíveis nos próximos dias.\n\n"
-            ."Envie *menu* para escolher outro serviço ou *0* para falar com um atendente.";
+            .'Envie *menu* para escolher outro serviço ou *0* para falar com um atendente.';
     }
 
     /**
@@ -104,7 +108,7 @@ class WhatsAppBookingBotMessageBuilder
      */
     public function timeMenu(array $slots, bool $hasMore): string
     {
-        $lines = ["Escolha o *horário* digitando o número:"];
+        $lines = ['Escolha o *horário* digitando o número:'];
 
         foreach ($slots as $index => $slot) {
             $number = $index + 1;
@@ -129,16 +133,16 @@ class WhatsAppBookingBotMessageBuilder
 
     public function askName(): string
     {
-        return "Qual é o seu *nome completo*?";
+        return 'Qual é o seu *nome completo*?';
     }
 
     public function askEmail(bool $required): string
     {
         if ($required) {
-            return "Informe seu *e-mail* para concluir o agendamento.";
+            return 'Informe seu *e-mail* para concluir o agendamento.';
         }
 
-        return "Deseja informar um *e-mail* para receber a confirmação? Digite o e-mail ou envie *pular*.";
+        return 'Deseja informar um *e-mail* para receber a confirmação? Digite o e-mail ou envie *pular*.';
     }
 
     public function acceptTerms(string $privacyNotice, ?string $bookingTerms): string
@@ -146,13 +150,13 @@ class WhatsAppBookingBotMessageBuilder
         $lines = [];
 
         if ($privacyNotice !== '') {
-            $lines[] = "*Aviso de privacidade*";
+            $lines[] = '*Aviso de privacidade*';
             $lines[] = $privacyNotice;
             $lines[] = '';
         }
 
         if (filled($bookingTerms)) {
-            $lines[] = "*Termos do agendamento*";
+            $lines[] = '*Termos do agendamento*';
             $lines[] = $bookingTerms;
             $lines[] = '';
         }
@@ -168,8 +172,8 @@ class WhatsAppBookingBotMessageBuilder
     public function confirmation(array $summary): string
     {
         $lines = [
-            "*Confirme seu agendamento*",
-            "",
+            '*Confirme seu agendamento*',
+            '',
             "• Serviço: {$summary['service']}",
             "• Profissional: {$summary['professional']}",
             "• Data: {$summary['date']}",
@@ -212,17 +216,17 @@ class WhatsAppBookingBotMessageBuilder
 
     public function cancelled(): string
     {
-        return "Tudo bem, cancelamos o atendimento. Envie *menu* quando quiser recomeçar.";
+        return 'Tudo bem, cancelamos o atendimento. Envie *menu* quando quiser recomeçar.';
     }
 
     public function invalidOption(): string
     {
-        return "Não entendi. Digite o *número* da opção desejada, ou envie *menu* para reiniciar.";
+        return 'Não entendi. Digite o *número* da opção desejada, ou envie *menu* para reiniciar.';
     }
 
     public function unsupportedMedia(): string
     {
-        return "Não consigo processar áudios, imagens ou anexos aqui. Envie apenas *texto*, ou digite *menu* para reiniciar.";
+        return 'Não consigo processar áudios, imagens ou anexos aqui. Envie apenas *texto*, ou digite *menu* para reiniciar.';
     }
 
     public function botDisabledFallback(): string
