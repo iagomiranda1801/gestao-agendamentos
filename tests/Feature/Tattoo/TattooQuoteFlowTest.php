@@ -20,6 +20,7 @@ use App\Services\Tattoo\TattooWhatsAppBotService;
 use App\Services\WhatsApp\Bot\WhatsAppBookingBotService;
 use App\Services\WhatsApp\Bot\WhatsAppOrderLinkBotService;
 use App\Services\WhatsApp\EvolutionApiClient;
+use Filament\Facades\Filament;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -167,6 +168,8 @@ class TattooQuoteFlowTest extends TestCase
 
         $this->assertSame('accepted', $request->fresh()->status);
         $this->assertNotNull($quote->fresh()->accepted_at);
+
+        Filament::setCurrentPanel(null);
 
         $this->get(route('tattoo.quotes.pdf', ['company' => $company, 'quote' => $quote]))
             ->assertOk()

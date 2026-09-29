@@ -14,6 +14,7 @@ class TattooQuotePdfController
     {
         abort_unless((int) $company->getKey() === (int) $quote->company_id, 404);
         abort_unless(auth()->user()?->canAccessTenant($company), 403);
+        Filament::setCurrentPanel(Filament::getPanel('app'));
         Filament::setTenant($company);
 
         $quote->loadMissing(['request.client', 'request.company']);

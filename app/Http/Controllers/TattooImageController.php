@@ -13,6 +13,7 @@ class TattooImageController
     {
         abort_unless((int) $company->getKey() === (int) $image->company_id, 404);
         abort_unless(auth()->user()?->canAccessTenant($company), 403);
+        Filament::setCurrentPanel(Filament::getPanel('app'));
         Filament::setTenant($company);
         abort_unless(auth()->user()->can('view', $image->request), 403);
 
