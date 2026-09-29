@@ -4,6 +4,7 @@ namespace Tests\Feature\Tattoo;
 
 use App\Enums\CompanyModule;
 use App\Enums\CompanyProfile;
+use App\Filament\App\Resources\Appointments\AppointmentResource;
 use App\Filament\App\Resources\Appointments\Pages\CreateAppointment;
 use App\Filament\App\Resources\TattooRequests\Pages\EditTattooRequest;
 use App\Filament\App\Resources\TattooRequests\TattooRequestResource;
@@ -129,6 +130,96 @@ class TattooQuoteFlowTest extends TestCase
         Livewire::test(EditTattooRequest::class, ['record' => $request->id])
             ->callAction('quote', ['price_type' => 'fixed', 'amount_min' => 350, 'sessions' => 1]);
         $this->assertDatabaseHas('tattoo_quotes', ['tattoo_request_id' => $request->id, 'amount_min' => 350]);
+    }
+
+    public function test_approving_quote_redirects_to_appointment_and_downloads_pdf(): void
+    {
+        $company = $this->createSchedulingCompany(['business_profile' => CompanyProfile::TattooStudio]);
+        $other = $this->createSchedulingCompany(['business_profile' => CompanyProfile::TattooStudio]);
+        $user = $this->createCompanyUser($company);
+        $this->authenticateForAppTenant($user, $company);
+        $client = Client::factory()->forCompany($company)->create(['name' => 'Ana Silva']);
+        $request = new TattooRequest([
+            'client_id' => $client->id,
+            'description' => 'Flor pequena',
+            'body_placement' => 'Braço',
+            'size_description' => '10 cm',
+            'source' => 'manual',
+            'status' => 'awaiting_review',
+        ]);
+        $request->company_id = $company->id;
+        $request->save();
+        $quote = app(TattooQuoteService::class)->create($request, $user, [
+            'price_type' => 'fixed',
+            'amount_min' => 350,
+            'sessions' => 2,
+            'deposit_amount' => 80,
+            'conditions' => 'Sinal no agendamento.',
+        ]);
+
+        Livewire::test(EditTattooRequest::class, ['record' => $request->id])
+            ->assertSee('Valor: R$ 350,00')
+            ->assertSee('Sessões previstas: 2')
+            ->assertSee('Rascunho')
+            ->assertDontSee('Responda esta mensagem')
+            ->callAction('approve_and_schedule')
+            ->assertRedirect(AppointmentResource::getUrl('create', ['tattoo_request' => $request->id]));
+
+        $this->assertSame('accepted', $request->fresh()->status);
+        $this->assertNotNull($quote->fresh()->accepted_at);
+
+        $this->get(route('tattoo.quotes.pdf', ['company' => $company, 'quote' => $quote]))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+
+        $this->get(route('tattoo.quotes.pdf', ['company' => $other, 'quote' => $quote]))
+            ->assertNotFound();
+    }
+
+    public function test_add_photo_action_accepts_whatsapp_jpeg(): void
+    {
+        Storage::fake('local');
+        config(['filesystems.tattoo_disk' => 'local']);
+        $this->assertSame('local', config('livewire.temporary_file_upload.disk'));
+
+        $company = $this->createSchedulingCompany(['business_profile' => CompanyProfile::TattooStudio]);
+        $user = $this->createCompanyUser($company);
+        $this->authenticateForAppTenant($user, $company);
+        $client = Client::factory()->forCompany($company)->create();
+        $request = new TattooRequest([
+            'client_id' => $client->id, 'description' => 'Flor pequena',
+            'body_placement' => 'Braço', 'source' => 'manual', 'status' => 'awaiting_review',
+        ]);
+        $request->company_id = $company->id;
+        $request->save();
+
+        $upload = UploadedFile::fake()->image('WhatsApp Image 2026-09-24 at 17.41.20.jpeg');
+
+        Livewire::test(EditTattooRequest::class, ['record' => $request->id])
+            ->callAction('add_image', ['image' => $upload])
+            ->assertHasNoActionErrors();
+
+        $image = $request->images()->first();
+        $this->assertNotNull($image);
+        $this->assertSame('image/jpeg', $image->mime_type);
+        Storage::disk('local')->assertExists($image->path);
+
+        $jpg = tempnam(sys_get_temp_dir(), 'tattoo_jpg_');
+        file_put_contents($jpg, 'jpeg-bytes');
+        try {
+            $stored = app(TattooImageService::class)->upload($request, new class($jpg, 'WhatsApp Image.jpeg', 'image/jpg', null, true) extends UploadedFile
+            {
+                public function getMimeType(): ?string
+                {
+                    return 'image/jpg';
+                }
+            });
+        } finally {
+            @unlink($jpg);
+        }
+
+        $this->assertSame('image/jpeg', $stored->mime_type);
+        $this->assertSame(2, $request->images()->count());
     }
 
     public function test_reference_image_is_isolated_by_company(): void

@@ -16,7 +16,7 @@ class TattooImageService
         if ($request->images()->count() >= 5) {
             throw ValidationException::withMessages(['image' => 'Este pedido já tem cinco imagens.']);
         }
-        $mime = (string) $file->getMimeType();
+        $mime = $this->normalizedMime((string) $file->getMimeType());
         if (! in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true) || $file->getSize() > 10 * 1024 * 1024) {
             throw ValidationException::withMessages(['image' => 'Envie uma imagem JPEG, PNG ou WebP de até 10 MB.']);
         }
@@ -43,5 +43,16 @@ class TattooImageService
             Storage::disk($disk)->delete($path);
             throw $exception;
         }
+    }
+
+    protected function normalizedMime(string $mime): string
+    {
+        $mime = strtolower(trim($mime));
+
+        if (in_array($mime, ['image/jpg', 'image/pjpeg'], true)) {
+            return 'image/jpeg';
+        }
+
+        return $mime;
     }
 }

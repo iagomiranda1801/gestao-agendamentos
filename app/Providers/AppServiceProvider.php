@@ -37,6 +37,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        config(['livewire.temporary_file_upload.disk' => 'local']);
+
         Company::observe(AdminAuditObserver::class);
         User::observe(AdminAuditObserver::class);
 

@@ -28,7 +28,7 @@ class EditTattooRequest extends EditRecord
     {
         return [
             Action::make('add_image')->label('Adicionar foto')->schema([
-                FileUpload::make('image')->label('Foto')->storeFiles(false)->image()->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])->maxSize(10240)->required(),
+                FileUpload::make('image')->label('Foto')->storeFiles(false)->image()->acceptedFileTypes(['image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/webp'])->maxSize(10240)->required(),
             ])->action(function (array $data): void {
                 app(TattooImageService::class)->upload($this->getRecord(), $data['image']);
                 $this->getRecord()->unsetRelation('images');
@@ -47,6 +47,24 @@ class EditTattooRequest extends EditRecord
                 app(TattooQuoteService::class)->create($this->getRecord(), auth()->user(), $data);
                 Notification::make()->success()->title('Orçamento salvo. Confira e envie pelo WhatsApp.')->send();
             }),
+            Action::make('download_pdf')->label('Baixar PDF')
+                ->visible(fn () => $this->getRecord()->quotes()->exists())
+                ->url(fn (): string => route('tattoo.quotes.pdf', [
+                    'company' => $this->getRecord()->company,
+                    'quote' => $this->getRecord()->quotes()->latest('version')->first(),
+                ]))
+                ->openUrlInNewTab(),
+            Action::make('approve_and_schedule')->label('Aprovar e agendar')
+                ->visible(fn () => $this->getRecord()->quotes()->exists()
+                    && ! in_array($this->getRecord()->status, ['accepted', 'declined', 'cancelled', 'booked'], true))
+                ->action(function (): void {
+                    $record = $this->getRecord();
+                    $record->update(['status' => 'accepted']);
+                    $record->quotes()->latest('version')->first()?->update(['accepted_at' => now()]);
+                    $this->redirect(AppointmentResource::getUrl('create', [
+                        'tattoo_request' => $record->getKey(),
+                    ]));
+                }),
             Action::make('send_quote')->label('Enviar orçamento')->requiresConfirmation()
                 ->visible(fn () => $this->getRecord()->quotes()->latest('version')->first()?->sent_at === null && $this->getRecord()->quotes()->exists())
                 ->action(function (): void {

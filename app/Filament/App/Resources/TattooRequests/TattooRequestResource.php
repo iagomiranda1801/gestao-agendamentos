@@ -79,13 +79,24 @@ class TattooRequestResource extends Resource
                     return new HtmlString($links ?: 'Nenhuma foto enviada.');
                 }),
                 Placeholder::make('quotes_list')->label('Orçamentos')->content(function (?TattooRequest $record): HtmlString {
-                    if (! $record) {
+                    $quote = $record?->quotes()->orderByDesc('version')->first();
+                    if (! $quote) {
                         return new HtmlString('Nenhum orçamento.');
                     }
-                    $lines = $record->quotes()->orderByDesc('version')->get()->map(fn ($quote) => '<strong>Versão '.(int) $quote->version.'</strong> — '.e($quote->sent_at ? 'Enviado' : 'Rascunho').'<pre>'.e($quote->message_snapshot).'</pre>'
-                    )->implode('');
 
-                    return new HtmlString($lines ?: 'Nenhum orçamento.');
+                    $lines = [
+                        '<strong>Versão '.(int) $quote->version.'</strong> — '.e($quote->situationLabel()),
+                        'Valor: '.e($quote->priceLabel()),
+                        'Sessões previstas: '.(int) $quote->sessions,
+                    ];
+                    if (filled($quote->deposit_amount) && (float) $quote->deposit_amount > 0) {
+                        $lines[] = 'Sinal: R$ '.e(number_format((float) $quote->deposit_amount, 2, ',', '.'));
+                    }
+                    if ($quote->valid_until) {
+                        $lines[] = 'Válido até: '.e($quote->valid_until->format('d/m/Y'));
+                    }
+
+                    return new HtmlString(implode('<br>', $lines));
                 }),
                 Placeholder::make('appointment_link')->label('Agendamento')->content(function (?TattooRequest $record): HtmlString {
                     if (! $record?->appointment_id) {

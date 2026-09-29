@@ -61,6 +61,7 @@ class AttendanceCompletionService
 
         $appointment->load(['client', 'professional', 'service']);
         $effectiveService = $this->resolveEffectiveService($company, $appointment, $data);
+        $serviceNameSnapshot = $this->resolveServiceNameSnapshot($company, $appointment, $data, $effectiveService);
 
         if ($company->isDentalClinic()
             && $company->dentalClinicSetting()->where('clinical_entry_required_to_complete', true)->exists()
@@ -111,6 +112,7 @@ class AttendanceCompletionService
             $finalAmount,
             $financialResult,
             $effectiveService,
+            $serviceNameSnapshot,
             $validatedMaterials,
             $completedAt,
         ): Attendance {
@@ -138,7 +140,7 @@ class AttendanceCompletionService
             $this->validateStockAvailability($company, $validatedMaterials);
 
             $attendance = new Attendance([
-                'service_name_snapshot' => $effectiveService->name,
+                'service_name_snapshot' => $serviceNameSnapshot,
                 'client_name_snapshot' => $lockedAppointment->client_name_snapshot ?? $lockedAppointment->client->name,
                 'professional_name_snapshot' => $lockedAppointment->professional->name,
                 'gross_amount' => $grossAmount,
@@ -270,6 +272,10 @@ class AttendanceCompletionService
             ]);
         }
 
+        if ($company->isTattooStudio()) {
+            return $this->tattooSessionService($company, $data);
+        }
+
         if (! $data->actualServiceId) {
             throw ValidationException::withMessages([
                 'actual_service_id' => 'Informe o procedimento realizado antes de concluir o atendimento.',
@@ -298,6 +304,65 @@ class AttendanceCompletionService
                 'actual_service_id' => 'O profissional não está associado ao procedimento informado.',
             ]);
         }
+
+        return $service;
+    }
+
+    protected function resolveServiceNameSnapshot(
+        Company $company,
+        Appointment $appointment,
+        AttendanceCompletionData $data,
+        Service $effectiveService,
+    ): string {
+        if ($company->isTattooStudio() && $appointment->hasServiceToBeDefined()) {
+            return trim((string) $data->actualServiceName);
+        }
+
+        return $effectiveService->name;
+    }
+
+    protected function tattooSessionService(Company $company, AttendanceCompletionData $data): Service
+    {
+        $name = trim((string) $data->actualServiceName);
+
+        if ($name === '') {
+            throw ValidationException::withMessages([
+                'procedure_performed' => 'Informe o procedimento realizado antes de concluir o atendimento.',
+            ]);
+        }
+
+        if (mb_strlen($name) > 255) {
+            throw ValidationException::withMessages([
+                'procedure_performed' => 'O procedimento realizado deve ter no máximo 255 caracteres.',
+            ]);
+        }
+
+        $service = Service::query()
+            ->where('company_id', $company->getKey())
+            ->where('slug', 'sessao-de-tatuagem')
+            ->first();
+
+        if ($service === null) {
+            $service = new Service([
+                'name' => 'Sessão de tatuagem',
+                'price' => '0.00',
+                'duration_minutes' => 60,
+                'is_bookable' => false,
+                'is_sellable' => false,
+                'is_online_booking_enabled' => false,
+                'is_active' => true,
+            ]);
+            $service->company()->associate($company);
+            $service->slug = 'sessao-de-tatuagem';
+            $service->save();
+        }
+
+        $service->forceFill([
+            'is_bookable' => false,
+            'is_sellable' => false,
+            'is_online_booking_enabled' => false,
+            'is_active' => true,
+        ])->save();
 
         return $service;
     }

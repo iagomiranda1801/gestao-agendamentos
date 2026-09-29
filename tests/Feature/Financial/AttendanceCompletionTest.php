@@ -9,6 +9,7 @@ use App\Enums\AppointmentHistoryType;
 use App\Enums\AppointmentStatus;
 use App\Enums\AttendanceHistoryType;
 use App\Enums\CommissionType;
+use App\Enums\CompanyProfile;
 use App\Enums\CompanyRole;
 use App\Enums\PayableOrigin;
 use App\Enums\PayableStatus;
@@ -21,7 +22,10 @@ use App\Models\Company;
 use App\Models\FinancialAccount;
 use App\Models\InventoryBalance;
 use App\Models\Payable;
+use App\Models\Client;
 use App\Models\Product;
+use App\Models\Professional;
+use App\Models\Service;
 use App\Models\User;
 use App\Services\Financial\AttendanceCompletionService;
 use App\Services\Financial\CompanyFinancialSettingService;
@@ -473,6 +477,91 @@ class AttendanceCompletionTest extends TestCase
         $this->assertSame($setup['service']->getKey(), $attendance->service_id);
         $this->assertSame($setup['service']->name, $attendance->service_name_snapshot);
         $this->assertSame('150.00', (string) $attendance->gross_amount);
+    }
+
+    public function test_tattoo_studio_completes_open_appointment_with_written_procedure(): void
+    {
+        $company = $this->createSchedulingCompany(['business_profile' => CompanyProfile::TattooStudio]);
+        app(CompanyFinancialSettingService::class)->update($company, [
+            'default_commission_type' => CommissionType::Percentage->value,
+            'default_commission_value' => '15',
+            'materials_reserve_percentage' => '10',
+            'business_reserve_percentage' => '10',
+            'allow_partial_payments' => true,
+            'allow_unpaid_completion' => true,
+            'default_payment_due_days' => 7,
+        ]);
+        $user = $this->createCompanyUser($company, [], CompanyRole::CompanyAdmin);
+        $this->authenticateForAppTenant($user, $company);
+        $client = Client::factory()->forCompany($company)->active()->create();
+        $professional = Professional::factory()->forCompany($company)->bookable()->active()->create();
+        $appointment = Appointment::factory()
+            ->forCompany($company)
+            ->create([
+                'client_id' => $client->getKey(),
+                'professional_id' => $professional->getKey(),
+                'service_id' => null,
+                'service_selection_mode' => 'to_be_defined',
+                'service_name_snapshot' => 'A definir no atendimento',
+                'price_snapshot' => null,
+                'status' => AppointmentStatus::Confirmed,
+                'client_name_snapshot' => $client->name,
+            ]);
+
+        $attendance = app(AttendanceCompletionService::class)->complete(
+            $company,
+            $user,
+            $appointment,
+            new AttendanceCompletionData(
+                discountAmount: '0.00',
+                materials: [],
+                payments: [],
+                grossAmount: '180.00',
+                actualServiceName: 'Floral no braço, primeira sessão',
+            ),
+        );
+
+        $this->assertSame('Floral no braço, primeira sessão', $attendance->service_name_snapshot);
+        $this->assertSame('180.00', (string) $attendance->gross_amount);
+
+        $service = $attendance->service;
+        $this->assertInstanceOf(Service::class, $service);
+        $this->assertSame('Sessão de tatuagem', $service->name);
+        $this->assertFalse($service->is_bookable);
+        $this->assertFalse($service->is_sellable);
+        $this->assertFalse($service->is_online_booking_enabled);
+
+        $second = Appointment::factory()
+            ->forCompany($company)
+            ->create([
+                'client_id' => $client->getKey(),
+                'professional_id' => $professional->getKey(),
+                'service_id' => null,
+                'service_selection_mode' => 'to_be_defined',
+                'service_name_snapshot' => 'A definir no atendimento',
+                'price_snapshot' => null,
+                'status' => AppointmentStatus::Confirmed,
+                'client_name_snapshot' => $client->name,
+                'start_at' => $appointment->start_at->copy()->addDay(),
+                'end_at' => $appointment->end_at->copy()->addDay(),
+            ]);
+
+        $again = app(AttendanceCompletionService::class)->complete(
+            $company,
+            $user,
+            $second,
+            new AttendanceCompletionData(
+                discountAmount: '0.00',
+                materials: [],
+                payments: [],
+                grossAmount: '90.00',
+                actualServiceName: 'Retoque da linha',
+            ),
+        );
+
+        $this->assertSame($service->getKey(), $again->service_id);
+        $this->assertSame('Retoque da linha', $again->service_name_snapshot);
+        $this->assertSame(1, Service::query()->where('company_id', $company->getKey())->where('slug', 'sessao-de-tatuagem')->count());
     }
 
     /**

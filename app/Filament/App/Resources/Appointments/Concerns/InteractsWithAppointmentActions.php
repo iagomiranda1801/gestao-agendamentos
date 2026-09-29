@@ -334,13 +334,18 @@ trait InteractsWithAppointmentActions
                 ->prefix('R$')
                 ->required()
                 ->visible(fn (): bool => $canManageFinancial() || $this->getRecord()->hasServiceToBeDefined()),
+            TextInput::make('procedure_performed')
+                ->label('Procedimento realizado')
+                ->maxLength(255)
+                ->required()
+                ->visible(fn (): bool => $this->usesFreeProcedureText()),
             Select::make('actual_service_id')
                 ->label('Procedimento realizado')
                 ->options(fn (): array => self::actualServiceOptions($this->getRecord()))
                 ->searchable()
                 ->native(false)
                 ->required(fn (): bool => $this->getRecord()->hasServiceToBeDefined())
-                ->visible(fn (): bool => $this->getRecord()->hasServiceToBeDefined()),
+                ->visible(fn (): bool => $this->getRecord()->hasServiceToBeDefined() && ! $this->usesFreeProcedureText()),
             TextInput::make('discount_amount')
                 ->label('Desconto')
                 ->numeric()
@@ -551,7 +556,19 @@ trait InteractsWithAppointmentActions
                 ? number_format((float) $data['gross_amount'], 2, '.', '')
                 : null,
             actualServiceId: filled($data['actual_service_id'] ?? null) ? (int) $data['actual_service_id'] : null,
+            actualServiceName: filled($data['procedure_performed'] ?? null)
+                ? trim((string) $data['procedure_performed'])
+                : null,
         );
+    }
+
+    protected function usesFreeProcedureText(): bool
+    {
+        $company = Filament::getTenant();
+
+        return $company instanceof Company
+            && $company->isTattooStudio()
+            && $this->getRecord()->hasServiceToBeDefined();
     }
 
     /**

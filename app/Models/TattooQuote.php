@@ -23,4 +23,28 @@ class TattooQuote extends Model
     {
         return $this->belongsTo(User::class, 'created_by');
     }
+
+    public function priceLabel(): string
+    {
+        $min = 'R$ '.number_format((float) $this->amount_min, 2, ',', '.');
+
+        if ($this->price_type === 'range' && filled($this->amount_max)) {
+            return $min.' a R$ '.number_format((float) $this->amount_max, 2, ',', '.');
+        }
+
+        return $min;
+    }
+
+    public function situationLabel(): string
+    {
+        if ($this->accepted_at !== null) {
+            return 'Aceito';
+        }
+
+        if ($this->sent_at !== null) {
+            return 'Enviado';
+        }
+
+        return 'Rascunho';
+    }
 }
