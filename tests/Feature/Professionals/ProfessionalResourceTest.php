@@ -3,14 +3,17 @@
 namespace Tests\Feature\Professionals;
 
 use App\Enums\CompanyRole;
+use App\Filament\App\Resources\Professionals\Pages\CreateProfessional;
 use App\Filament\App\Resources\Professionals\Pages\ListProfessionals;
 use App\Filament\App\Resources\Professionals\ProfessionalResource;
 use App\Models\Professional;
 use App\Models\User;
 use App\Policies\ProfessionalPolicy;
 use App\Services\Professional\ProfessionalService;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 class ProfessionalResourceTest extends TestCase
@@ -60,6 +63,83 @@ class ProfessionalResourceTest extends TestCase
         ]);
 
         $this->assertSame($company->id, $professional->company_id);
+    }
+
+    public function test_admin_can_create_professional_and_panel_access_together(): void
+    {
+        $company = $this->createCompany();
+        $admin = $this->createCompanyUser($company);
+        $this->authenticateForAppTenant($admin, $company);
+
+        Livewire::test(CreateProfessional::class)
+            ->fillForm([
+                'name' => 'Joana',
+                'email' => 'joana@example.test',
+                'create_access' => true,
+                'access_role' => CompanyRole::Employee->value,
+                'access_password' => 'SenhaForte123!',
+                'access_password_confirmation' => 'SenhaForte123!',
+                'is_active' => true,
+                'is_bookable' => true,
+                'sort_order' => 0,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $professional = Professional::query()->where('company_id', $company->id)->where('email', 'joana@example.test')->firstOrFail();
+        $user = User::query()->where('email', 'joana@example.test')->firstOrFail();
+        $this->assertSame($user->id, $professional->user_id);
+        $this->assertTrue($user->hasActiveRoleInCompany($company, CompanyRole::Employee));
+        $this->assertTrue(Hash::check('SenhaForte123!', $user->password));
+    }
+
+    public function test_duplicate_email_does_not_create_professional_or_second_user(): void
+    {
+        $company = $this->createCompany();
+        $admin = $this->createCompanyUser($company);
+        User::factory()->create(['email' => 'joana@example.test']);
+        $this->authenticateForAppTenant($admin, $company);
+
+        try {
+            app(ProfessionalService::class)->create($company, [
+                'name' => 'Joana',
+                'email' => 'joana@example.test',
+                'create_access' => true,
+                'access_role' => CompanyRole::Employee->value,
+                'access_password' => 'SenhaForte123!',
+                'access_password_confirmation' => 'SenhaForte123!',
+            ]);
+            $this->fail('O e-mail duplicado deveria ser recusado.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('email', $exception->errors());
+        }
+
+        $this->assertDatabaseCount('professionals', 0);
+        $this->assertSame(1, User::query()->where('email', 'joana@example.test')->count());
+    }
+
+    public function test_manager_cannot_create_panel_access_through_professional_service(): void
+    {
+        $company = $this->createCompany();
+        $manager = $this->createCompanyUser($company, role: CompanyRole::Manager);
+        $this->authenticateForAppTenant($manager, $company);
+
+        try {
+            app(ProfessionalService::class)->create($company, [
+                'name' => 'Joana',
+                'email' => 'joana@example.test',
+                'create_access' => true,
+                'access_role' => CompanyRole::Employee->value,
+                'access_password' => 'SenhaForte123!',
+                'access_password_confirmation' => 'SenhaForte123!',
+            ]);
+            $this->fail('O gerente não deveria poder criar acesso.');
+        } catch (HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+
+        $this->assertDatabaseCount('professionals', 0);
+        $this->assertDatabaseMissing('users', ['email' => 'joana@example.test']);
     }
 
     public function test_manipulated_company_id_is_ignored_on_create(): void

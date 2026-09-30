@@ -2,11 +2,16 @@
 
 namespace App\Services\Professional;
 
+use App\Enums\CompanyPermission;
+use App\Enums\CompanyRole;
 use App\Models\Company;
 use App\Models\Professional;
 use App\Models\User;
+use App\Services\Company\CompanyPermissionService;
+use App\Services\Company\CompanyTeamService;
 use App\Support\PhoneNormalizer;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class ProfessionalService
@@ -17,6 +22,27 @@ class ProfessionalService
     public function create(Company $company, array $data): Professional
     {
         return DB::transaction(function () use ($company, $data): Professional {
+            if ($data['create_access'] ?? false) {
+                $actor = auth()->user();
+                abort_unless($actor instanceof User && app(CompanyPermissionService::class)
+                    ->allows($actor, $company, CompanyPermission::ManagePermissions), 403);
+
+                validator($data, [
+                    'name' => ['required', 'string', 'max:255'],
+                    'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+                    'access_role' => ['required', 'in:'.implode(',', array_column(CompanyRole::cases(), 'value'))],
+                    'access_password' => ['required', 'confirmed', Password::defaults()],
+                ])->validate();
+
+                $user = app(CompanyTeamService::class)->create($company, [
+                    'name' => $data['name'],
+                    'email' => $data['email'],
+                    'password' => $data['access_password'],
+                    'role' => $data['access_role'],
+                ]);
+                $data['user_id'] = $user->getKey();
+            }
+
             $payload = $this->preparePayload($data);
 
             $this->assertUserCanBeLinked($company, $payload['user_id'] ?? null);
@@ -83,7 +109,7 @@ class ProfessionalService
      */
     protected function preparePayload(array $data): array
     {
-        unset($data['company_id']);
+        unset($data['company_id'], $data['create_access'], $data['access_role'], $data['access_password'], $data['access_password_confirmation']);
 
         if (array_key_exists('phone', $data)) {
             $data['phone_normalized'] = filled($data['phone'])
