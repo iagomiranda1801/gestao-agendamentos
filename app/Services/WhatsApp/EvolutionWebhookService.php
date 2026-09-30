@@ -104,6 +104,10 @@ class EvolutionWebhookService
             'data.message.extendedTextMessage.text',
             'data.message.imageMessage.caption',
             'data.0.message.imageMessage.caption',
+            'data.message.documentMessage.caption',
+            'data.0.message.documentMessage.caption',
+            'data.message.documentWithCaptionMessage.message.documentMessage.caption',
+            'data.0.message.documentWithCaptionMessage.message.documentMessage.caption',
             'data.0.message.extendedTextMessage.text',
             'data.message.buttonsResponseMessage.selectedDisplayText',
             'data.message.listResponseMessage.title',
@@ -125,10 +129,26 @@ class EvolutionWebhookService
 
     protected function imageMime(array $payload): ?string
     {
-        $mime = Arr::get($payload, 'data.message.imageMessage.mimetype')
-            ?? Arr::get($payload, 'data.0.message.imageMessage.mimetype');
+        foreach (['data.message', 'data.0.message'] as $root) {
+            foreach ([$root.'.imageMessage', $root.'.documentMessage', $root.'.documentWithCaptionMessage.message.documentMessage'] as $path) {
+                $mime = Arr::get($payload, $path.'.mimetype');
+                $mime = is_string($mime) ? strtolower(trim(explode(';', $mime, 2)[0])) : null;
+                if (in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+                    return $mime;
+                }
 
-        return is_string($mime) ? $mime : null;
+                if ($mime === 'application/octet-stream') {
+                    $filename = (string) Arr::get($payload, $path.'.fileName', '');
+                    $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+                    $inferred = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'][$extension] ?? null;
+                    if ($inferred !== null) {
+                        return $inferred;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     protected function extractPhone(string $remoteJid): string

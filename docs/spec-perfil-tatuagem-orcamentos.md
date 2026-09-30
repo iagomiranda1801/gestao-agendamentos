@@ -17,8 +17,8 @@ Receber pedidos de tatuagem pelo WhatsApp, reunir descrição e foto de referên
 
 ## Jornada proposta
 
-1. No WhatsApp de uma empresa com perfil Tatuagem e bot habilitado, o menu oferece **Pedir orçamento**, **Agendar** e **Falar com a equipe**.
-2. Para orçamento, o bot coleta nome, descrição do desenho, parte do corpo, tamanho aproximado em centímetros e uma foto de referência. O cliente pode informar que não tem foto. Cores ou estilo podem ser descritos na mensagem do desenho.
+1. No WhatsApp de uma empresa com perfil Tatuagem e bot habilitado, a primeira mensagem de texto inicia o pedido de orçamento perguntando o nome, sem menu numerado. Uma conversa encerrada só reabre com pedido explícito, ou com saudação após o período de espera, para não interferir no atendimento humano. O bot não oferece agendamento; quando o cliente pede horário, explica que o tatuador analisa o orçamento primeiro. O cliente pode pedir atendimento humano em linguagem natural.
+2. Para orçamento, o bot coleta nome, descrição do desenho, parte do corpo, tamanho aproximado em centímetros e uma foto de referência. Se o cliente já descreveu a tatuagem na primeira mensagem, o bot aproveita essa informação. A referência pode chegar como foto ou documento JPEG, PNG ou WEBP; o cliente também pode informar que não tem foto. Cores ou estilo podem ser descritos na mensagem do desenho.
 3. O bot mostra um resumo e pede confirmação. Depois cria uma solicitação com status **Aguardando análise** e informa que o valor será definido por uma pessoa. Não informa preço automático.
 4. A solicitação entra na tela **Orçamentos de tatuagem**. A equipe atribui o tatuador, que pode ver as imagens, montar a proposta e enviá-la pelo WhatsApp. Pedidos de mais detalhes são tratados pela equipe na conversa com o cliente.
 5. O orçamento registra valor fechado ou faixa estimada, duração por sessão, número previsto de sessões, sinal opcional, validade e observações. A criação salva a versão exata do texto que será enviado ao cliente.

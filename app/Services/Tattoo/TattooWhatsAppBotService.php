@@ -66,16 +66,30 @@ class TattooWhatsAppBotService
         if ($conversation && $messageId && $conversation->last_incoming_message_id === $messageId) {
             return null;
         }
+        if ($conversation === null && $messageId && WhatsAppBotConversation::query()
+            ->where('company_id', $company->id)->where('phone_normalized', $phone)
+            ->where('last_incoming_message_id', $messageId)->exists()) {
+            return null;
+        }
 
         $normalized = Str::lower(Str::ascii($text));
+        $wantsHuman = (bool) preg_match('/^(quero |gostaria de |preciso )?(atendente|humano|falar com (um |uma |a )?(atendente|pessoa|equipe))[!. ]*$/u', $normalized);
+        $wantsBooking = (bool) preg_match('/\b(agendar|agendamento|marcar horario)\b/u', $normalized);
+        $bookingCommand = (bool) preg_match('/^(quero |gostaria de |preciso )?(agendar|agendamento|marcar)( um)?( horario)?[!. ]*$/u', $normalized);
         if ($conversation === null) {
-            if (! in_array($normalized, ['oi', 'ola', 'menu', 'orcamento', 'orçamento', 'tatuagem', 'agendar'], true)) {
+            $isGreeting = $this->isGreeting($normalized);
+            $wantsQuote = (bool) preg_match('/\b(orcamento|tatuagem|tatuar|tattoo)\b/u', $normalized);
+            if ($normalized === '') {
                 return null;
             }
-            if (in_array($normalized, ['oi', 'ola'], true)
-                && WhatsAppBotConversation::query()->where('company_id', $company->id)
-                    ->where('phone_normalized', $phone)->whereNotNull('finished_at')
-                    ->where('finished_at', '>=', now()->subMinutes(15))->exists()) {
+            $priorConversation = WhatsAppBotConversation::query()
+                ->where('company_id', $company->id)->where('phone_normalized', $phone)
+                ->latest('id')->first();
+            if ($priorConversation !== null && ! $isGreeting && ! $wantsQuote && ! $wantsBooking && ! $wantsHuman && $normalized !== 'menu') {
+                return null;
+            }
+            if ($isGreeting
+                && $priorConversation?->finished_at?->gte(now()->subMinutes(15))) {
                 return null;
             }
             $conversation = new WhatsAppBotConversation([
@@ -83,60 +97,92 @@ class TattooWhatsAppBotService
                 'company_whatsapp_instance_id' => $instance->id,
                 'phone_normalized' => $phone,
                 'remote_jid' => $remoteJid,
-                'state' => State::Greeting,
+                'state' => State::TattooName,
                 'data' => [],
             ]);
             $conversation->save();
 
-            return $this->reply($conversation, $messageId, "Olá! Você está falando com *{$company->name}*.\n1 - Pedir orçamento de tatuagem\n2 - Agendar um horário\n0 - Falar com a equipe");
+            if ($wantsHuman) {
+                $conversation->finished_at = now();
+                $conversation->finished_reason = 'handoff';
+
+                return $this->reply($conversation, $messageId, 'Certo, vou parar as perguntas. A equipe pode continuar com você por aqui.');
+            }
+
+            if ($wantsBooking) {
+                return $this->reply($conversation, $messageId, $this->quoteBeforeBookingPrompt(State::TattooName));
+            }
+
+            if ($wantsQuote) {
+                $description = $this->initialDescription($text);
+                $conversation->data = $description === null ? [] : ['description' => $description];
+
+                return $this->reply($conversation, $messageId, $description === null
+                    ? 'Claro, vamos preparar seu pedido para o tatuador. Como posso te chamar?'
+                    : 'Entendi a ideia da tatuagem. Como posso te chamar?');
+            }
+
+            return $this->reply($conversation, $messageId, "Oi! Você está falando com *{$company->name}*. Vou reunir sua ideia para o tatuador preparar um orçamento. Como posso te chamar?");
         }
 
         if ($normalized === 'menu') {
             $this->cancelDraft($conversation);
-            $conversation->state = State::Greeting;
+            $conversation->state = State::TattooName;
             $conversation->data = [];
 
-            return $this->reply($conversation, $messageId, "O que deseja fazer?\n1 - Pedir orçamento\n2 - Agendar\n0 - Falar com a equipe");
+            return $this->reply($conversation, $messageId, 'Vamos começar de novo. Como posso te chamar?');
         }
 
         $data = $conversation->data ?: [];
         $state = $conversation->state;
+        if ($wantsHuman || ($text === '0' && $state !== State::TattooPhoto)) {
+            $this->cancelDraft($conversation);
+            $conversation->finished_at = now();
+            $conversation->finished_reason = 'handoff';
+
+            return $this->reply($conversation, $messageId, 'Certo, vou parar as perguntas. A equipe pode continuar com você por aqui.');
+        }
+        if ($bookingCommand || ($text === '2' && $state === State::Greeting)) {
+            if ($state === State::Greeting) {
+                $conversation->state = State::TattooName;
+                $state = State::TattooName;
+            }
+
+            return $this->reply($conversation, $messageId, $this->quoteBeforeBookingPrompt($state));
+        }
         if ($imageMime !== null && $state !== State::TattooPhoto) {
             return $this->reply($conversation, $messageId, 'Vou pedir a foto de referência após as informações sobre o desenho, local e tamanho.');
         }
         if ($state === State::Greeting) {
-            if ($text === '0') {
-                $conversation->finished_at = now();
-                $conversation->finished_reason = 'handoff';
+            if ($text !== '1' && preg_match('/\b(orcamento|tatuagem|tatuar|tattoo)\b/u', $normalized)) {
+                $description = $this->initialDescription($text);
+                $conversation->state = State::TattooName;
+                $conversation->data = $description === null ? [] : ['description' => $description];
 
-                return $this->reply($conversation, $messageId, 'Certo. A equipe vai continuar seu atendimento por aqui.');
-            }
-            if ($text === '2') {
-                $conversation->finished_at = now();
-                $conversation->finished_reason = 'booking_link';
-                $bookingEnabled = (bool) $company->schedulingSetting?->public_booking_enabled;
-
-                return $this->reply($conversation, $messageId, $bookingEnabled
-                    ? 'Você pode escolher um horário em '.route('public.booking.show', ['company' => $company])
-                    : 'A equipe vai ajudar você a escolher um horário por aqui.');
-            }
-            if ($text !== '1') {
-                return null;
+                return $this->reply($conversation, $messageId, 'Claro, vamos preparar seu pedido para o tatuador. Como posso te chamar?');
             }
             $conversation->state = State::TattooName;
-
-            return $this->reply($conversation, $messageId, 'Qual é seu nome?');
+            if ($text === '1') {
+                return $this->reply($conversation, $messageId, 'Claro. Como posso te chamar?');
+            }
+            $state = State::TattooName;
         }
 
         if ($state === State::TattooName) {
-            if (mb_strlen($text) < 2 || mb_strlen($text) > 120) {
-                return $this->reply($conversation, $messageId, 'Informe seu nome (de 2 a 120 caracteres).');
+            if (mb_strlen($text) < 2 || mb_strlen($text) > 120 || $this->isGreeting($normalized)) {
+                return $this->reply($conversation, $messageId, 'Como posso te chamar? Pode ser só seu primeiro nome.');
             }
             $data['name'] = $text;
             $conversation->state = State::TattooDescription;
             $conversation->data = $data;
 
-            return $this->reply($conversation, $messageId, 'Conte qual desenho você quer tatuar. Pode descrever estilo e cores.');
+            if (isset($data['description'])) {
+                $conversation->state = State::TattooPlacement;
+
+                return $this->reply($conversation, $messageId, "Prazer, {$text}! Em que parte do corpo você pensa em fazer essa tatuagem?");
+            }
+
+            return $this->reply($conversation, $messageId, "Prazer, {$text}! Me conta como você imagina a tatuagem. Pode falar do desenho, estilo e cores do seu jeito.");
         }
         if ($state === State::TattooDescription) {
             if (mb_strlen($text) < 5 || mb_strlen($text) > 3000) {
@@ -146,7 +192,7 @@ class TattooWhatsAppBotService
             $conversation->state = State::TattooPlacement;
             $conversation->data = $data;
 
-            return $this->reply($conversation, $messageId, 'Em qual parte do corpo será a tatuagem?');
+            return $this->reply($conversation, $messageId, 'Entendi. Em que parte do corpo você pensa em fazer essa tatuagem?');
         }
         if ($state === State::TattooPlacement) {
             if (mb_strlen($text) < 2 || mb_strlen($text) > 255) {
@@ -156,7 +202,7 @@ class TattooWhatsAppBotService
             $conversation->state = State::TattooSize;
             $conversation->data = $data;
 
-            return $this->reply($conversation, $messageId, 'Qual o tamanho aproximado em centímetros? Pode responder, por exemplo, 10 x 15 cm.');
+            return $this->reply($conversation, $messageId, 'E qual tamanho você imagina, mais ou menos? Pode ser uma estimativa, como 10 x 15 cm.');
         }
         if ($state === State::TattooSize) {
             if (mb_strlen($text) < 1 || mb_strlen($text) > 255) {
@@ -164,9 +210,10 @@ class TattooWhatsAppBotService
             }
             $data['size_description'] = $text;
             $request = DB::transaction(function () use ($company, $phone, $data, $conversation): TattooRequest {
-                $client = Client::query()->where('company_id', $company->id)->where('phone_normalized', $phone)->first();
+                $client = Client::query()->where('company_id', $company->id)
+                    ->whereIn('phone_normalized', PhoneNormalizer::candidates($phone))->first();
                 if (! $client) {
-                    $client = new Client(['name' => $data['name'], 'phone' => $phone, 'is_active' => true]);
+                    $client = new Client(['name' => $data['name'], 'phone' => $phone, 'is_active' => true, 'source' => 'whatsapp']);
                     $client->company_id = $company->id;
                     $client->save();
                 }
@@ -185,7 +232,7 @@ class TattooWhatsAppBotService
             $conversation->state = State::TattooPhoto;
             $conversation->data = $data;
 
-            return $this->reply($conversation, $messageId, 'Envie uma foto de referência (JPEG, PNG ou WebP), ou digite *0* se não tiver foto.');
+            return $this->reply($conversation, $messageId, 'Tem alguma foto de referência? Pode mandar por aqui. Se não tiver, é só dizer *sem foto*.');
         }
         if ($state === State::TattooPhoto) {
             if ($imageMime !== null && $messageId) {
@@ -202,7 +249,8 @@ class TattooWhatsAppBotService
                     $tmp = tempnam(sys_get_temp_dir(), 'tattoo_');
                     file_put_contents($tmp, $binary);
                     try {
-                        $file = new UploadedFile($tmp, 'referencia.jpg', $imageMime, null, true);
+                        $extension = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][$imageMime] ?? 'img';
+                        $file = new UploadedFile($tmp, 'referencia.'.$extension, $imageMime, null, true);
                         $this->images->upload($request, $file, $messageId);
                     } finally {
                         @unlink($tmp);
@@ -210,34 +258,34 @@ class TattooWhatsAppBotService
                 } catch (Throwable $exception) {
                     report($exception);
 
-                    return $this->reply($conversation, $messageId, 'Não consegui salvar a foto. Envie novamente ou digite *0* para continuar sem foto.');
+                    return $this->reply($conversation, $messageId, 'Não consegui salvar a imagem. Pode enviar de novo ou dizer *sem foto* para continuar.');
                 }
                 $conversation->state = State::TattooConfirm;
 
                 return $this->reply($conversation, $messageId, $this->summary($data));
             }
-            if ($text !== '0') {
-                return $this->reply($conversation, $messageId, 'Envie uma foto ou digite *0* para continuar sem foto.');
+            if (! preg_match('/^(0|nao tenho( foto)?|sem foto|pode seguir( sem foto)?|seguir sem foto)[!. ]*$/u', $normalized)) {
+                return $this->reply($conversation, $messageId, 'Pode mandar uma foto de referência ou me dizer *sem foto* para continuar.');
             }
             $conversation->state = State::TattooConfirm;
 
             return $this->reply($conversation, $messageId, $this->summary($data));
         }
         if ($state === State::TattooConfirm) {
-            if ($text === '1') {
+            if (in_array($normalized, ['1', 'sim', 'isso', 'esta certo', 'pode enviar', 'confirmar', 'confirmo'], true)) {
                 TattooRequest::query()->where('company_id', $company->id)->where('status', 'collecting')->whereKey($data['request_id'])->update(['status' => 'awaiting_review']);
                 $conversation->state = State::Done;
                 $conversation->finished_at = now();
                 $conversation->finished_reason = 'tattoo_request';
 
-                return $this->reply($conversation, $messageId, 'Pedido recebido! O tatuador vai analisar as informações e responder com o orçamento por aqui.');
+                return $this->reply($conversation, $messageId, 'Recebi seu pedido! A equipe vai analisar a ideia e preparar um orçamento para você.');
             }
-            if ($text === '2') {
+            if (in_array($normalized, ['2', 'cancelar', 'cancela'], true)) {
                 $this->cancelDraft($conversation);
                 $conversation->finished_at = now();
                 $conversation->finished_reason = 'cancelled';
 
-                return $this->reply($conversation, $messageId, 'Pedido cancelado. Envie *menu* para começar novamente.');
+                return $this->reply($conversation, $messageId, 'Tudo bem, cancelei o pedido. Quando quiser começar outro, diga *orçamento*.');
             }
 
             return $this->reply($conversation, $messageId, $this->summary($data));
@@ -248,7 +296,37 @@ class TattooWhatsAppBotService
 
     protected function summary(array $data): string
     {
-        return "Confirma o pedido?\nDesenho: {$data['description']}\nLocal: {$data['body_placement']}\nTamanho: {$data['size_description']}\n1 - Confirmar\n2 - Cancelar";
+        return "Anotei assim:\nDesenho: {$data['description']}\nLocal: {$data['body_placement']}\nTamanho: {$data['size_description']}\n\nEstá tudo certo? Se estiver, me diga *sim* e eu envio para análise. Se quiser parar, diga *cancelar*.";
+    }
+
+    protected function quoteBeforeBookingPrompt(State $state): string
+    {
+        $intro = 'Por enquanto, começamos pelo pedido de orçamento. O tatuador analisa a ideia antes de combinar um horário.';
+
+        return $intro.' '.match ($state) {
+            State::TattooDescription => 'Como você imagina a tatuagem?',
+            State::TattooPlacement => 'Em que parte do corpo você pensa em fazer?',
+            State::TattooSize => 'Qual tamanho você imagina, mais ou menos?',
+            State::TattooPhoto => 'Tem uma foto de referência? Se não tiver, diga *sem foto*.',
+            State::TattooConfirm => 'Se as informações estiverem certas, diga *sim* para enviar o pedido.',
+            default => 'Como posso te chamar?',
+        };
+    }
+
+    protected function isGreeting(string $normalized): bool
+    {
+        return (bool) preg_match('/^(oi+|ola|opa|e ai|eae|bom dia|boa tarde|boa noite|tudo bem)(,? tudo bem)?[!.? ]*$/u', $normalized);
+    }
+
+    protected function initialDescription(string $text): ?string
+    {
+        $normalized = Str::lower(Str::ascii(trim($text)));
+        if (mb_strlen($text) < 18 || mb_strlen($text) > 3000
+            || ! preg_match('/\b(tatuagem|tattoo)\s+(de|com)\s+\S.{4,}|\btatuar\s+(um|uma|o|a)\s+\S.{4,}/u', $normalized)) {
+            return null;
+        }
+
+        return trim($text);
     }
 
     protected function cancelDraft(WhatsAppBotConversation $conversation): void

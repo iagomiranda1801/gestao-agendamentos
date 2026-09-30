@@ -75,10 +75,20 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
         }
 
         if ($company->isTattooStudio()) {
-            if (! $company->is_active
-                || ! $modules->hasModule($company, CompanyModule::WhatsApp)
-                || ! $modules->hasModule($company, CompanyModule::Scheduling)
-                || ! (bool) $settingsService->getOrCreate($company)->whatsapp_bot_enabled) {
+            $disabledReason = match (true) {
+                ! $company->is_active => 'inactive_company',
+                ! $modules->hasModule($company, CompanyModule::WhatsApp) => 'whatsapp_module_disabled',
+                ! $modules->hasModule($company, CompanyModule::Scheduling) => 'scheduling_module_disabled',
+                ! (bool) $settingsService->getOrCreate($company)->whatsapp_bot_enabled => 'bot_disabled',
+                default => null,
+            };
+            if ($disabledReason !== null) {
+                Log::info('WhatsApp tattoo bot: disabled for company.', [
+                    'company_id' => $company->getKey(),
+                    'instance' => $this->instanceName,
+                    'reason' => $disabledReason,
+                ]);
+
                 return;
             }
             $reply = app(TattooWhatsAppBotService::class)->handleIncoming($company, $instance, $this->remoteJid, $this->phone, $this->text, $this->messageId, $this->imageMime);
