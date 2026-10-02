@@ -12,6 +12,7 @@ use App\Filament\App\Resources\TattooRequests\Pages\ListTattooRequests;
 use App\Models\Professional;
 use App\Models\TattooRequest;
 use App\Services\Company\CompanyPermissionService;
+use App\Support\CompanyDateTime;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Placeholder;
@@ -113,7 +114,7 @@ class TattooRequestResource extends Resource
     public static function table(Table $table): Table
     {
         return $table->columns([
-            TextColumn::make('created_at')->label('Recebido')->dateTime('d/m/Y H:i')->sortable(),
+            TextColumn::make('created_at')->label('Recebido')->dateTime('d/m/Y H:i', timezone: fn (): string => CompanyDateTime::timezone(Filament::getTenant()))->sortable(),
             TextColumn::make('client.name')->label('Cliente')->searchable(),
             TextColumn::make('body_placement')->label('Local')->searchable(),
             TextColumn::make('professional.name')->label('Tatuador')->default('A atribuir'),

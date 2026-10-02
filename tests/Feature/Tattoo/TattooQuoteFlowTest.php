@@ -292,6 +292,33 @@ class TattooQuoteFlowTest extends TestCase
         $this->assertDatabaseHas('tattoo_quotes', ['tattoo_request_id' => $request->id, 'amount_min' => 350]);
     }
 
+    public function test_quote_list_displays_received_time_in_company_timezone(): void
+    {
+        $company = $this->createSchedulingCompany([
+            'business_profile' => CompanyProfile::TattooStudio,
+            'timezone' => 'America/Sao_Paulo',
+        ]);
+        $user = $this->createCompanyUser($company);
+        $this->authenticateForAppTenant($user, $company);
+        $client = Client::factory()->forCompany($company)->create();
+        $request = new TattooRequest([
+            'client_id' => $client->id,
+            'description' => 'Flor pequena',
+            'body_placement' => 'Braço',
+            'source' => 'manual',
+            'status' => 'awaiting_review',
+        ]);
+        $request->company_id = $company->id;
+        $request->save();
+        $request->created_at = '2026-09-30 21:10:00';
+        $request->save();
+
+        $this->get(TattooRequestResource::getUrl('index'))
+            ->assertOk()
+            ->assertSee('30/09/2026 18:10')
+            ->assertDontSee('30/09/2026 21:10');
+    }
+
     public function test_approving_quote_redirects_to_appointment_and_downloads_pdf(): void
     {
         $company = $this->createSchedulingCompany(['business_profile' => CompanyProfile::TattooStudio]);
