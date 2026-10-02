@@ -27,6 +27,8 @@ class EvolutionApiClient
 
         $number = $this->toWhatsAppNumber($phoneDigits);
 
+        app(WhatsAppHumanTakeover::class)->rememberBotSend($instance, $phoneDigits, $message);
+
         $response = $this->http()
             ->acceptJson()
             ->timeout(20)
@@ -60,6 +62,8 @@ class EvolutionApiClient
         }
 
         $number = $this->toWhatsAppNumber($phoneDigits);
+
+        app(WhatsAppHumanTakeover::class)->rememberBotSend($instance, $phoneDigits, $caption);
         $mimeType = strtolower(trim($mimeType));
 
         if (! in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp'], true)) {

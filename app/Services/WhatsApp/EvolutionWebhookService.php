@@ -41,6 +41,8 @@ class EvolutionWebhookService
      */
     protected function maybeDispatchInboundBot(EvolutionWebhookEvent $event, array $payload): void
     {
+        $this->maybePauseBotForManualReply($event, $payload);
+
         if (! $this->isInboundUserMessage($payload)) {
             return;
         }
@@ -149,6 +151,56 @@ class EvolutionWebhookService
         }
 
         return null;
+    }
+
+    /**
+     * Mensagem enviada pelo proprio WhatsApp da empresa (celular, Web) que nao
+     * foi o sistema que mandou: alguem da equipe assumiu, entao o bot se cala.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function maybePauseBotForManualReply(EvolutionWebhookEvent $event, array $payload): void
+    {
+        $eventName = strtolower((string) Arr::get($payload, 'event'));
+
+        if (! in_array($eventName, ['messages.upsert', 'messages-upsert'], true)) {
+            return;
+        }
+
+        $fromMe = Arr::get($payload, 'data.key.fromMe')
+            ?? Arr::get($payload, 'data.0.key.fromMe')
+            ?? Arr::get($payload, 'key.fromMe');
+
+        if (! ($fromMe === true || $fromMe === 1 || $fromMe === '1' || $fromMe === 'true')) {
+            return;
+        }
+
+        $remoteJid = (string) ($event->remote_jid ?? '');
+        $instance = (string) ($event->instance ?? '');
+
+        if ($remoteJid === '' || $instance === '' || str_ends_with($remoteJid, '@g.us') || str_starts_with($remoteJid, 'status@')) {
+            return;
+        }
+
+        $phone = $this->extractPhone($remoteJid);
+
+        if ($phone === '') {
+            return;
+        }
+
+        $takeover = app(WhatsAppHumanTakeover::class);
+
+        if ($takeover->isBotEcho($instance, $phone, $this->extractText($payload), $event->message_id)) {
+            return;
+        }
+
+        $takeover->pause($instance, $phone);
+
+        Log::info('WhatsApp bot paused: business replied manually.', [
+            'instance' => $instance,
+            'phone' => $phone,
+            'minutes' => $takeover->minutes(),
+        ]);
     }
 
     protected function extractPhone(string $remoteJid): string

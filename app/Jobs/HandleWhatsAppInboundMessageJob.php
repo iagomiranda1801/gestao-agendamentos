@@ -13,6 +13,7 @@ use App\Services\Tattoo\TattooWhatsAppBotService;
 use App\Services\WhatsApp\Bot\WhatsAppBookingBotService;
 use App\Services\WhatsApp\Bot\WhatsAppOrderLinkBotService;
 use App\Services\WhatsApp\EvolutionApiClient;
+use App\Services\WhatsApp\WhatsAppHumanTakeover;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -40,6 +41,10 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
         WhatsAppOrderLinkBotService $orderLinkBot,
     ): void {
         if (trim($this->phone) === '' || trim($this->instanceName) === '') {
+            return;
+        }
+
+        if ($this->humanIsHandlingConversation()) {
             return;
         }
 
@@ -118,6 +123,20 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
         $this->sendReply($company, $client, $reply);
     }
 
+    protected function humanIsHandlingConversation(): bool
+    {
+        if (! app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone)) {
+            return false;
+        }
+
+        Log::info('WhatsApp bot: skipped, business is replying manually.', [
+            'instance' => $this->instanceName,
+            'phone' => $this->phone,
+        ]);
+
+        return true;
+    }
+
     protected function resolveCompany(?CompanyWhatsAppInstance $instance): ?Company
     {
         if ($instance instanceof CompanyWhatsAppInstance) {
@@ -160,6 +179,10 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
     protected function sendReply(Company $company, EvolutionApiClient $client, ?string $reply): void
     {
         if ($reply === null || trim($reply) === '') {
+            return;
+        }
+
+        if ($this->humanIsHandlingConversation()) {
             return;
         }
 

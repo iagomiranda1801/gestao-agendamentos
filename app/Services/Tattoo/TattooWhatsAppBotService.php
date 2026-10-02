@@ -169,20 +169,29 @@ class TattooWhatsAppBotService
         }
 
         if ($state === State::TattooName) {
-            if (mb_strlen($text) < 2 || mb_strlen($text) > 120 || $this->isGreeting($normalized)) {
-                return $this->reply($conversation, $messageId, 'Como posso te chamar? Pode ser só seu primeiro nome.');
+            $name = $this->extractName($text, $normalized);
+            if ($name === null && empty($data['name_retry'])) {
+                $data['name_retry'] = true;
+                if (! isset($data['description']) && ($description = $this->initialDescription($text)) !== null) {
+                    $data['description'] = $description;
+                }
+                $conversation->data = $data;
+
+                return $this->reply($conversation, $messageId, "Antes de seguir, como posso te chamar? Pode ser s\u{00F3} seu primeiro nome.");
             }
-            $data['name'] = $text;
+            unset($data['name_retry']);
+            $data['name'] = $name ?? 'Cliente WhatsApp '.substr($phone, -4);
+            $prazer = $name !== null ? "Prazer, {$name}! " : 'Tudo bem! ';
             $conversation->state = State::TattooDescription;
             $conversation->data = $data;
 
             if (isset($data['description'])) {
                 $conversation->state = State::TattooPlacement;
 
-                return $this->reply($conversation, $messageId, "Prazer, {$text}! Em que parte do corpo você pensa em fazer essa tatuagem?");
+                return $this->reply($conversation, $messageId, $prazer."Em que parte do corpo você pensa em fazer essa tatuagem?");
             }
 
-            return $this->reply($conversation, $messageId, "Prazer, {$text}! Me conta como você imagina a tatuagem. Pode falar do desenho, estilo e cores do seu jeito.");
+            return $this->reply($conversation, $messageId, $prazer."Me conta como você imagina a tatuagem. Pode falar do desenho, estilo e cores do seu jeito.");
         }
         if ($state === State::TattooDescription) {
             if (mb_strlen($text) < 5 || mb_strlen($text) > 3000) {
@@ -316,6 +325,33 @@ class TattooWhatsAppBotService
     protected function isGreeting(string $normalized): bool
     {
         return (bool) preg_match('/^(oi+|ola|opa|e ai|eae|bom dia|boa tarde|boa noite|tudo bem)(,? tudo bem)?[!.? ]*$/u', $normalized);
+    }
+
+    /**
+     * Extrai um nome de verdade da resposta. Frases como "quero fazer uma
+     * tattoo" ou "quanto custa?" nao viram nome do cliente.
+     */
+    protected function extractName(string $text, string $normalized): ?string
+    {
+        if ($this->isGreeting($normalized) || str_contains($text, '?')) {
+            return null;
+        }
+
+        $candidate = trim($text);
+        $candidate = (string) preg_replace('/^(?:(?:oi+|ol[aá]|opa|bom dia|boa tarde|boa noite)[,!.\s]+)?(?:(?:o\s+)?meu nome [eé]|me chamo|pode me chamar de|me chama de|aqui [eé] (?:o|a)|sou (?:o|a)|sou|[eé] (?:o|a))\s+/iu', '', $candidate);
+        $candidate = trim((string) preg_replace('/[\s!.,;:]+$/u', '', $candidate));
+
+        if (mb_strlen($candidate) < 2 || mb_strlen($candidate) > 60
+            || ! preg_match('/^\p{L}[\p{L}\'\-]*(?:\s+\p{L}[\p{L}\'\-]*){0,3}$/u', $candidate)) {
+            return null;
+        }
+
+        $ascii = Str::lower(Str::ascii($candidate));
+        if (preg_match('/\b(quero|queria|gostaria|preciso|tatuagem|tattoo|tatuar|tatoo|orcamento|preco|valor|quanto|custa|agendar|agenda|horario|marcar|fazer|desenho|braco|perna|costas|obrigad[oa]|sim|nao|ok|blz|beleza|tudo|bem|aqui|voces|vcs|voce|vc|informacao|informacoes|duvida|menu|atendente|humano)\b/u', $ascii)) {
+            return null;
+        }
+
+        return $candidate === Str::lower($candidate) ? mb_convert_case($candidate, MB_CASE_TITLE, 'UTF-8') : $candidate;
     }
 
     protected function initialDescription(string $text): ?string
