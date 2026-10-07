@@ -99,7 +99,7 @@ class TattooAIFlowTest extends TestCase
 
         $this->send($company, $instance, $phone, 'Quero uma rosa', 'name-1');
         $this->assertDatabaseCount('clients', 0);
-        $this->assertSame('Olá! Como posso te chamar?', TattooAiMessage::query()
+        $this->assertSame('Opa, tudo bem? Qual seu nome?', TattooAiMessage::query()
             ->where('provider_message_id', 'reply:name-1')->firstOrFail()->body);
 
         $this->send($company, $instance, $phone, 'Ana Maria', 'name-2');
@@ -122,7 +122,7 @@ class TattooAIFlowTest extends TestCase
         });
         $this->send($company, $instance, $phone, 'Oi', 'unknown');
         $this->assertDatabaseCount('tattoo_requests', 0);
-        $this->assertStringContainsString('encaminhar', TattooAiMessage::query()->where('direction', 'out')->firstOrFail()->body);
+        $this->assertStringContainsString('chamar o pessoal', TattooAiMessage::query()->where('direction', 'out')->firstOrFail()->body);
 
     }
 
@@ -288,7 +288,7 @@ class TattooAIFlowTest extends TestCase
         $this->send($company, $instance, $phone, 'Quanto custa?', 'price-1');
         $reply = TattooAiMessage::query()->where('provider_message_id', 'reply:price-1')->firstOrFail()->body;
         $this->assertStringNotContainsString('R$ 500', $reply);
-        $this->assertStringContainsString('Como posso te chamar?', $reply);
+        $this->assertStringContainsString('Qual seu nome?', $reply);
     }
 
     public function test_receipt_analysis_never_confirms_payment_and_human_review_does(): void

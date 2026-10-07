@@ -68,8 +68,8 @@ class TattooAIConversationService
                     ['company_id' => $company->id, 'direction' => 'out', 'status' => 'pending', 'body' => mb_substr($reply, 0, 4000)],
                 );
                 if ($out->status === 'pending') {
-                    $handoffAcknowledgement = str_starts_with($out->body, 'Vou encaminhar sua conversa')
-                        || str_starts_with($out->body, 'Certo. Encaminhei');
+                    $handoffAcknowledgement = str_starts_with($out->body, 'Beleza, vou chamar o pessoal')
+                        || str_starts_with($out->body, 'Fechou, já chamei o pessoal');
                     if (($conversation->fresh()->human_takeover && ! $handoffAcknowledgement)
                         || app(WhatsAppHumanTakeover::class)->isPaused($instance->instance_name, $phone)) {
                         $out->update(['status' => 'suppressed']);
@@ -108,7 +108,7 @@ class TattooAIConversationService
         if (preg_match('/\b(atendente|humano|pessoa da equipe)\b/u', $normalized)) {
             $conversation->update(['human_takeover' => true, 'status' => 'human_takeover']);
 
-            return 'Certo. Encaminhei a conversa para a equipe.';
+            return 'Fechou, já chamei o pessoal do estúdio pra falar com você.';
         }
         if ($quote && $quote->sent_at && $request->status === 'quote_sent'
             && preg_match('/^(aceito|aprovado|pode seguir|fechado|concordo|sim)[!. ]*$/u', $normalized)) {
@@ -119,7 +119,7 @@ class TattooAIConversationService
             if ((float) $quote->deposit_amount <= 0) {
                 $conversation->update(['status' => 'ready_to_schedule']);
 
-                return 'Orçamento aceito. Vamos combinar seu horário com o tatuador.';
+                return 'Fechado! Agora é só combinar o melhor horário com o tatuador.';
             }
             $conversation->update(['status' => 'waiting_payment_receipt']);
 
@@ -133,8 +133,8 @@ class TattooAIConversationService
                 $conversation->update(['status' => 'receipt_received']);
 
                 return $receipt->receipt_analysis_status === 'compatible'
-                    ? 'Recebi seu comprovante ✅ Ele foi encaminhado para conferência. Assim que o sinal for confirmado, seguimos com seu agendamento.'
-                    : 'Recebi o comprovante, mas não consegui validar algumas informações. Vou encaminhá-lo para conferência.';
+                    ? 'Recebi o comprovante! Vou conferir aqui e já te falo.'
+                    : 'Recebi o comprovante, mas não consegui ler tudo direitinho. Vou conferir aqui e já te falo.';
             } catch (\Throwable $exception) {
                 Log::warning('Tattoo receipt processing failed.', ['company_id' => $conversation->company_id,
                     'conversation_id' => $conversation->id, 'message_id' => $message->provider_message_id,
@@ -146,43 +146,43 @@ class TattooAIConversationService
             return $this->pixMessage($conversation, $quote);
         }
         if ($conversation->status === 'receipt_received') {
-            return 'Seu comprovante está aguardando conferência da equipe. Avisaremos quando o sinal for confirmado.';
+            return 'Seu comprovante tá na conferência. Assim que confirmar o sinal, te aviso aqui.';
         }
         if (in_array($conversation->status, ['payment_confirmed', 'ready_to_schedule'], true)) {
             $slots = $this->scheduling->slots($conversation);
             if ($slots === []) {
-                return 'A equipe vai combinar seu horário com o tatuador.';
+                return 'Vou ver com o tatuador o melhor horário e já te chamo.';
             }
             $selected = preg_match('/\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}\b/', $text, $match) ? $match[0] : null;
             if ($selected !== null) {
                 try {
                     $this->scheduling->book($conversation, $selected);
 
-                    return 'Agendamento criado para '.date('d/m/Y H:i', strtotime($selected)).'. A equipe poderá acompanhar os detalhes.';
+                    return 'Fechado, ficou marcado pra '.date('d/m/Y H:i', strtotime($selected)).'. Qualquer coisa é só chamar aqui!';
                 } catch (ValidationException) {
-                    return 'Esse horário não está mais disponível. Escolha uma das opções atuais: '.implode(', ', $slots).'.';
+                    return 'Esse horário acabou de sair. Tenho estes: '.implode(', ', $slots).'.';
                 }
             }
 
-            return 'Horários disponíveis: '.implode(', ', $slots).'. Responda com uma data e hora exatamente como acima.';
+            return 'Tenho estes horários: '.implode(', ', $slots).'. Me responde com a data e a hora igualzinho tá aí em cima que eu já marco.';
         }
         if ($conversation->status === 'converted_to_appointment') {
-            return 'Seu agendamento já foi criado. A equipe pode ajudar com qualquer ajuste.';
+            return 'Seu horário já tá marcado! Se precisar mudar algo, é só falar.';
         }
         if ($message->media_mime !== null && $request) {
             $this->attachReference($conversation, $request, $message);
 
-            return 'Recebi a referência. O tatuador poderá vê-la junto do seu pedido.';
+            return 'Boa, recebi a referência! Ajuda muito.';
         }
         if ($quote && ! $quote->accepted_at) {
             return $quote->sent_at
-                ? 'Seu orçamento já foi enviado. Se concordar, pode responder *aceito*. Se quiser conversar sobre ele, encaminho para a equipe.'
-                : 'O tatuador está preparando seu orçamento. Avisaremos assim que ele estiver pronto.';
+                ? 'Te mandei o orçamento ali em cima. Se curtir, é só responder *aceito* que a gente segue 😉'
+                : 'O tatuador ainda tá montando seu orçamento. Assim que ficar pronto, te mando aqui.';
         }
         if ($message->media_mime !== null && $request === null) {
             $this->storeEarlyReference($conversation, $message);
 
-            return 'Recebi a imagem de referência. Qual o desenho, a parte do corpo e o tamanho aproximado?';
+            return 'Boa, recebi a referência! Me conta um pouco da ideia: o desenho, onde no corpo e mais ou menos o tamanho.';
         }
         if ($request && in_array($request->status, ['awaiting_review', 'in_review'], true)) {
             return 'Seu pedido está com o tatuador para análise. Avisaremos quando houver um orçamento.';
@@ -207,12 +207,12 @@ class TattooAIConversationService
             Log::warning('Tattoo AI rejected unknown action.', ['company_id' => $conversation->company_id,
                 'conversation_id' => $conversation->id, 'action' => is_scalar($action) ? $action : 'invalid']);
 
-            return 'Vou encaminhar sua dúvida para a equipe.';
+            return 'Beleza, vou chamar o pessoal do estúdio pra te ajudar com isso.';
         }
         if ($action === 'handoff') {
             $conversation->update(['human_takeover' => true, 'status' => 'human_takeover']);
 
-            return 'Vou encaminhar sua conversa para a equipe.';
+            return 'Beleza, vou chamar o pessoal do estúdio pra falar com você.';
         }
         $details = validator($result['details'] ?? [], [
             'name' => ['nullable', 'string', 'min:2', 'max:100'],
@@ -233,12 +233,12 @@ class TattooAIConversationService
             $this->saveClient($conversation, $data['name']);
         }
         if (empty($data['name'])) {
-            return 'Olá! Como posso te chamar?';
+            return 'Opa, tudo bem? Qual seu nome?';
         }
         if ($request === null && ! empty($data['description']) && ! empty($data['body_placement']) && ! empty($data['size_description'])) {
             $this->createRequest($conversation, $data);
 
-            return 'Anotei sua ideia e encaminhei o pedido para o tatuador preparar o orçamento. Não definimos valores automaticamente.';
+            return 'Show, '.$this->firstName($data['name']).'! Já passei sua ideia pro tatuador. Ele dá uma olhada e te manda o orçamento por aqui 🤙';
         }
         $reply = trim((string) ($result['reply'] ?? ''));
         if (preg_match('/R\$\s*\d|\b\d+(?:[.,]\d+)?\s*(?:reais|real)\b|\b(pagamento|sinal)\s+(foi\s+)?confirmado\b|\b\d{1,2}(?::\d{2}|h\d{0,2})\b/iu', $reply)) {
@@ -253,7 +253,11 @@ class TattooAIConversationService
         $company = $conversation->company;
         $custom = $company->schedulingSetting?->tattoo_ai_prompt;
 
-        return "Você atende clientes de tatuagem do estabelecimento {$company->name}. Responda em português brasileiro, curto e cordial. "
+        return "Você conversa pelo WhatsApp em nome do estúdio de tatuagem {$company->name}, como alguém da equipe falando com o cliente. "
+            .'Escreva em português brasileiro do jeito que um tatuador conversa: informal, próximo e animado com a ideia, com frases curtas e uma pergunta por vez. '
+            .'Use "você"; pode usar expressões como "show", "massa", "top" e "fechou", e no máximo um emoji de vez em quando. Comente a ideia do cliente com interesse genuíno quando fizer sentido. '
+            .'Evite tom de central de atendimento: não use "prezado", "informe", "seu atendimento", "encaminhar", "aguarde" nem listas. '
+            .'Não se apresente como robô ou assistente virtual; se o cliente perguntar diretamente se é robô, seja honesto: diga que é o assistente do estúdio e que o tatuador acompanha a conversa. '
             .'Retorne JSON com action (ask, save_details, request_approval ou handoff), details e reply. '
             .'Peça o nome logo no início. Só preencha details.name quando o cliente informar o próprio nome explicitamente; nunca deduza o nome de uma ideia de tatuagem. '
             .'Colete desenho, local do corpo e tamanho aos poucos; aproveite o que já foi informado. '
@@ -263,13 +267,18 @@ class TattooAIConversationService
             .($custom ? 'Orientações do estabelecimento: '.mb_substr($custom, 0, 3000) : '');
     }
 
+    protected function firstName(string $name): string
+    {
+        return explode(' ', trim($name))[0] ?: trim($name);
+    }
+
     protected function nextQuestion(array $data): string
     {
         return match (true) {
-            empty($data['name']) => 'Como posso te chamar?',
-            empty($data['description']) => 'Como você imagina a tatuagem?',
-            empty($data['body_placement']) => 'Em qual parte do corpo será a tatuagem?',
-            default => 'Qual o tamanho aproximado, em centímetros?',
+            empty($data['name']) => 'Qual seu nome?',
+            empty($data['description']) => 'Me conta como você imagina a tattoo?',
+            empty($data['body_placement']) => 'Massa! E vai ser em qual parte do corpo?',
+            default => 'E mais ou menos de que tamanho? Pode ser em cm mesmo.',
         };
     }
 
@@ -397,16 +406,16 @@ class TattooAIConversationService
     protected function pixMessage(TattooAiConversation $conversation, TattooQuote $quote): string
     {
         if (! $quote->accepted_at || (float) $quote->deposit_amount <= 0) {
-            return 'A equipe vai confirmar os detalhes do sinal antes de enviar o PIX.';
+            return 'Vou confirmar os detalhes do sinal e já te mando o PIX.';
         }
         $account = $this->receipts->pixAccount($conversation->company_id);
         if (! $account || ! $account->pix_recipient_name) {
-            return 'A equipe vai enviar os dados do PIX para você em breve.';
+            return 'Já já te mando os dados do PIX por aqui.';
         }
 
         return 'Sinal: R$ '.number_format((float) $quote->deposit_amount, 2, ',', '.')
             ."\nChave PIX: {$account->pix_key}\nFavorecido: {$account->pix_recipient_name}"
             .($account->bank_name ? "\nBanco: {$account->bank_name}" : '')
-            ."\nDepois de pagar, envie o comprovante por aqui. A equipe conferirá o recebimento.";
+            ."\nDepois que pagar, me manda o comprovante aqui que eu confiro.";
     }
 }
