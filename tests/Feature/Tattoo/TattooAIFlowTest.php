@@ -17,6 +17,7 @@ use App\Models\TattooRequest;
 use App\Services\Tattoo\TattooAIConversationService;
 use App\Services\Tattoo\TattooAISchedulingService;
 use App\Services\Tattoo\TattooReceiptService;
+use App\Services\WhatsApp\WhatsAppHumanTakeover;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -236,6 +237,27 @@ class TattooAIFlowTest extends TestCase
 
         $this->assertDatabaseCount('clients', 1);
         $this->assertSame($client->id, $conversation->fresh()->client_id);
+    }
+
+    public function test_chat_shows_external_pause_and_can_resume_ai(): void
+    {
+        [$company, $instance, $phone] = $this->setupAI();
+        $user = $this->createCompanyUser($company);
+        $conversation = TattooAiConversation::query()->create(['company_id' => $company->id,
+            'company_whatsapp_instance_id' => $instance->id, 'phone_normalized' => $phone,
+            'remote_jid' => $phone.'@s.whatsapp.net']);
+        app(WhatsAppHumanTakeover::class)->pause($instance->instance_name, $phone);
+        $this->authenticateForAppTenant($user, $company);
+
+        Livewire::test(ViewTattooAiConversation::class, ['record' => $conversation->id])
+            ->assertSee('IA pausada pelo WhatsApp')
+            ->assertActionVisible('resume_ai')
+            ->callAction('resume_ai')
+            ->assertHasNoActionErrors()
+            ->assertSee('IA atendendo');
+
+        $this->assertFalse(app(WhatsAppHumanTakeover::class)->isPaused($instance->instance_name, $phone));
+        $this->assertFalse($conversation->fresh()->human_takeover);
     }
 
     public function test_gemini_failure_keeps_incoming_message_for_retry(): void

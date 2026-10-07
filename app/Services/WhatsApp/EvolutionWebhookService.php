@@ -67,6 +67,8 @@ class EvolutionWebhookService
 
         $text = $this->extractText($payload);
 
+        app(WhatsAppHumanTakeover::class)->rememberInbound($instance, $phone);
+
         HandleWhatsAppInboundMessageJob::dispatch(
             instanceName: $instance,
             remoteJid: $remoteJid,
@@ -191,6 +193,15 @@ class EvolutionWebhookService
         $takeover = app(WhatsAppHumanTakeover::class);
 
         if ($takeover->isBotEcho($instance, $phone, $this->extractText($payload), $event->message_id)) {
+            return;
+        }
+
+        if ($takeover->isLikelyAutomaticReply($instance, $phone)) {
+            Log::info('WhatsApp bot not paused: outgoing message looks like a WhatsApp Business automatic reply.', [
+                'instance' => $instance,
+                'phone' => $phone,
+            ]);
+
             return;
         }
 

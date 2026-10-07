@@ -8,6 +8,7 @@ use App\Models\TattooAiMessage;
 use App\Models\WhatsAppContact;
 use App\Services\Tattoo\TattooConversationTakeoverService;
 use App\Services\Tattoo\TattooManualReplyService;
+use App\Services\WhatsApp\WhatsAppHumanTakeover;
 use App\Support\PhoneNormalizer;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
@@ -105,9 +106,16 @@ class ViewTattooAiConversation extends ViewRecord
                     $this->getRecord()->refresh();
                     Notification::make()->success()->title('Atendimento assumido e cliente vinculado.')->send();
                 }),
-            Action::make('resume_ai')->label('Devolver para IA')->requiresConfirmation()
-                ->visible(fn () => $this->canManageConversation() && $this->getRecord()->human_takeover)
-                ->action(fn () => $this->getRecord()->update(['human_takeover' => false, 'status' => 'collecting_information'])),
+            Action::make('resume_ai')->label('Retomar IA')->requiresConfirmation()
+                ->visible(fn () => $this->canManageConversation() && ($this->getRecord()->human_takeover || $this->isExternallyPaused()))
+                ->modalDescription('A IA voltará a responder às próximas mensagens do cliente.')
+                ->action(function (): void {
+                    abort_unless($this->canManageConversation(), 403);
+                    $conversation = $this->getRecord();
+                    app(WhatsAppHumanTakeover::class)->resume($conversation->instance->instance_name, $conversation->phone_normalized);
+                    $conversation->update(['human_takeover' => false, 'status' => 'collecting_information']);
+                    Notification::make()->success()->title('IA retomada para as próximas mensagens.')->send();
+                }),
         ];
     }
 
@@ -135,6 +143,13 @@ class ViewTattooAiConversation extends ViewRecord
         return $contact && filled($contact->name) && ! $this->isPlaceholderName($contact->name)
             && PhoneNormalizer::normalize($contact->name) !== PhoneNormalizer::normalize($conversation->phone_normalized)
             ? trim((string) $contact->name) : '';
+    }
+
+    public function isExternallyPaused(): bool
+    {
+        $conversation = $this->getRecord();
+
+        return app(WhatsAppHumanTakeover::class)->isPaused($conversation->instance->instance_name, $conversation->phone_normalized);
     }
 
     protected function isPlaceholderName(string $name): bool

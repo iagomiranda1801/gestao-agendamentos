@@ -71,6 +71,48 @@ class WhatsAppHumanTakeover
         return $key !== null && Cache::has($this->pauseKey($instance, $key));
     }
 
+    public function resume(string $instance, string $phone): void
+    {
+        $key = $this->phoneKey($phone);
+
+        if ($key !== null) {
+            Cache::forget($this->pauseKey($instance, $key));
+        }
+    }
+
+    /**
+     * Guarda quando o cliente mandou a ultima mensagem, para reconhecer as
+     * respostas automaticas do WhatsApp Business (saudacao e ausencia), que
+     * saem do numero da empresa logo em seguida.
+     */
+    public function rememberInbound(string $instance, string $phone): void
+    {
+        $key = $this->phoneKey($phone);
+
+        if ($key !== null) {
+            Cache::put($this->inboundKey($instance, $key), now()->getTimestamp(), now()->addMinutes(10));
+        }
+    }
+
+    public function isLikelyAutomaticReply(string $instance, string $phone): bool
+    {
+        $key = $this->phoneKey($phone);
+        $grace = (int) config('services.evolution.auto_reply_grace_seconds', 20);
+
+        if ($key === null || $grace <= 0) {
+            return false;
+        }
+
+        $last = Cache::get($this->inboundKey($instance, $key));
+
+        return is_numeric($last) && now()->getTimestamp() - (int) $last <= $grace;
+    }
+
+    protected function inboundKey(string $instance, string $phoneKey): string
+    {
+        return "wa:last-inbound:{$instance}:{$phoneKey}";
+    }
+
     public function minutes(): int
     {
         return (int) config('services.evolution.human_takeover_minutes', 120);

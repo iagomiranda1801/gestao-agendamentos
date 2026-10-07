@@ -42,6 +42,8 @@ return [
         'webhook_token' => env('EVOLUTION_WEBHOOK_TOKEN'),
         // Minutos que o bot fica em silencio numa conversa depois que a empresa responde manualmente.
         'human_takeover_minutes' => (int) env('WHATSAPP_HUMAN_TAKEOVER_MINUTES', 120),
+        // Mensagens da empresa que saem logo depois da mensagem do cliente (saudacao/ausencia automatica do WhatsApp Business) nao pausam o bot.
+        'auto_reply_grace_seconds' => (int) env('WHATSAPP_AUTO_REPLY_GRACE_SECONDS', 20),
         'outbound' => [
             'min_interval_seconds' => (int) env('EVOLUTION_OUTBOUND_MIN_INTERVAL', 30),
             'max_interval_seconds' => (int) env('EVOLUTION_OUTBOUND_MAX_INTERVAL', 45),

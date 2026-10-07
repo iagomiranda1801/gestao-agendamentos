@@ -12,13 +12,16 @@ use App\Filament\App\Resources\TattooRequests\Pages\ListTattooRequests;
 use App\Models\Professional;
 use App\Models\TattooRequest;
 use App\Services\Company\CompanyPermissionService;
+use App\Services\Tattoo\TattooRequestDeletionService;
 use App\Support\CompanyDateTime;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -140,6 +143,18 @@ class TattooRequestResource extends Resource
             TextColumn::make('status')->label('Status')->badge()->formatStateUsing(fn (string $state) => self::statuses()[$state] ?? $state),
         ])->filters([
             SelectFilter::make('status')->options(self::statuses()),
+        ])->recordActions([
+            Action::make('delete_request')->label('Excluir')->icon('heroicon-o-trash')->color('danger')
+                ->visible(fn (): bool => self::canManageRequests())
+                ->disabled(fn (TattooRequest $record): bool => app(TattooRequestDeletionService::class)->blockReason($record) !== null)
+                ->tooltip(fn (TattooRequest $record): ?string => app(TattooRequestDeletionService::class)->blockReason($record))
+                ->requiresConfirmation()->modalHeading('Excluir pedido de orçamento?')
+                ->modalDescription('O pedido, os orçamentos em rascunho e as fotos vinculadas serão excluídos. O cliente será mantido. Se houver conversa com IA, ela ficará sob atendimento humano.')
+                ->action(function (TattooRequest $record): void {
+                    abort_unless(self::canManageRequests(), 403);
+                    app(TattooRequestDeletionService::class)->delete(Filament::getTenant(), $record);
+                    Notification::make()->success()->title('Pedido de orçamento excluído.')->send();
+                }),
         ])->recordUrl(fn (TattooRequest $record) => self::getUrl('edit', ['record' => $record]));
     }
 

@@ -13,7 +13,9 @@ use App\Models\TattooQuote;
 use App\Services\Tattoo\TattooImageService;
 use App\Services\Tattoo\TattooQuoteService;
 use App\Services\Tattoo\TattooReceiptService;
+use App\Services\Tattoo\TattooRequestDeletionService;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -29,6 +31,18 @@ class EditTattooRequest extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('delete_request')->label('Excluir pedido')->icon('heroicon-o-trash')->color('danger')
+                ->visible(fn (): bool => TattooRequestResource::canManageRequests())
+                ->disabled(fn (): bool => app(TattooRequestDeletionService::class)->blockReason($this->getRecord()) !== null)
+                ->tooltip(fn (): ?string => app(TattooRequestDeletionService::class)->blockReason($this->getRecord()))
+                ->requiresConfirmation()->modalHeading('Excluir pedido de orçamento?')
+                ->modalDescription('O pedido, os orçamentos em rascunho e as fotos vinculadas serão excluídos. O cliente será mantido. Se houver conversa com IA, ela ficará sob atendimento humano.')
+                ->action(function (): void {
+                    abort_unless(TattooRequestResource::canManageRequests(), 403);
+                    app(TattooRequestDeletionService::class)->delete(Filament::getTenant(), $this->getRecord());
+                    Notification::make()->success()->title('Pedido de orçamento excluído.')->send();
+                    $this->redirect(TattooRequestResource::getUrl('index'));
+                }),
             Action::make('add_image')->label('Adicionar foto')->schema([
                 FileUpload::make('image')->label('Foto')->storeFiles(false)->image()->acceptedFileTypes(['image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/webp'])->maxSize(10240)->required(),
             ])->action(function (array $data): void {

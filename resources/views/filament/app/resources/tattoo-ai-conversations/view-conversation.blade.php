@@ -8,6 +8,7 @@
     $quote = $request?->quotes->sortByDesc('version')->first();
     $messages = $this->getChatMessages();
     $timezone = CompanyDateTime::timezone($conversation->company);
+    $externallyPaused = $this->isExternallyPaused();
     $statusLabels = [
         'collecting_information' => 'Coletando informações',
         'waiting_professional_quote' => 'Aguardando orçamento',
@@ -29,8 +30,8 @@
                     <strong>{{ $conversation->client?->name ?: 'Cliente WhatsApp' }}</strong>
                     <span>{{ $conversation->phone_normalized }}</span>
                 </div>
-                <span class="tattoo-chat-mode {{ $conversation->human_takeover ? 'is-human' : 'is-ai' }}">
-                    {{ $conversation->human_takeover ? 'Equipe atendendo' : 'IA atendendo' }}
+                <span class="tattoo-chat-mode {{ $conversation->human_takeover ? 'is-human' : ($externallyPaused ? 'is-paused' : 'is-ai') }}">
+                    {{ $conversation->human_takeover ? 'Equipe atendendo' : ($externallyPaused ? 'IA pausada pelo WhatsApp' : 'IA atendendo') }}
                 </span>
             </header>
 
@@ -93,7 +94,13 @@
                         </div>
                     </form>
                 @else
-                    <div class="tattoo-chat-composer-locked">A IA está atendendo. Use <strong>Assumir atendimento</strong> para responder como equipe.</div>
+                    <div class="tattoo-chat-composer-locked">
+                        @if ($externallyPaused)
+                            A IA está pausada por uma mensagem enviada no WhatsApp da empresa. Use <strong>Retomar IA</strong> para responder às próximas mensagens, ou <strong>Assumir atendimento</strong> para responder pela equipe.
+                        @else
+                            A IA está atendendo. Use <strong>Assumir atendimento</strong> para responder como equipe.
+                        @endif
+                    </div>
                 @endif
             </footer>
         </section>

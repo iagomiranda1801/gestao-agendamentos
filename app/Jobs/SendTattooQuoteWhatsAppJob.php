@@ -18,8 +18,8 @@ class SendTattooQuoteWhatsAppJob implements ShouldQueue
 
     public function handle(TattooQuoteService $quotes): void
     {
-        $quote = TattooQuote::query()->with('request.company')->findOrFail($this->quoteId);
-        if ($quote->sent_at !== null) {
+        $quote = TattooQuote::query()->with('request.company')->find($this->quoteId);
+        if (! $quote || $quote->sent_at !== null) {
             return;
         }
         if (! $this->deferUntilOutboundSlot($quote->request->company, WhatsAppOutboundKind::Confirmation)) {

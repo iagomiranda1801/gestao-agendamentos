@@ -52,7 +52,10 @@ class TattooQuoteService
     public function send(TattooQuote $quote): void
     {
         Cache::lock('tattoo-quote-send:'.$quote->getKey(), 60)->block(5, function () use ($quote): void {
-            $quote->refresh();
+            $quote = TattooQuote::query()->find($quote->getKey());
+            if (! $quote) {
+                return;
+            }
             $request = $quote->request->loadMissing(['client', 'company']);
             if ($quote->sent_at !== null) {
                 return;

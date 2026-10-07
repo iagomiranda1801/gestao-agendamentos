@@ -36,6 +36,24 @@ class HumanTakeoverTest extends TestCase
         $this->assertSame('human_takeover', WhatsAppBotConversation::query()->where('company_id', $company->id)->value('finished_reason'));
     }
 
+    public function test_whatsapp_business_greeting_right_after_customer_message_does_not_pause_bot(): void
+    {
+        Queue::fake();
+        $this->tattooCompany('tattoo-greeting');
+        $webhooks = app(EvolutionWebhookService::class);
+        $takeover = app(WhatsAppHumanTakeover::class);
+        $phone = '5511987654321';
+
+        $webhooks->handle($this->payload('tattoo-greeting', $phone, 'Oi', false, 'in-g1'));
+        $this->travel(2)->seconds();
+        $webhooks->handle($this->payload('tattoo-greeting', $phone, 'Seja bem-vindo(a)! Em breve responderemos.', true, 'out-g1'));
+        $this->assertFalse($takeover->isPaused('tattoo-greeting', $phone));
+
+        $this->travel(5)->minutes();
+        $webhooks->handle($this->payload('tattoo-greeting', $phone, 'Oi, aqui e o tatuador', true, 'out-g2'));
+        $this->assertTrue($takeover->isPaused('tattoo-greeting', $phone));
+    }
+
     public function test_messages_sent_by_the_system_do_not_pause_the_bot(): void
     {
         Queue::fake();
