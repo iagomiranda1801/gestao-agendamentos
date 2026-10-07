@@ -18,11 +18,13 @@ use App\Services\WhatsApp\EvolutionApiClient;
 use App\Support\CompanyDateTime;
 use App\Support\CustomerNameDetector;
 use App\Support\PhoneNormalizer;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Throwable;
 
 /**
  * Atendimento com IA para estética e salão: descobre o nome, o serviço, a
@@ -57,7 +59,23 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
         return 'Beauty AI';
     }
 
+    /**
+     * Nenhuma mensagem fica sem resposta: se algo inesperado acontecer (Gemini
+     * fora do ar, cota esgotada, JSON estranho, erro interno), a cliente recebe
+     * a próxima pergunta do fluxo e o motivo fica registrado no log.
+     */
     protected function process(TattooAiConversation $conversation, TattooAiMessage $message): ?string
+    {
+        try {
+            return $this->respond($conversation, $message);
+        } catch (Throwable $exception) {
+            $this->logFallback($conversation, $message, 'unexpected_error', $exception);
+
+            return $this->safeReply($conversation->fresh() ?? $conversation, $message);
+        }
+    }
+
+    protected function respond(TattooAiConversation $conversation, TattooAiMessage $message): ?string
     {
         $company = $conversation->company;
         $text = trim((string) $message->body);
@@ -101,9 +119,14 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
                 : null;
         }
 
+        $quick = $this->quickReply($conversation, $data, $text, $services);
+        if ($quick !== null) {
+            return $quick;
+        }
+
         $service = $this->currentService($data, $services);
         $professionals = $service ? $this->scheduling->professionals($company, $service) : collect();
-        $result = $this->askModel($conversation, $message, $this->systemPrompt($company), [
+        $result = $this->interpret($conversation, $message, $this->systemPrompt($company), [
             'today' => CompanyDateTime::nowLocal($company)->format('Y-m-d').' ('.Weekday::from(CompanyDateTime::nowLocal($company)->dayOfWeek)->label().')',
             'catalog' => ['services' => $services->map(fn (Service $item) => ['id' => $item->id, 'name' => $item->name,
                 'description' => $item->description ? mb_substr((string) $item->description, 0, 200) : null])->values()->all()],
@@ -116,9 +139,18 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
             'recent_messages' => $this->recentMessages($conversation),
             'current_message' => $text,
         ]);
-        $action = $this->allowedAction($conversation, $result, self::ACTIONS);
-        if ($action === null || $action === 'handoff') {
+        $action = $result !== null ? $this->allowedAction($conversation, $result, self::ACTIONS) : null;
+        if ($action === 'handoff') {
             return $this->handoff($conversation);
+        }
+        if ($action === null) {
+            // Gemini falhou ou devolveu algo fora do protocolo: segue o fluxo
+            // com o que dá pra entender sem IA, em vez de ficar em silêncio.
+            if ($result !== null) {
+                $this->logFallback($conversation, $message, 'invalid_action');
+            }
+            $result = ['action' => 'save_details', 'details' => $this->detailsWithoutModel($text, $services), 'reply' => ''];
+            $action = 'save_details';
         }
 
         $details = is_array($result['details'] ?? null) ? $result['details'] : [];
@@ -128,14 +160,14 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
         if (! empty($data['name']) && $data['name'] !== $nameBefore) {
             $this->saveClient($conversation, $data['name']);
         }
-        $greeting = ! empty($data['name']) && $data['name'] !== $nameBefore ? 'Prazer, '.$this->firstName($data['name']).'! ' : '';
+        $greeting = ! empty($data['name']) && $data['name'] !== $nameBefore ? 'Prazer, '.$this->displayFirstName($data['name']).'! ' : '';
 
         if ($action === 'confirm' && $conversation->status === 'awaiting_confirmation' && ! empty($data['selected_slot'])) {
             return $this->book($conversation, $data, $services);
         }
         if ($action === 'info') {
-            $answer = $this->infoAnswer($conversation, (string) ($details['info_topic'] ?? ''), $details, $services,
-                trim((string) ($result['reply'] ?? '')));
+            $answer = $this->infoAnswer($conversation, is_string($details['info_topic'] ?? null) ? $details['info_topic'] : '',
+                $details, $services, is_string($result['reply'] ?? null) ? trim($result['reply']) : '');
             if ($answer === null) {
                 return $this->handoff($conversation);
             }
@@ -152,16 +184,188 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
             return $this->prefixed($conversation, $answer."\n\n", $this->nextStep($conversation, $data, $services));
         }
 
-        $reply = trim((string) ($result['reply'] ?? ''));
+        $reply = is_string($result['reply'] ?? null) ? trim($result['reply']) : '';
         $reply = $reply !== '' && ! $this->mentionsUnverifiedFacts($reply) ? mb_substr($reply, 0, 600) : '';
         if ($action === 'ask' && $conversation->status === 'converted_to_appointment' && empty($data['service_id']) && ! empty($data['name'])) {
             return $reply !== '' ? $reply : 'Imagina! Qualquer coisa é só me chamar por aqui 😊';
         }
-        if ($action === 'ask' && $reply !== '' && ! empty($data['name']) && empty($data['service_id'])) {
+        // Texto livre do modelo só vale quando esclarece um serviço do catálogo
+        // (ex.: "manicure ou unha em gel?"); resposta genérica vira a pergunta do fluxo.
+        if ($action === 'ask' && $reply !== '' && ! empty($data['name']) && empty($data['service_id'])
+            && $this->mentionedServices($reply, $services)->isNotEmpty()) {
             return $greeting.$reply;
         }
 
         return $this->prefixed($conversation, $greeting, $this->nextStep($conversation, $data, $services));
+    }
+
+    /**
+     * Saudação, papo rápido ("bem e vc?") e "quero entender o serviço" têm
+     * resposta pronta, sem depender do Gemini.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  Collection<int, Service>  $services
+     */
+    protected function quickReply(TattooAiConversation $conversation, array $data, string $text, Collection $services): ?string
+    {
+        $normalized = trim((string) preg_replace('/\s+/u', ' ', Str::lower(Str::ascii($text))));
+        $intent = match (true) {
+            $this->isGreeting($normalized) => 'greeting',
+            $this->isSmallTalk($normalized) => 'small_talk',
+            empty($data['service_id']) && $this->asksAboutServices($normalized, $services) => 'services',
+            default => null,
+        };
+        if ($intent === null) {
+            return null;
+        }
+        Log::info('Beauty AI quick reply.', ['company_id' => $conversation->company_id,
+            'conversation_id' => $conversation->id, 'intent' => $intent]);
+
+        $name = ! empty($data['name']) ? $this->displayFirstName((string) $data['name']) : null;
+        if ($intent === 'services') {
+            $list = 'Claro! Aqui a gente faz '.$this->joinNames($services->pluck('name')->take(12)->all()).'.';
+            if ($name === null) {
+                $data['asked_name'] = true;
+                $conversation->update(['collected_data' => $data]);
+
+                return $list." Qual deles te interessa?\n\nSe quiser marcar, me fala também seu nome 😊";
+            }
+
+            return $list.' Qual deles te interessa, '.$name.'?';
+        }
+
+        $opening = $intent === 'greeting'
+            ? ($name !== null ? 'Oi, '.$name.'! Tudo bem? 😊 ' : 'Oi, tudo bem? 😊 ')
+            : 'Tudo ótimo por aqui, obrigada! 😊 ';
+        if ($name === null) {
+            $data['asked_name'] = true;
+            $conversation->update(['collected_data' => $data]);
+
+            return $opening.'Qual seu nome?';
+        }
+        if ($conversation->status === 'converted_to_appointment' && empty($data['service_id'])) {
+            return $opening.'Quer marcar mais algum horário? Aqui a gente faz '
+                .$this->joinNames($services->pluck('name')->take(8)->all()).'.';
+        }
+
+        return $this->prefixed($conversation, $opening, $this->nextStep($conversation, $data, $services));
+    }
+
+    protected function isGreeting(string $normalized): bool
+    {
+        return CustomerNameDetector::isGreeting($normalized)
+            || (bool) preg_match('/^(?:oi+e?|ola+|opa|oie|hey|hello|salve|e ai|eai|eae|bom dia|boa tarde|boa noite)(?:[,!. ]+(?:moca|moco|gente|pessoal|tudo bem|td bem|tudo bom|como vai))*[!.?, ]*$/u', $normalized);
+    }
+
+    protected function isSmallTalk(string $normalized): bool
+    {
+        $you = '(?:voce|vc|vcs|voces|ai|contigo)';
+
+        return (bool) preg_match('/^(?:(?:oi+|ola)[,! ]+)?(?:'
+            .'(?:e )?(?:tudo (?:bem|bom|certo|joia|otimo|tranquilo)|td (?:bem|bom)|como vai|como (?:voce|vc) (?:esta|ta))(?: (?:com|e) '.$you.')?'
+            .'|(?:(?:eu )?(?:to|tou|estou|ta) )?(?:bem|otimo|otima|tranquilo|tranquila|tudo (?:bem|bom|certo|otimo|joia|sim)|mais ou menos)(?: (?:gracas a deus|obrigad[oa]))?(?:,? (?:e )?(?:com )?'.$you.')?'
+            .'|e (?:com )?'.$you
+            .')[\s!.?,]*$/u', $normalized);
+    }
+
+    /** @param  Collection<int, Service>  $services */
+    protected function asksAboutServices(string $normalized, Collection $services): bool
+    {
+        if ($this->mentionedServices($normalized, $services)->isNotEmpty()
+            || preg_match('/\b(quanto|valor|valores|preco|precos|custa|horario|horarios|abre|fecha|aberto|endereco|onde fica|localizacao|remarcar|cancelar|desmarcar)\b/u', $normalized)) {
+            return false;
+        }
+
+        return (bool) preg_match('/\b(servico|servicos|procedimento|procedimentos|tratamento|tratamentos|o que (?:voces|vcs|vc|voce) (?:faz|fazem)|quais (?:as )?opcoes|entender (?:mais|melhor)|saber mais|conhecer (?:mais|melhor|o trabalho)|mais informac(?:ao|oes)|informac(?:ao|oes)|como funciona)\b/u', $normalized);
+    }
+
+    /**
+     * Serviços do catálogo citados pelo nome no texto.
+     *
+     * @param  Collection<int, Service>  $services
+     * @return Collection<int, Service>
+     */
+    protected function mentionedServices(string $text, Collection $services): Collection
+    {
+        $haystack = ' '.trim((string) preg_replace('/[^a-z0-9]+/', ' ', Str::lower(Str::ascii($text)))).' ';
+
+        return $services->filter(function (Service $service) use ($haystack): bool {
+            $name = trim((string) preg_replace('/[^a-z0-9]+/', ' ', Str::lower(Str::ascii((string) $service->name))));
+
+            return $name !== '' && str_contains($haystack, ' '.$name.' ');
+        })->values();
+    }
+
+    /**
+     * O que dá pra extrair da mensagem sem IA: o serviço citado pelo nome
+     * exato (o nome da cliente é tratado em applyDetails).
+     *
+     * @param  Collection<int, Service>  $services
+     * @return array<string, mixed>
+     */
+    protected function detailsWithoutModel(string $text, Collection $services): array
+    {
+        $mentioned = $this->mentionedServices($text, $services);
+
+        return $mentioned->count() === 1 ? ['service_id' => (int) $mentioned->first()->id] : [];
+    }
+
+    /**
+     * Chama o Gemini; qualquer falha (HTTP, cota, timeout, JSON inválido) vira
+     * null para o fluxo seguir sem a IA.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>|null
+     */
+    protected function interpret(TattooAiConversation $conversation, TattooAiMessage $message, string $instruction, array $payload): ?array
+    {
+        try {
+            return $this->askModel($conversation, $message, $instruction, $payload);
+        } catch (Throwable $exception) {
+            $this->logFallback($conversation, $message, 'model_unavailable', $exception);
+
+            return null;
+        }
+    }
+
+    /**
+     * Última rede de segurança: a próxima pergunta do fluxo, ou um pedido
+     * curto pra repetir se nem isso der certo.
+     */
+    protected function safeReply(TattooAiConversation $conversation, TattooAiMessage $message): string
+    {
+        try {
+            $services = $this->scheduling->services($conversation->company);
+            if ($services->isEmpty()) {
+                return $this->handoff($conversation);
+            }
+
+            return $this->nextStep($conversation, $conversation->collected_data ?: [], $services);
+        } catch (Throwable $exception) {
+            $this->logFallback($conversation, $message, 'fallback_failed', $exception);
+
+            return 'Opa, tive uma instabilidade rapidinha aqui 😅 Pode me mandar sua mensagem de novo?';
+        }
+    }
+
+    protected function logFallback(TattooAiConversation $conversation, TattooAiMessage $message, string $reason, ?Throwable $exception = null): void
+    {
+        Log::warning('Beauty AI fallback reply.', [
+            'company_id' => $conversation->company_id, 'conversation_id' => $conversation->id,
+            'message_id' => $message->provider_message_id, 'reason' => $reason,
+            'error_type' => $exception ? $exception::class : null,
+            'http_status' => $exception instanceof RequestException ? $exception->response->status() : null,
+            'error' => $exception ? mb_substr($exception->getMessage(), 0, 300) : null,
+        ]);
+    }
+
+    /** Nome cadastrado todo em maiúsculas/minúsculas aparece como "Iago". */
+    protected function displayFirstName(string $name): string
+    {
+        $first = $this->firstName($name);
+
+        return $first === mb_strtoupper($first) || $first === mb_strtolower($first)
+            ? mb_convert_case(mb_strtolower($first), MB_CASE_TITLE, 'UTF-8') : $first;
     }
 
     /**
@@ -369,7 +573,7 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
         $conversation->update(['collected_data' => $kept, 'status' => 'converted_to_appointment',
             'appointment_id' => $appointment->id, 'client_id' => $appointment->client_id,
             'professional_id' => $appointment->professional_id]);
-        $first = $this->firstName($data['name']);
+        $first = $this->displayFirstName($data['name']);
         $what = $service->name.' com '.$slot['professional_name'].', '.$slot['label'];
 
         return $appointment->status === AppointmentStatus::Confirmed

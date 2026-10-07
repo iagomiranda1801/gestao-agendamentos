@@ -16,6 +16,7 @@ use App\Services\WhatsApp\Bot\WhatsAppBookingBotService;
 use App\Services\WhatsApp\Bot\WhatsAppOrderLinkBotService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\WhatsAppHumanTakeover;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -65,9 +66,9 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
             if (! $company->is_active || ! $modules->hasModule($company, CompanyModule::WhatsApp)) {
                 return;
             }
-            app(TattooAIConversationService::class)->handle($company, $instance, $this->remoteJid,
+            $this->runAiConversation($company, fn () => app(TattooAIConversationService::class)->handle($company, $instance, $this->remoteJid,
                 $this->phone, $this->text, $this->messageId, $this->imageMime,
-                app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone));
+                app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone)));
 
             return;
         }
@@ -90,9 +91,9 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
 
                 return;
             }
-            app(BeautyAIConversationService::class)->handle($company, $instance, $this->remoteJid,
+            $this->runAiConversation($company, fn () => app(BeautyAIConversationService::class)->handle($company, $instance, $this->remoteJid,
                 $this->phone, $this->text, $this->messageId, $this->imageMime,
-                app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone));
+                app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone)));
 
             return;
         }
@@ -242,6 +243,25 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
                 'error' => $exception->getMessage(),
             ]);
             $this->rememberOutboundFailureAndMaybeRethrow($company, $exception);
+        }
+    }
+
+    /**
+     * Mensagens seguidas do mesmo cliente esperam a anterior terminar; se a
+     * trava demorar (Gemini lento), o job volta pra fila sem contar como erro,
+     * em vez de estourar as tentativas e deixar a mensagem sem resposta.
+     */
+    private function runAiConversation(Company $company, callable $callback): void
+    {
+        try {
+            $callback();
+        } catch (LockTimeoutException) {
+            Log::info('WhatsApp AI: conversation busy, message re-queued.', [
+                'company_id' => $company->getKey(),
+                'instance' => $this->instanceName,
+                'message_id' => $this->messageId,
+            ]);
+            $this->release(5);
         }
     }
 }

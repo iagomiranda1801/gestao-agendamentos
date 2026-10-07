@@ -223,14 +223,15 @@ class BeautyAIFlowTest extends TestCase
         $this->assertSame(1, $this->geminiCalls());
     }
 
-    public function test_unknown_model_action_hands_off_instead_of_executing(): void
+    public function test_unknown_model_action_is_ignored_and_flow_continues(): void
     {
         [$company, $instance] = $this->setupBeauty();
         $this->fakeAi([['action' => 'delete_appointments', 'details' => [], 'reply' => 'ok']]);
 
-        $reply = $this->send($company, $instance, 'Oi', 'u1');
-        $this->assertStringStartsWith('Beleza, vou chamar a equipe', $reply);
+        $reply = $this->send($company, $instance, 'Quero agendar', 'u1');
+        $this->assertSame('Oi, tudo bem? 😊 Qual seu nome?', $reply);
         $this->assertDatabaseCount('appointments', 0);
+        $this->assertFalse((bool) TattooAiConversation::query()->firstOrFail()->human_takeover);
     }
 
     public function test_job_routes_salon_to_ai_and_respects_whatsapp_takeover_pause(): void
