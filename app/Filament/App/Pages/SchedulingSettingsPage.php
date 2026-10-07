@@ -107,6 +107,8 @@ class SchedulingSettingsPage extends Page
             'whatsapp_bot_enabled' => $setting->whatsapp_bot_enabled,
             'tattoo_ai_enabled' => $setting->tattoo_ai_enabled,
             'tattoo_ai_prompt' => $setting->tattoo_ai_prompt,
+            'beauty_ai_enabled' => $setting->beauty_ai_enabled,
+            'beauty_ai_prompt' => $setting->beauty_ai_prompt,
             'whatsapp_instance' => $setting->whatsapp_instance,
             'whatsapp_sender_phone' => $setting->whatsapp_sender_phone,
             'whatsapp_confirmation_template' => $setting->whatsapp_confirmation_template,
@@ -400,6 +402,12 @@ class SchedulingSettingsPage extends Page
                             ->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
                         Textarea::make('tattoo_ai_prompt')->label('Orientações adicionais para a IA')
                             ->maxLength(3000)->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
+                        Toggle::make('beauty_ai_enabled')->label('Atendimento com IA (Gemini)')
+                            ->helperText('A IA conversa com a cliente, mostra horários livres reais e marca o agendamento. Substitui o bot de menu nesta empresa. Requer agendamento online habilitado e GEMINI_API_KEY no servidor.')
+                            ->visible(fn (): bool => (bool) Filament::getTenant()?->isSalon()),
+                        Textarea::make('beauty_ai_prompt')->label('Informações e orientações para a IA')
+                            ->helperText('Ex.: endereço, estacionamento, formas de pagamento e cuidados antes do procedimento. A IA só responde dúvidas com base no que estiver aqui; o resto ela passa para a equipe.')
+                            ->maxLength(3000)->visible(fn (): bool => (bool) Filament::getTenant()?->isSalon()),
                     ])
                     ->columns(1)
                     ->visible(fn (): bool => (new CompanySchedulingSettingPolicy)->update(

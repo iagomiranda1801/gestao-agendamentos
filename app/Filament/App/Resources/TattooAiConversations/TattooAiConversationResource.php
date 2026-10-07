@@ -53,8 +53,22 @@ class TattooAiConversationResource extends Resource
     {
         $company = Filament::getTenant();
 
-        return $company instanceof Company && $company->isTattooStudio()
+        return $company instanceof Company && static::companyUsesAiAttendance($company)
             && auth()->user()?->canAccessTenant($company);
+    }
+
+    /**
+     * Estúdios de tatuagem sempre veem a tela; salões, quando ligaram a IA
+     * ou já têm conversas registradas por ela.
+     */
+    public static function companyUsesAiAttendance(Company $company): bool
+    {
+        if ($company->isTattooStudio()) {
+            return true;
+        }
+
+        return $company->isSalon() && ((bool) $company->schedulingSetting?->beauty_ai_enabled
+            || TattooAiConversation::query()->where('company_id', $company->getKey())->exists());
     }
 
     public static function canView($record): bool
@@ -87,7 +101,10 @@ class TattooAiConversationResource extends Resource
             TextColumn::make('client.name')->label('Cliente')->placeholder('A identificar'),
             TextColumn::make('phone_normalized')->label('Telefone')->searchable(),
             TextColumn::make('status')->label('Status')->badge(),
-            TextColumn::make('request.id')->label('Pedido')->placeholder('—'),
+            TextColumn::make('request.id')->label('Pedido')->placeholder('—')
+                ->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
+            TextColumn::make('appointment.service_name_snapshot')->label('Último agendamento')->placeholder('—')
+                ->visible(fn (): bool => ! Filament::getTenant()?->isTattooStudio()),
             TextColumn::make('human_takeover')->label('Equipe assumiu')->formatStateUsing(fn (bool $state) => $state ? 'Sim' : 'Não'),
         ])->defaultSort('last_interaction_at', 'desc')
             ->recordUrl(fn (TattooAiConversation $record) => self::getUrl('view', ['record' => $record]));

@@ -9,6 +9,7 @@ use App\Models\CompanyWhatsAppInstance;
 use App\Models\TattooRequest;
 use App\Models\WhatsAppBotConversation;
 use App\Services\WhatsApp\EvolutionApiClient;
+use App\Support\CustomerNameDetector;
 use App\Support\PhoneNormalizer;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -333,25 +334,11 @@ class TattooWhatsAppBotService
      */
     protected function extractName(string $text, string $normalized): ?string
     {
-        if ($this->isGreeting($normalized) || str_contains($text, '?')) {
+        if ($this->isGreeting($normalized)) {
             return null;
         }
 
-        $candidate = trim($text);
-        $candidate = (string) preg_replace('/^(?:(?:oi+|ol[aá]|opa|bom dia|boa tarde|boa noite)[,!.\s]+)?(?:(?:o\s+)?meu nome [eé]|me chamo|pode me chamar de|me chama de|aqui [eé] (?:o|a)|sou (?:o|a)|sou|[eé] (?:o|a))\s+/iu', '', $candidate);
-        $candidate = trim((string) preg_replace('/[\s!.,;:]+$/u', '', $candidate));
-
-        if (mb_strlen($candidate) < 2 || mb_strlen($candidate) > 60
-            || ! preg_match('/^\p{L}[\p{L}\'\-]*(?:\s+\p{L}[\p{L}\'\-]*){0,3}$/u', $candidate)) {
-            return null;
-        }
-
-        $ascii = Str::lower(Str::ascii($candidate));
-        if (preg_match('/\b(quero|queria|gostaria|preciso|tatuagem|tattoo|tatuar|tatoo|orcamento|preco|valor|quanto|custa|agendar|agenda|horario|marcar|fazer|desenho|braco|perna|costas|obrigad[oa]|sim|nao|ok|blz|beleza|tudo|bem|aqui|voces|vcs|voce|vc|informacao|informacoes|duvida|menu|atendente|humano)\b/u', $ascii)) {
-            return null;
-        }
-
-        return $candidate === Str::lower($candidate) ? mb_convert_case($candidate, MB_CASE_TITLE, 'UTF-8') : $candidate;
+        return CustomerNameDetector::fromMessage($text);
     }
 
     protected function initialDescription(string $text): ?string

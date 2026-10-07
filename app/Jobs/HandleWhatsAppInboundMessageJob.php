@@ -7,6 +7,7 @@ use App\Enums\WhatsAppOutboundKind;
 use App\Jobs\Concerns\DefersViaWhatsAppOutboundGate;
 use App\Models\Company;
 use App\Models\CompanyWhatsAppInstance;
+use App\Services\Beauty\BeautyAIConversationService;
 use App\Services\Company\CompanyModuleService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\Tattoo\TattooAIConversationService;
@@ -65,6 +66,31 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
                 return;
             }
             app(TattooAIConversationService::class)->handle($company, $instance, $this->remoteJid,
+                $this->phone, $this->text, $this->messageId, $this->imageMime,
+                app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone));
+
+            return;
+        }
+
+        if ($company->isSalon() && (bool) $settingsService->getOrCreate($company)->beauty_ai_enabled) {
+            $settings = $settingsService->getOrCreate($company);
+            $disabledReason = match (true) {
+                ! $company->is_active => 'inactive_company',
+                ! $modules->hasModule($company, CompanyModule::WhatsApp) => 'whatsapp_module_disabled',
+                ! $modules->hasModule($company, CompanyModule::Scheduling) => 'scheduling_module_disabled',
+                ! (bool) $settings->public_booking_enabled => 'public_booking_disabled',
+                default => null,
+            };
+            if ($disabledReason !== null) {
+                Log::info('WhatsApp beauty AI: disabled for company.', [
+                    'company_id' => $company->getKey(),
+                    'instance' => $this->instanceName,
+                    'reason' => $disabledReason,
+                ]);
+
+                return;
+            }
+            app(BeautyAIConversationService::class)->handle($company, $instance, $this->remoteJid,
                 $this->phone, $this->text, $this->messageId, $this->imageMime,
                 app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone));
 

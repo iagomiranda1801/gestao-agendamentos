@@ -35,6 +35,11 @@ class TattooAiConversation extends Model
         return $this->belongsTo(TattooRequest::class, 'tattoo_request_id');
     }
 
+    public function appointment(): BelongsTo
+    {
+        return $this->belongsTo(Appointment::class);
+    }
+
     public function instance(): BelongsTo
     {
         return $this->belongsTo(CompanyWhatsAppInstance::class, 'company_whatsapp_instance_id');

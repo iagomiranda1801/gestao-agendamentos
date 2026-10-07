@@ -1,9 +1,12 @@
 @php
     use App\Filament\App\Resources\TattooRequests\TattooRequestResource;
     use App\Filament\App\Resources\Clients\ClientResource;
+    use App\Filament\App\Resources\Appointments\AppointmentResource;
     use App\Support\CompanyDateTime;
 
-    $conversation = $this->getRecord()->fresh(['client', 'company', 'request.professional', 'request.quotes']);
+    $conversation = $this->getRecord()->fresh(['client', 'company', 'professional', 'appointment', 'request.professional', 'request.quotes']);
+    $isTattoo = $conversation->company->isTattooStudio();
+    $collected = $conversation->collected_data ?: [];
     $request = $conversation->request;
     $quote = $request?->quotes->sortByDesc('version')->first();
     $messages = $this->getChatMessages();
@@ -18,6 +21,8 @@
         'ready_to_schedule' => 'Pronto para agendar',
         'converted_to_appointment' => 'Agendado',
         'human_takeover' => 'Atendimento humano',
+        'offering_slots' => 'Escolhendo horário',
+        'awaiting_confirmation' => 'Aguardando confirmação',
     ];
 @endphp
 
@@ -111,12 +116,29 @@
                 <dl>
                     <div><dt>Status</dt><dd>{{ $statusLabels[$conversation->status] ?? str_replace('_', ' ', $conversation->status) }}</dd></div>
                     <div><dt>Última interação</dt><dd>{{ $conversation->last_interaction_at?->timezone($timezone)->format('d/m/Y H:i') ?: '—' }}</dd></div>
-                    <div><dt>Profissional</dt><dd>{{ $request?->professional?->name ?: 'Ainda não atribuído' }}</dd></div>
+                    <div><dt>Profissional</dt><dd>{{ $request?->professional?->name ?: ($conversation->professional?->name ?: 'Ainda não atribuído') }}</dd></div>
                 </dl>
                 @if ($conversation->client)
                     <a class="tattoo-chat-detail-link" href="{{ ClientResource::getUrl('edit', ['record' => $conversation->client]) }}">Abrir cadastro do cliente</a>
                 @endif
             </div>
+            @unless ($isTattoo)
+            <div class="tattoo-chat-detail-card">
+                <h2>Agendamento</h2>
+                <dl>
+                    <div><dt>Serviço em conversa</dt><dd>{{ $collected['service_name'] ?? 'Ainda não escolhido' }}</dd></div>
+                    @if (! empty($collected['selected_slot']['label']))
+                        <div><dt>Horário escolhido</dt><dd>{{ $collected['selected_slot']['label'] }}</dd></div>
+                    @endif
+                    @if ($conversation->appointment)
+                        <div><dt>Último agendamento</dt><dd>{{ $conversation->appointment->service_name_snapshot }} · {{ $conversation->appointment->start_at?->timezone($timezone)->format('d/m/Y H:i') }}</dd></div>
+                    @endif
+                </dl>
+                @if ($conversation->appointment)
+                    <a class="tattoo-chat-detail-link" href="{{ AppointmentResource::getUrl('view', ['record' => $conversation->appointment]) }}">Abrir agendamento</a>
+                @endif
+            </div>
+            @else
             <div class="tattoo-chat-detail-card">
                 <h2>Pedido de tatuagem</h2>
                 @if ($request)
@@ -131,6 +153,7 @@
                     <p class="tattoo-chat-muted">A IA ainda está reunindo os detalhes para criar o pedido.</p>
                 @endif
             </div>
+            @endunless
         </aside>
     </div>
 </x-filament-panels::page>
