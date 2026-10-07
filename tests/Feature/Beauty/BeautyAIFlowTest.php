@@ -124,6 +124,7 @@ class BeautyAIFlowTest extends TestCase
         $this->assertSame('offering_slots', $conversation->status);
         $this->assertCount(3, $offered);
         $this->assertStringContainsString('Pra Corte feminino', $reply);
+        $this->assertStringContainsString('tenho estes horários:', $reply);
         $catalog = app(OnlineBookingCatalogService::class);
         foreach ($offered as $slot) {
             $this->assertStringContainsString($slot['label'], $reply);
@@ -229,7 +230,7 @@ class BeautyAIFlowTest extends TestCase
         $this->fakeAi([['action' => 'delete_appointments', 'details' => [], 'reply' => 'ok']]);
 
         $reply = $this->send($company, $instance, 'Quero agendar', 'u1');
-        $this->assertSame('Oi, tudo bem? 😊 Qual seu nome?', $reply);
+        $this->assertSame("Oi, tudo bem? 😊\n\nQual seu nome?", $reply);
         $this->assertDatabaseCount('appointments', 0);
         $this->assertFalse((bool) TattooAiConversation::query()->firstOrFail()->human_takeover);
     }

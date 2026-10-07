@@ -141,7 +141,8 @@ class BeautyAIResilienceTest extends TestCase
         $this->assertStringContainsString('Qual serviço', $reply);
 
         $reply = $this->viaJob('Quero entender mais sobre o seu serviço', 'r4');
-        $this->assertSame('Claro! Aqui a gente faz Corte feminino, Escova e Manicure. Qual deles te interessa, Iago?', $reply);
+        $this->assertStringStartsWith("Claro! Aqui a gente faz:\n\n1. Corte feminino\n2. Escova\n3. Manicure", $reply);
+        $this->assertStringContainsString('Qual deles te interessa, Iago?', $reply);
         $this->assertStringNotContainsString('Coloração interna', $reply);
 
         $this->assertSame(0, $this->geminiCalls());
@@ -156,10 +157,10 @@ class BeautyAIResilienceTest extends TestCase
         Client::query()->where('phone_normalized', $this->phone)->delete();
         $this->fakeGemini([]);
 
-        $this->assertSame('Oi, tudo bem? 😊 Qual seu nome?', $this->send($company, $instance, 'Ola', 'g1'));
-        $this->assertSame('Tudo ótimo por aqui, obrigada! 😊 Qual seu nome?', $this->send($company, $instance, 'bem e vc?', 'g2'));
+        $this->assertSame("Oi, tudo bem? 😊\n\nQual seu nome?", $this->send($company, $instance, 'Ola', 'g1'));
+        $this->assertSame("Tudo ótimo por aqui, obrigada! 😊\n\nQual seu nome?", $this->send($company, $instance, 'bem e vc?', 'g2'));
         $reply = $this->send($company, $instance, 'o que vocês fazem?', 'g3');
-        $this->assertStringStartsWith('Claro! Aqui a gente faz Corte feminino, Escova e Manicure. Qual deles te interessa?', $reply);
+        $this->assertStringStartsWith("Claro! Aqui a gente faz:\n\n1. Corte feminino", $reply);
         $this->assertStringContainsString('me fala também seu nome', $reply);
         $this->assertSame(0, $this->geminiCalls());
     }

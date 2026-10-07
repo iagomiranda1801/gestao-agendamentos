@@ -205,29 +205,29 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
 
         $name = ! empty($data['name']) ? $this->displayFirstName((string) $data['name']) : null;
         if ($intent === 'services') {
-            $list = 'Claro! Aqui a gente faz '.$this->joinNames($services->pluck('name')->take(12)->all()).'.';
+            $list = "Claro! Aqui a gente faz:\n\n".$this->numberedList($services->pluck('name')->take(12)->all());
             if ($name === null) {
                 $data['asked_name'] = true;
                 $conversation->update(['collected_data' => $data]);
 
-                return $list." Qual deles te interessa?\n\nSe quiser marcar, me fala também seu nome 😊";
+                return $list."\n\nQual deles te interessa?\n\nSe quiser marcar, me fala também seu nome 😊";
             }
 
-            return $list.' Qual deles te interessa, '.$name.'?';
+            return $list."\n\nQual deles te interessa, ".$name.'?';
         }
 
         $opening = $intent === 'greeting'
-            ? ($name !== null ? 'Oi, '.$name.'! Tudo bem? 😊 ' : 'Oi, tudo bem? 😊 ')
-            : 'Tudo ótimo por aqui, obrigada! 😊 ';
+            ? ($name !== null ? 'Oi, '.$name.'! Tudo bem? 😊' : 'Oi, tudo bem? 😊')
+            : 'Tudo ótimo por aqui, obrigada! 😊';
         if ($name === null) {
             $data['asked_name'] = true;
             $conversation->update(['collected_data' => $data]);
 
-            return $opening.'Qual seu nome?';
+            return $opening."\n\nQual seu nome?";
         }
         if ($conversation->status === 'converted_to_appointment' && empty($data['service_id'])) {
-            return $opening.'Quer marcar mais algum horário? Aqui a gente faz '
-                .$this->joinNames($services->pluck('name')->take(8)->all()).'.';
+            return $opening."\n\nQuer marcar mais algum horário?\n\n"
+                .$this->numberedList($services->pluck('name')->take(8)->all());
         }
 
         return $this->prefixed($conversation, $opening, $this->nextStep($conversation, $data, $services));
@@ -385,22 +385,22 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
 
             return match (true) {
                 $alreadyAsked => 'Desculpa, não peguei seu nome. Como você se chama?',
-                $service !== null => 'Oi, tudo bem? Consigo sim te ajudar com '.$service->name.'! Qual seu nome?',
-                default => 'Oi, tudo bem? 😊 Qual seu nome?',
+                $service !== null => 'Oi, tudo bem? Consigo sim te ajudar com '.$service->name."!\n\nQual seu nome?",
+                default => "Oi, tudo bem? 😊\n\nQual seu nome?",
             };
         }
 
         $service = $this->currentService($data, $services);
         if ($service === null) {
-            return 'Qual serviço você quer fazer? Aqui a gente tem '.$this->joinNames($services->pluck('name')->take(8)->all()).'.';
+            return "Qual serviço você quer fazer?\n\n".$this->numberedList($services->pluck('name')->take(8)->all());
         }
 
         if (! isset($data['professional_id'])) {
             $professionals = $this->scheduling->professionals($company, $service);
             if ($professionals->count() > 1 && $settings->allow_professional_selection) {
-                return 'Show! Tem preferência de profissional? Pode ser com '
-                    .$this->joinNames($professionals->pluck('name')->take(6)->all(), 'ou')
-                    .', ou com quem tiver horário primeiro.';
+                return "Show! Tem preferência de profissional?\n\n"
+                    .$this->numberedList($professionals->pluck('name')->take(6)->all())
+                    ."\n\nOu com quem tiver horário primeiro.";
             }
             $data['professional_id'] = $professionals->count() === 1 ? (int) $professionals->first()->id : 'any';
             if ($professionals->count() === 1) {
@@ -417,13 +417,22 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
             $slot = $data['selected_slot'];
             $professional = $this->scheduling->professionals($company, $service)->firstWhere('id', (int) $slot['professional_id']);
             $amount = $professional ? (float) $this->snapshots->resolve($company, $professional, $service)['price_snapshot'] : 0.0;
-            $price = $settings->show_service_price && $amount > 0 ? ' O valor fica '.$this->money($amount).'.' : '';
-            $terms = filled($settings->booking_terms) || filled($settings->privacy_notice)
-                ? ' Confirmando, você concorda com os termos de agendamento do salão.' : '';
             $conversation->update(['status' => 'awaiting_confirmation']);
+            $lines = [
+                'Fechado então:',
+                $service->name.' com '.$slot['professional_name'],
+                $slot['label'],
+            ];
+            if ($settings->show_service_price && $amount > 0) {
+                $lines[] = 'Valor: '.$this->money($amount);
+            }
+            $lines[] = '';
+            if (filled($settings->booking_terms) || filled($settings->privacy_notice)) {
+                $lines[] = 'Confirmando, você concorda com os termos de agendamento do salão.';
+            }
+            $lines[] = 'Posso confirmar?';
 
-            return 'Fechado então: '.$service->name.' com '.$slot['professional_name'].', '.$slot['label'].'.'
-                .$price.$terms.' Posso confirmar?';
+            return implode("\n", $lines);
         }
 
         $offered = $data['offered_slots'] ?? [];
@@ -451,7 +460,9 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
         $options = array_map(fn (array $slot) => $slot['label'].($sameProfessional ? '' : ' com '.$slot['professional_name']), $offered);
         $who = $sameProfessional && ! empty($data['professional_name']) ? ' com '.$data['professional_name'] : '';
 
-        return 'Pra '.$service->name.$who.', tenho '.$this->joinNames($options, 'ou').'. Qual fica melhor pra você?';
+        return 'Pra '.$service->name.$who.", tenho estes horários:\n\n"
+            .$this->numberedList($options)
+            ."\n\nQual fica melhor pra você?";
     }
 
     /**
@@ -496,11 +507,11 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
             'appointment_id' => $appointment->id, 'client_id' => $appointment->client_id,
             'professional_id' => $appointment->professional_id]);
         $first = $this->displayFirstName($data['name']);
-        $what = $service->name.' com '.$slot['professional_name'].', '.$slot['label'];
+        $summary = $service->name.' com '.$slot['professional_name']."\n".$slot['label'];
 
         return $appointment->status === AppointmentStatus::Confirmed
-            ? "Prontinho, {$first}! Seu horário tá marcado: {$what}. Te espero! 😊"
-            : "Prontinho, {$first}! Reservei {$what}. A equipe confirma e te avisa por aqui 😊";
+            ? "Prontinho, {$first}! Seu horário tá marcado:\n\n{$summary}\n\nTe espero! 😊"
+            : "Prontinho, {$first}! Reservei:\n\n{$summary}\n\nA equipe confirma e te avisa por aqui 😊";
     }
 
     /**
@@ -531,10 +542,12 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
                 return $service->name.' fica '.$this->money((float) $service->price).$duration.'.';
             }
 
-            return 'Os valores daqui: '.$this->joinNames($priced->map(fn (Service $item) => $item->name.' '.$this->money((float) $item->price))->all()).'.';
+            return "Os valores daqui:\n\n".$this->numberedList(
+                $priced->map(fn (Service $item) => $item->name.' '.$this->money((float) $item->price))->all()
+            );
         }
         if ($topic === 'services') {
-            return 'Aqui a gente faz '.$this->joinNames($services->pluck('name')->take(12)->all()).'.';
+            return "Aqui a gente faz:\n\n".$this->numberedList($services->pluck('name')->take(12)->all());
         }
         if ($topic === 'hours') {
             return $this->hoursAnswer($company);
@@ -611,7 +624,16 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
      */
     protected function prefixed(TattooAiConversation $conversation, string $prefix, string $next): string
     {
-        return $conversation->human_takeover ? $next : $prefix.$next;
+        if ($conversation->human_takeover) {
+            return $next;
+        }
+
+        $prefix = rtrim($prefix);
+        if ($prefix === '') {
+            return $next;
+        }
+
+        return str_ends_with($prefix, "\n") ? $prefix.$next : $prefix."\n\n".$next;
     }
 
     protected function handoff(TattooAiConversation $conversation, string $message = self::HANDOFF): string
@@ -656,14 +678,14 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
     }
 
     /** @param  list<string>  $names */
-    protected function joinNames(array $names, string $last = 'e'): string
+    protected function numberedList(array $names): string
     {
-        $names = array_values(array_filter($names, fn ($name) => filled($name)));
-        if (count($names) <= 1) {
-            return (string) ($names[0] ?? '');
+        $lines = [];
+        foreach (array_values(array_filter($names, fn ($name) => filled($name))) as $index => $name) {
+            $lines[] = ($index + 1).'. '.$name;
         }
 
-        return implode(', ', array_slice($names, 0, -1)).' '.$last.' '.end($names);
+        return implode("\n", $lines);
     }
 
     protected function money(float $value): string
