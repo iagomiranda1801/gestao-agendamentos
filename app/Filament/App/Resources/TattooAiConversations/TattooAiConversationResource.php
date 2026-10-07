@@ -12,14 +12,11 @@ use App\Models\Professional;
 use App\Models\TattooAiConversation;
 use BackedEnum;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\Placeholder;
 use Filament\Resources\Resource;
-use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\HtmlString;
 use UnitEnum;
 
 class TattooAiConversationResource extends Resource
@@ -31,6 +28,10 @@ class TattooAiConversationResource extends Resource
     protected static ?string $slug = 'atendimentos-ia';
 
     protected static ?string $navigationLabel = 'Atendimentos IA';
+
+    protected static ?string $modelLabel = 'atendimento IA';
+
+    protected static ?string $pluralModelLabel = 'Atendimentos IA';
 
     protected static string|UnitEnum|null $navigationGroup = 'Agenda';
 
@@ -90,25 +91,6 @@ class TattooAiConversationResource extends Resource
             TextColumn::make('human_takeover')->label('Equipe assumiu')->formatStateUsing(fn (bool $state) => $state ? 'Sim' : 'Não'),
         ])->defaultSort('last_interaction_at', 'desc')
             ->recordUrl(fn (TattooAiConversation $record) => self::getUrl('view', ['record' => $record]));
-    }
-
-    public static function form(Schema $schema): Schema
-    {
-        return $schema->components([
-            Placeholder::make('history')->label('Mensagens recentes')->content(function (?TattooAiConversation $record): HtmlString {
-                $lines = $record?->messages()->latest('id')->limit(30)->get()->reverse()
-                    ->map(fn ($message) => '<strong>'.($message->direction === 'in' ? 'Cliente' : 'IA').':</strong> '.nl2br(e($message->body ?: '[mídia]')))->all() ?? [];
-
-                return new HtmlString(implode('<br><br>', $lines) ?: 'Nenhuma mensagem.');
-            }),
-            Placeholder::make('request_link')->label('Orçamento')->content(function (?TattooAiConversation $record): HtmlString {
-                if (! $record?->tattoo_request_id) {
-                    return new HtmlString('Ainda não criado.');
-                }
-
-                return new HtmlString('<a href="'.e(TattooRequestResource::getUrl('edit', ['record' => $record->tattoo_request_id])).'">Abrir pedido</a>');
-            }),
-        ]);
     }
 
     public static function getPages(): array

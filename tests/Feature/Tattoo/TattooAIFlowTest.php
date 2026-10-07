@@ -3,6 +3,7 @@
 namespace Tests\Feature\Tattoo;
 
 use App\Enums\CompanyProfile;
+use App\Filament\App\Resources\TattooAiConversations\Pages\ViewTattooAiConversation;
 use App\Filament\App\Resources\TattooAiConversations\TattooAiConversationResource;
 use App\Models\Client;
 use App\Models\CompanyWhatsAppInstance;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 use Tests\Concerns\CreatesSchedulingFixtures;
 use Tests\TestCase;
 
@@ -77,6 +79,36 @@ class TattooAIFlowTest extends TestCase
         $this->assertSame(4, TattooAiMessage::query()->where('direction', 'out')->count());
     }
 
+    public function test_ai_asks_name_first_and_registers_client_as_soon_as_name_is_given(): void
+    {
+        [$company, $instance, $phone] = $this->setupAI();
+        Http::fake(function ($request) {
+            if (str_contains($request->url(), 'generateContent')) {
+                $details = TattooAiMessage::query()->where('direction', 'in')->count() === 1
+                    ? ['description' => 'Uma rosa']
+                    : ['name' => 'Ana Maria'];
+
+                return Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode([
+                    'action' => 'save_details', 'details' => $details, 'reply' => 'Conte mais.',
+                ])]]]]]]);
+            }
+
+            return Http::response(['key' => ['id' => 'sent']]);
+        });
+
+        $this->send($company, $instance, $phone, 'Quero uma rosa', 'name-1');
+        $this->assertDatabaseCount('clients', 0);
+        $this->assertSame('Olá! Como posso te chamar?', TattooAiMessage::query()
+            ->where('provider_message_id', 'reply:name-1')->firstOrFail()->body);
+
+        $this->send($company, $instance, $phone, 'Ana Maria', 'name-2');
+        $conversation = TattooAiConversation::query()->firstOrFail();
+        $this->assertDatabaseHas('clients', ['id' => $conversation->client_id, 'company_id' => $company->id,
+            'name' => 'Ana Maria', 'phone_normalized' => $phone, 'source' => 'whatsapp']);
+        $this->assertDatabaseCount('tattoo_requests', 0);
+        $this->assertSame('Ana Maria', $conversation->collected_data['name']);
+    }
+
     public function test_unknown_action_does_not_execute_and_invalid_json_keeps_message_for_retry(): void
     {
         [$company, $instance, $phone] = $this->setupAI();
@@ -129,6 +161,81 @@ class TattooAIFlowTest extends TestCase
         $this->authenticateForAppTenant($user, $company);
         $this->get(TattooAiConversationResource::getUrl('index'))
             ->assertOk()->assertSee($phone);
+    }
+
+    public function test_conversation_page_displays_messages_as_chat(): void
+    {
+        [$company, $instance, $phone] = $this->setupAI();
+        $user = $this->createCompanyUser($company);
+        $conversation = TattooAiConversation::query()->create(['company_id' => $company->id,
+            'company_whatsapp_instance_id' => $instance->id, 'phone_normalized' => $phone,
+            'remote_jid' => $phone.'@s.whatsapp.net']);
+        $conversation->messages()->create(['company_id' => $company->id, 'provider_message_id' => 'incoming-chat',
+            'direction' => 'in', 'status' => 'processed', 'body' => 'Quero uma rosa no braço']);
+        $conversation->messages()->create(['company_id' => $company->id, 'provider_message_id' => 'reply:incoming-chat',
+            'direction' => 'out', 'status' => 'sent', 'body' => 'Qual tamanho você imagina?']);
+
+        $this->authenticateForAppTenant($user, $company);
+        $this->get(TattooAiConversationResource::getUrl('view', ['record' => $conversation]))
+            ->assertOk()->assertSee('tattoo-chat-thread')->assertSee('Quero uma rosa no braço')
+            ->assertSee('Qual tamanho você imagina?')->assertSee('IA atendendo');
+    }
+
+    public function test_staff_can_reply_after_taking_over_conversation(): void
+    {
+        [$company, $instance, $phone] = $this->setupAI();
+        $user = $this->createCompanyUser($company);
+        $conversation = TattooAiConversation::query()->create(['company_id' => $company->id,
+            'company_whatsapp_instance_id' => $instance->id, 'phone_normalized' => $phone,
+            'remote_jid' => $phone.'@s.whatsapp.net']);
+        $this->authenticateForAppTenant($user, $company);
+        Http::fake(['evolution.test/*' => Http::response(['key' => ['id' => 'sent']])]);
+
+        Livewire::test(ViewTattooAiConversation::class, ['record' => $conversation->id])
+            ->set('messageDraft', 'Olá, vou continuar seu atendimento.')
+            ->call('sendReply')
+            ->assertHasErrors(['messageDraft']);
+        Http::assertNothingSent();
+
+        Livewire::test(ViewTattooAiConversation::class, ['record' => $conversation->id])
+            ->callAction('takeover', ['name' => 'Ana Maria'])
+            ->assertHasNoActionErrors();
+        $this->assertDatabaseHas('clients', ['company_id' => $company->id,
+            'phone_normalized' => $phone, 'name' => 'Ana Maria']);
+        $this->assertTrue($conversation->fresh()->human_takeover);
+        Livewire::test(ViewTattooAiConversation::class, ['record' => $conversation->id])
+            ->set('messageDraft', 'Olá, vou continuar seu atendimento.')
+            ->call('sendReply')
+            ->assertHasNoErrors()
+            ->assertSet('messageDraft', '');
+
+        $this->assertDatabaseHas('tattoo_ai_messages', [
+            'tattoo_ai_conversation_id' => $conversation->id,
+            'direction' => 'out',
+            'status' => 'sent_manual',
+            'body' => 'Olá, vou continuar seu atendimento.',
+        ]);
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/message/sendText/ai-test')
+            && $request['number'] === $phone && $request['text'] === 'Olá, vou continuar seu atendimento.');
+    }
+
+    public function test_takeover_reuses_existing_client_for_same_phone(): void
+    {
+        [$company, $instance, $phone] = $this->setupAI();
+        $user = $this->createCompanyUser($company);
+        $client = Client::factory()->forCompany($company)->create(['name' => 'Ana', 'phone' => $phone]);
+        $conversation = TattooAiConversation::query()->create(['company_id' => $company->id,
+            'company_whatsapp_instance_id' => $instance->id, 'phone_normalized' => $phone,
+            'remote_jid' => $phone.'@s.whatsapp.net']);
+        $this->authenticateForAppTenant($user, $company);
+
+        Livewire::test(ViewTattooAiConversation::class, ['record' => $conversation->id])
+            ->callAction('takeover', ['name' => 'Ana'])
+            ->assertHasNoActionErrors();
+
+        $this->assertDatabaseCount('clients', 1);
+        $this->assertSame($client->id, $conversation->fresh()->client_id);
     }
 
     public function test_gemini_failure_keeps_incoming_message_for_retry(): void
