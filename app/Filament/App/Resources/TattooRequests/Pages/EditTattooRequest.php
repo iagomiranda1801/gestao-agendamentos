@@ -8,9 +8,11 @@ use App\Filament\App\Resources\TattooRequests\TattooRequestResource;
 use App\Jobs\SendTattooQuoteWhatsAppJob;
 use App\Models\Client;
 use App\Models\Professional;
+use App\Models\TattooAiConversation;
 use App\Models\TattooQuote;
 use App\Services\Tattoo\TattooImageService;
 use App\Services\Tattoo\TattooQuoteService;
+use App\Services\Tattoo\TattooReceiptService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
@@ -56,7 +58,8 @@ class EditTattooRequest extends EditRecord
                 ->openUrlInNewTab(),
             Action::make('approve_and_schedule')->label('Aprovar e agendar')
                 ->visible(fn () => $this->getRecord()->quotes()->exists()
-                    && ! in_array($this->getRecord()->status, ['accepted', 'declined', 'cancelled', 'booked'], true))
+                    && ! in_array($this->getRecord()->status, ['accepted', 'declined', 'cancelled', 'booked'], true)
+                    && ! TattooAiConversation::query()->where('tattoo_request_id', $this->getRecord()->id)->exists())
                 ->action(function (): void {
                     $record = $this->getRecord();
                     $record->update(['status' => 'accepted']);
@@ -100,6 +103,22 @@ class EditTattooRequest extends EditRecord
                 ->url(fn () => AppointmentResource::getUrl('create', [
                     'tattoo_request' => $this->getRecord()->getKey(),
                 ])),
+            Action::make('confirm_deposit')->label('Confirmar sinal')->requiresConfirmation()
+                ->visible(fn () => $this->canReviewPayment()
+                    && $this->getRecord()->receipts()->where('payment_status', 'receipt_received')->exists())
+                ->action(function (): void {
+                    $receipt = $this->getRecord()->receipts()->where('payment_status', 'receipt_received')->latest('id')->firstOrFail();
+                    app(TattooReceiptService::class)->review($receipt, auth()->user(), true);
+                    Notification::make()->success()->title('Sinal confirmado pela equipe.')->send();
+                }),
+            Action::make('reject_receipt')->label('Rejeitar comprovante')->color('danger')->requiresConfirmation()
+                ->visible(fn () => $this->canReviewPayment()
+                    && $this->getRecord()->receipts()->where('payment_status', 'receipt_received')->exists())
+                ->action(function (): void {
+                    $receipt = $this->getRecord()->receipts()->where('payment_status', 'receipt_received')->latest('id')->firstOrFail();
+                    app(TattooReceiptService::class)->review($receipt, auth()->user(), false);
+                    Notification::make()->success()->title('Comprovante rejeitado. Solicite outro ao cliente.')->send();
+                }),
         ];
     }
 
@@ -118,5 +137,12 @@ class EditTattooRequest extends EditRecord
         $record->update($data);
 
         return $record;
+    }
+
+    protected function canReviewPayment(): bool
+    {
+        return TattooRequestResource::canManageRequests()
+            || ($this->getRecord()->professional_id !== null
+                && (int) $this->getRecord()->professional?->user_id === (int) auth()->id());
     }
 }

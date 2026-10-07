@@ -40,6 +40,9 @@ class FinancialAccountForm
                         TextInput::make('pix_key')
                             ->label('Chave PIX')
                             ->maxLength(255),
+                        TextInput::make('pix_recipient_name')
+                            ->label('Nome do favorecido PIX')
+                            ->maxLength(255),
                         Toggle::make('allow_negative_balance')
                             ->label('Permitir saldo negativo')
                             ->default(false),

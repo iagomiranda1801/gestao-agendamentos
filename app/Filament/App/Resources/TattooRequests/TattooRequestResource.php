@@ -107,6 +107,25 @@ class TattooRequestResource extends Resource
 
                     return new HtmlString('<a href="'.e($url).'">Abrir agendamento</a>');
                 }),
+                Placeholder::make('payment_receipt')->label('Comprovante PIX')->content(function (?TattooRequest $record): HtmlString {
+                    $receipt = $record?->receipts()->latest('id')->first();
+                    if (! $receipt) {
+                        return new HtmlString('Nenhum comprovante recebido.');
+                    }
+                    $url = route('tattoo.receipts.download', ['company' => $record->company, 'receipt' => $receipt]);
+                    $analysis = $receipt->analysis ?: [];
+                    $lines = [
+                        '<a href="'.e($url).'" target="_blank" rel="noopener">Abrir comprovante</a>',
+                        'Leitura: '.e($receipt->receipt_analysis_status),
+                        'Pagamento: '.e($receipt->payment_status),
+                        'Valor esperado: R$ '.e(number_format((float) $receipt->quote->deposit_amount, 2, ',', '.')),
+                        'Valor lido: '.e(isset($analysis['amount']) ? 'R$ '.number_format((float) $analysis['amount'], 2, ',', '.') : 'não identificado'),
+                        'Favorecido lido: '.e($analysis['recipient_name'] ?? 'não identificado'),
+                        'Alertas: '.e(implode('; ', $analysis['warnings'] ?? [])),
+                    ];
+
+                    return new HtmlString(implode('<br>', $lines));
+                }),
             ])->visible(fn (?TattooRequest $record) => $record !== null),
         ]);
     }

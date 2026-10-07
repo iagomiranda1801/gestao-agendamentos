@@ -4,6 +4,7 @@ use App\Http\Controllers\EvolutionWebhookController;
 use App\Http\Controllers\PrintDentalTreatmentPlanController;
 use App\Http\Controllers\TattooImageController;
 use App\Http\Controllers\TattooQuotePdfController;
+use App\Http\Controllers\TattooReceiptController;
 use App\Livewire\PublicBooking\BookingWizard;
 use App\Livewire\PublicBooking\ManageAppointment;
 use App\Livewire\PublicOrders\OrderWizard;
@@ -33,3 +34,6 @@ Route::get('/app/empresa/{company:slug}/tatuagem/fotos/{image}', TattooImageCont
 Route::get('/app/empresa/{company:slug}/tatuagem/orcamentos/{quote}', TattooQuotePdfController::class)
     ->middleware('auth')
     ->name('tattoo.quotes.pdf');
+
+Route::get('/app/empresa/{company:slug}/tatuagem/comprovantes/{receipt}', TattooReceiptController::class)
+    ->middleware('auth')->name('tattoo.receipts.download');

@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'branch',
     'account_number',
     'pix_key',
+    'pix_recipient_name',
     'description',
     'allow_negative_balance',
     'is_default_receipt_account',

@@ -9,6 +9,7 @@ use App\Models\Client;
 use App\Models\Company;
 use App\Models\Professional;
 use App\Models\Service;
+use App\Models\TattooAiConversation;
 use App\Models\TattooRequest;
 use App\Services\Scheduling\AppointmentService;
 use App\Support\CompanyDateTime;
@@ -38,6 +39,7 @@ class CreateAppointment extends CreateRecord
                 ->where('company_id', Filament::getTenant()?->getKey())
                 ->where('status', 'accepted')
                 ->findOrFail($requestId);
+            $this->assertTattooDepositConfirmed($tattooRequest);
             $this->tattooRequestId = $tattooRequest->getKey();
             $this->form->fill(array_merge($this->data ?? [], [
                 'client_id' => $tattooRequest->client_id,
@@ -76,6 +78,7 @@ class CreateAppointment extends CreateRecord
         if ($this->tattooRequestId !== null) {
             $tattooRequest = TattooRequest::query()->where('company_id', $company->getKey())
                 ->where('status', 'accepted')->whereNull('appointment_id')->findOrFail($this->tattooRequestId);
+            $this->assertTattooDepositConfirmed($tattooRequest);
             if ((int) $tattooRequest->client_id !== (int) $client->getKey()
                 || ($tattooRequest->professional_id !== null && (int) $tattooRequest->professional_id !== (int) $professional->getKey())) {
                 throw ValidationException::withMessages(['client_id' => 'O cliente ou tatuador não corresponde ao orçamento aceito.']);
@@ -101,6 +104,17 @@ class CreateAppointment extends CreateRecord
         } catch (ValidationException $exception) {
             $this->hasNotifiedValidationError = true;
             AppointmentSchedulingForm::notifyAndRethrow($exception, $this->form->getStatePath());
+        }
+    }
+
+    protected function assertTattooDepositConfirmed(TattooRequest $request): void
+    {
+        if (! TattooAiConversation::query()->where('tattoo_request_id', $request->id)->exists()) {
+            return;
+        }
+        $deposit = $request->quotes()->latest('version')->value('deposit_amount');
+        if ((float) $deposit > 0 && ! $request->receipts()->where('payment_status', 'confirmed')->exists()) {
+            throw ValidationException::withMessages(['tattoo_request' => 'Confirme o sinal antes de agendar este pedido.']);
         }
     }
 }

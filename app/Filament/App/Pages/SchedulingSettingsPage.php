@@ -105,6 +105,8 @@ class SchedulingSettingsPage extends Page
             'booking_terms' => $setting->booking_terms,
             'whatsapp_notifications_enabled' => $setting->whatsapp_notifications_enabled,
             'whatsapp_bot_enabled' => $setting->whatsapp_bot_enabled,
+            'tattoo_ai_enabled' => $setting->tattoo_ai_enabled,
+            'tattoo_ai_prompt' => $setting->tattoo_ai_prompt,
             'whatsapp_instance' => $setting->whatsapp_instance,
             'whatsapp_sender_phone' => $setting->whatsapp_sender_phone,
             'whatsapp_confirmation_template' => $setting->whatsapp_confirmation_template,
@@ -393,6 +395,11 @@ class SchedulingSettingsPage extends Page
                                 ? 'O bot coleta os detalhes da tatuagem e encaminha o pedido para análise no painel.'
                                 : 'Ao receber uma mensagem do cliente, o bot conduz o agendamento (serviço, profissional, data, horário e confirmação) sem sair do WhatsApp.')
                             ->columnSpanFull(),
+                        Toggle::make('tattoo_ai_enabled')->label('Atendimento com IA (Gemini)')
+                            ->helperText('Substitui o questionário do bot de tatuagem nesta empresa. Requer GEMINI_API_KEY no servidor.')
+                            ->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
+                        Textarea::make('tattoo_ai_prompt')->label('Orientações adicionais para a IA')
+                            ->maxLength(3000)->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
                     ])
                     ->columns(1)
                     ->visible(fn (): bool => (new CompanySchedulingSettingPolicy)->update(

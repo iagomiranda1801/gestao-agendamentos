@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\CompanyWhatsAppInstance;
 use App\Services\Company\CompanyModuleService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
+use App\Services\Tattoo\TattooAIConversationService;
 use App\Services\Tattoo\TattooWhatsAppBotService;
 use App\Services\WhatsApp\Bot\WhatsAppBookingBotService;
 use App\Services\WhatsApp\Bot\WhatsAppOrderLinkBotService;
@@ -44,10 +45,6 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
             return;
         }
 
-        if ($this->humanIsHandlingConversation()) {
-            return;
-        }
-
         $instance = CompanyWhatsAppInstance::query()
             ->where('instance_name', $this->instanceName)
             ->first();
@@ -60,6 +57,21 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
                 'phone' => $this->phone,
             ]);
 
+            return;
+        }
+
+        if ($company->isTattooStudio() && (bool) $settingsService->getOrCreate($company)->tattoo_ai_enabled) {
+            if (! $company->is_active || ! $modules->hasModule($company, CompanyModule::WhatsApp)) {
+                return;
+            }
+            app(TattooAIConversationService::class)->handle($company, $instance, $this->remoteJid,
+                $this->phone, $this->text, $this->messageId, $this->imageMime,
+                app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone));
+
+            return;
+        }
+
+        if ($this->humanIsHandlingConversation()) {
             return;
         }
 

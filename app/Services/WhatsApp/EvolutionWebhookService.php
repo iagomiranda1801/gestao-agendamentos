@@ -135,14 +135,14 @@ class EvolutionWebhookService
             foreach ([$root.'.imageMessage', $root.'.documentMessage', $root.'.documentWithCaptionMessage.message.documentMessage'] as $path) {
                 $mime = Arr::get($payload, $path.'.mimetype');
                 $mime = is_string($mime) ? strtolower(trim(explode(';', $mime, 2)[0])) : null;
-                if (in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+                if (in_array($mime, ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'], true)) {
                     return $mime;
                 }
 
                 if ($mime === 'application/octet-stream') {
                     $filename = (string) Arr::get($payload, $path.'.fileName', '');
                     $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-                    $inferred = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'][$extension] ?? null;
+                    $inferred = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'pdf' => 'application/pdf'][$extension] ?? null;
                     if ($inferred !== null) {
                         return $inferred;
                     }

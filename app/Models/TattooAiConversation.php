@@ -6,9 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class TattooRequest extends Model
+class TattooAiConversation extends Model
 {
-    protected $guarded = ['id', 'company_id'];
+    protected $guarded = ['id'];
+
+    protected function casts(): array
+    {
+        return ['human_takeover' => 'boolean', 'collected_data' => 'array', 'last_interaction_at' => 'datetime'];
+    }
 
     public function company(): BelongsTo
     {
@@ -25,24 +30,19 @@ class TattooRequest extends Model
         return $this->belongsTo(Professional::class);
     }
 
-    public function appointment(): BelongsTo
+    public function request(): BelongsTo
     {
-        return $this->belongsTo(Appointment::class);
+        return $this->belongsTo(TattooRequest::class, 'tattoo_request_id');
     }
 
-    public function conversation(): BelongsTo
+    public function instance(): BelongsTo
     {
-        return $this->belongsTo(WhatsAppBotConversation::class, 'whatsapp_bot_conversation_id');
+        return $this->belongsTo(CompanyWhatsAppInstance::class, 'company_whatsapp_instance_id');
     }
 
-    public function images(): HasMany
+    public function messages(): HasMany
     {
-        return $this->hasMany(TattooRequestImage::class);
-    }
-
-    public function quotes(): HasMany
-    {
-        return $this->hasMany(TattooQuote::class);
+        return $this->hasMany(TattooAiMessage::class);
     }
 
     public function receipts(): HasMany
