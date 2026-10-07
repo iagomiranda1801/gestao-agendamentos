@@ -15,9 +15,12 @@ class EvolutionApiClient
     }
 
     /**
+     * $typingMs > 0 faz a Evolution (v2) mostrar "digitando..." por esse tempo
+     * antes de entregar a mensagem (campo `delay` do sendText).
+     *
      * @return array<string, mixed>
      */
-    public function sendText(string $instance, string $phoneDigits, string $message): array
+    public function sendText(string $instance, string $phoneDigits, string $message, int $typingMs = 0): array
     {
         $instance = $this->resolveInstance($instance);
 
@@ -29,13 +32,15 @@ class EvolutionApiClient
 
         app(WhatsAppHumanTakeover::class)->rememberBotSend($instance, $phoneDigits, $message);
 
+        $typingMs = max(0, min($typingMs, 20000));
         $response = $this->http()
             ->acceptJson()
-            ->timeout(20)
-            ->post($this->url("/message/sendText/{$instance}"), [
+            ->timeout(20 + (int) ceil($typingMs / 1000))
+            ->post($this->url("/message/sendText/{$instance}"), array_filter([
                 'number' => $number,
                 'text' => $message,
-            ]);
+                'delay' => $typingMs > 0 ? $typingMs : null,
+            ], fn ($value) => $value !== null));
 
         if ($response->failed()) {
             throw new RequestException($response);

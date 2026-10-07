@@ -44,6 +44,13 @@ return [
         'human_takeover_minutes' => (int) env('WHATSAPP_HUMAN_TAKEOVER_MINUTES', 120),
         // Mensagens da empresa que saem logo depois da mensagem do cliente (saudacao/ausencia automatica do WhatsApp Business) nao pausam o bot.
         'auto_reply_grace_seconds' => (int) env('WHATSAPP_AUTO_REPLY_GRACE_SECONDS', 20),
+        // Respostas da IA (tatuagem/estetica) chegam entre min e max segundos depois da mensagem do cliente,
+        // com "digitando..." nos ultimos typing_max segundos. Min e max em 0 desligam o atraso.
+        'ai_reply_delay' => [
+            'min_seconds' => (int) env('WHATSAPP_AI_REPLY_DELAY_MIN_SECONDS', 5),
+            'max_seconds' => (int) env('WHATSAPP_AI_REPLY_DELAY_MAX_SECONDS', 10),
+            'typing_max_seconds' => (int) env('WHATSAPP_AI_TYPING_MAX_SECONDS', 4),
+        ],
         'outbound' => [
             'min_interval_seconds' => (int) env('EVOLUTION_OUTBOUND_MIN_INTERVAL', 30),
             'max_interval_seconds' => (int) env('EVOLUTION_OUTBOUND_MAX_INTERVAL', 45),

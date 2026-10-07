@@ -3,6 +3,7 @@
 namespace App\Services\AI;
 
 use App\Enums\WhatsAppOutboundKind;
+use App\Jobs\SendWhatsAppAIReplyJob;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\CompanyWhatsAppInstance;
@@ -13,6 +14,7 @@ use App\Services\WhatsApp\Outbound\WhatsAppOutboundGate;
 use App\Services\WhatsApp\WhatsAppHumanTakeover;
 use App\Support\CustomerNameDetector;
 use App\Support\PhoneNormalizer;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -61,7 +63,7 @@ abstract class WhatsAppAIConversationService
         if (! $phone || ! $messageId) {
             return;
         }
-        Cache::lock("wa:ai:{$company->id}:{$phone}", 150)->block(10, function () use ($company, $instance, $jid, $phone, $text, $messageId, $mediaMime, $paused): void {
+        $out = Cache::lock("wa:ai:{$company->id}:{$phone}", 150)->block(10, function () use ($company, $instance, $jid, $phone, $text, $messageId, $mediaMime, $paused): ?TattooAiMessage {
             $conversation = TattooAiConversation::query()->firstOrCreate(
                 ['company_whatsapp_instance_id' => $instance->id, 'phone_normalized' => $phone],
                 ['company_id' => $company->id, 'remote_jid' => $jid, 'status' => 'collecting_information'],
@@ -73,48 +75,167 @@ abstract class WhatsAppAIConversationService
                     'body' => mb_substr($text, 0, 4000), 'media_mime' => $mediaMime],
             );
             if ($incoming->tattoo_ai_conversation_id !== $conversation->id || $incoming->status === 'processed') {
-                return;
+                return null;
             }
             $conversation->update(['last_interaction_at' => now(), 'remote_jid' => $jid]);
             if ($paused || $conversation->human_takeover) {
                 $incoming->update(['status' => 'processed']);
 
-                return;
+                return null;
             }
             $reply = $this->replyWithoutSilence($conversation, $incoming);
+            $out = null;
             if ($reply !== null && trim($reply) !== '') {
                 $out = $conversation->messages()->firstOrCreate(
                     ['provider_message_id' => 'reply:'.$messageId],
                     ['company_id' => $company->id, 'direction' => 'out', 'status' => 'pending', 'body' => mb_substr($reply, 0, 4000)],
                 );
-                if ($out->status === 'pending') {
-                    if (($conversation->fresh()->human_takeover && ! $this->isHandoffAcknowledgement((string) $out->body))
-                        || app(WhatsAppHumanTakeover::class)->isPaused($instance->instance_name, $phone)) {
-                        $out->update(['status' => 'suppressed']);
-                        $incoming->update(['status' => 'processed']);
-
-                        return;
-                    }
-                    app(WhatsAppOutboundGate::class)->reserve($company, WhatsAppOutboundKind::BotReply);
-                    // An uncertain provider failure is left for human review; retries must not send twice.
-                    $out->update(['status' => 'sending']);
-                    try {
-                        $this->evolution->sendText($instance->instance_name, $phone, $out->body);
-                        app(WhatsAppOutboundGate::class)->recordSuccess($company);
-                        $out->update(['status' => 'sent']);
-                    } catch (Throwable $exception) {
-                        $out->update(['status' => 'failed']);
-                        app(WhatsAppOutboundGate::class)->recordFailure($company);
-                        Log::warning($this->logLabel().' reply delivery failed.', [
-                            'company_id' => $company->id, 'conversation_id' => $conversation->id,
-                            'message_id' => $messageId, 'error_type' => $exception::class,
-                        ]);
-                        throw $exception;
-                    }
+                if ($out->status !== 'pending' || $this->suppressIfTakenOver($conversation, $out)) {
+                    $out = null;
                 }
             }
             $incoming->update(['status' => 'processed']);
+
+            return $out;
         });
+        if ($out === null) {
+            return;
+        }
+
+        // A entrega acontece fora da trava: com atraso humano vai pra fila
+        // (sem prender o worker); com o atraso desligado sai na hora.
+        $plan = $this->replyTiming($out);
+        if ($plan === null) {
+            if ($this->deliver($out->id) === 'wait') {
+                SendWhatsAppAIReplyJob::dispatch(static::class, $out->id)->delay(now()->addSeconds(2));
+            }
+
+            return;
+        }
+        SendWhatsAppAIReplyJob::dispatch(static::class, $out->id, $plan['typing_ms'])->delay($plan['dispatch_at']);
+    }
+
+    /**
+     * Entrega uma resposta pendente. Logo antes de enviar confere de novo se a
+     * equipe assumiu ou pausou a conversa, se uma resposta anterior ainda não
+     * saiu (mantém a ordem) e se é repetição da resposta que acabou de sair.
+     *
+     * @return string sent | skipped | suppressed | duplicate | wait
+     */
+    public function deliver(int $messageId, int $typingMs = 0): string
+    {
+        $out = TattooAiMessage::query()->with('conversation.instance', 'conversation.company')->find($messageId);
+        if (! $out || $out->direction !== 'out' || $out->status !== 'pending' || ! $out->conversation?->instance) {
+            return 'skipped';
+        }
+        $conversation = $out->conversation;
+        $outcome = Cache::lock("wa:ai:{$conversation->company_id}:{$conversation->phone_normalized}", 150)
+            ->block(10, function () use ($out, $conversation): string {
+                $out->refresh();
+                $conversation->refresh();
+                if ($out->status !== 'pending') {
+                    return 'skipped';
+                }
+                if ($this->suppressIfTakenOver($conversation, $out)) {
+                    return 'suppressed';
+                }
+                $earlier = $conversation->messages()->where('direction', 'out')->where('id', '<', $out->id);
+                if ((clone $earlier)->whereIn('status', ['pending', 'sending'])->where('updated_at', '>=', now()->subMinutes(2))->exists()) {
+                    return 'wait';
+                }
+                $previous = (clone $earlier)->whereIn('status', ['sending', 'sent'])->latest('id')->first();
+                $askedAt = TattooAiMessage::query()->where('company_id', $out->company_id)
+                    ->where('provider_message_id', Str::after((string) $out->provider_message_id, 'reply:'))->value('created_at');
+                if ($previous && $askedAt && trim((string) $previous->body) === trim((string) $out->body)
+                    && $previous->updated_at?->gt($askedAt)) {
+                    // O cliente mandou outra mensagem ("oi" e "olá") antes da resposta anterior sair:
+                    // a mesma resposta não vai duas vezes.
+                    $out->update(['status' => 'suppressed']);
+                    Log::info($this->logLabel().' duplicate reply suppressed.', ['company_id' => $conversation->company_id,
+                        'conversation_id' => $conversation->id, 'message_id' => $out->provider_message_id]);
+
+                    return 'duplicate';
+                }
+                // Uma falha incerta do provedor fica para revisão humana; retentativas não podem enviar duas vezes.
+                $out->update(['status' => 'sending']);
+
+                return 'claimed';
+            });
+        if ($outcome !== 'claimed') {
+            return $outcome;
+        }
+
+        $company = $conversation->company;
+        $gate = app(WhatsAppOutboundGate::class);
+        $gate->reserve($company, WhatsAppOutboundKind::BotReply);
+        try {
+            $instance = $conversation->instance->instance_name;
+            $typingMs > 0
+                ? $this->evolution->sendText($instance, $conversation->phone_normalized, (string) $out->body, $typingMs)
+                : $this->evolution->sendText($instance, $conversation->phone_normalized, (string) $out->body);
+            $gate->recordSuccess($company);
+            $out->update(['status' => 'sent']);
+        } catch (Throwable $exception) {
+            $out->update(['status' => 'failed']);
+            $gate->recordFailure($company);
+            Log::warning($this->logLabel().' reply delivery failed.', [
+                'company_id' => $company->id, 'conversation_id' => $conversation->id,
+                'message_id' => $out->provider_message_id, 'error_type' => $exception::class,
+            ]);
+            throw $exception;
+        }
+
+        return 'sent';
+    }
+
+    /**
+     * Atraso humano da resposta: entre min e max segundos contados da chegada
+     * da mensagem do cliente (respostas longas puxam pro fim da faixa), com
+     * "digitando..." nos últimos segundos. Respostas seguidas da mesma
+     * conversa ficam em fila, espaçadas, na ordem em que foram geradas.
+     *
+     * @return array{dispatch_at: CarbonImmutable, typing_ms: int, send_at: CarbonImmutable}|null
+     */
+    protected function replyTiming(TattooAiMessage $out): ?array
+    {
+        $config = (array) config('services.evolution.ai_reply_delay', []);
+        $max = max(0, (int) ($config['max_seconds'] ?? 0));
+        if ($max === 0) {
+            return null;
+        }
+        $min = max(0, min((int) ($config['min_seconds'] ?? 0), $max));
+        $typingMax = max(0, (int) ($config['typing_max_seconds'] ?? 4));
+        $floor = $min + intdiv(($max - $min) * min(mb_strlen((string) $out->body), 400), 800);
+        $seconds = random_int($floor, $max);
+
+        $now = CarbonImmutable::now();
+        $incoming = TattooAiMessage::query()->where('company_id', $out->company_id)
+            ->where('provider_message_id', Str::after((string) $out->provider_message_id, 'reply:'))->value('created_at');
+        $receivedAt = $incoming ? CarbonImmutable::parse($incoming) : $now;
+        $sendAt = $receivedAt->addSeconds($seconds);
+
+        $key = "wa:ai:next-send:{$out->tattoo_ai_conversation_id}";
+        $last = Cache::get($key);
+        if (is_numeric($last)) {
+            $sendAt = $sendAt->max(CarbonImmutable::createFromTimestamp((int) $last + min($typingMax, $seconds) + 2));
+        }
+        $sendAt = $sendAt->max($now);
+        $remaining = (int) $now->diffInSeconds($sendAt, true);
+        $typing = min($typingMax, $remaining);
+        Cache::put($key, $sendAt->getTimestamp(), now()->addMinutes(10));
+
+        return ['dispatch_at' => $now->addSeconds($remaining - $typing), 'typing_ms' => $typing * 1000, 'send_at' => $sendAt];
+    }
+
+    protected function suppressIfTakenOver(TattooAiConversation $conversation, TattooAiMessage $out): bool
+    {
+        $paused = app(WhatsAppHumanTakeover::class)->isPaused((string) $conversation->instance?->instance_name, $conversation->phone_normalized);
+        if (! $paused && ! ($conversation->human_takeover && ! $this->isHandoffAcknowledgement((string) $out->body))) {
+            return false;
+        }
+        $out->update(['status' => 'suppressed']);
+
+        return true;
     }
 
     /**
