@@ -9,6 +9,7 @@ use App\Models\TattooRequest;
 use App\Services\AI\GeminiService;
 use App\Services\AI\WhatsAppAIConversationService;
 use App\Services\WhatsApp\EvolutionApiClient;
+use App\Support\CustomerNameDetector;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Throwable;
 
 class TattooAIConversationService extends WhatsAppAIConversationService
 {
@@ -65,20 +67,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         }
         if ($quote && $quote->accepted_at && $quote->deposit_amount > 0 && $message->media_mime
             && ! in_array($conversation->status, ['payment_confirmed', 'converted_to_appointment'], true)) {
-            try {
-                $receipt = $this->receipts->receive($conversation, $quote, (string) $message->provider_message_id, $message->media_mime);
-                $receipt = $this->receipts->analyze($receipt);
-                $conversation->update(['status' => 'receipt_received']);
-
-                return $receipt->receipt_analysis_status === 'compatible'
-                    ? 'Recebi o comprovante! Vou conferir aqui e já te falo.'
-                    : 'Recebi o comprovante, mas não consegui ler tudo direitinho. Vou conferir aqui e já te falo.';
-            } catch (\Throwable $exception) {
-                Log::warning('Tattoo receipt processing failed.', ['company_id' => $conversation->company_id,
-                    'conversation_id' => $conversation->id, 'message_id' => $message->provider_message_id,
-                    'error_type' => $exception::class]);
-                throw $exception;
-            }
+            return $this->handleReceipt($conversation, $quote, $message);
         }
         if ($quote && $quote->accepted_at && preg_match('/\b(pix|chave|sinal|pagar)\b/u', $normalized)) {
             return $this->pixMessage($conversation, $quote);
@@ -126,24 +115,37 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             return 'Seu pedido está com o tatuador para análise. Avisaremos quando houver um orçamento.';
         }
 
+        $collected = $conversation->collected_data ?: [];
+        if ($request === null && ($quick = $this->quickReply($conversation, $collected, $text)) !== null) {
+            return $quick;
+        }
+
         $recent = $conversation->messages()->where('direction', 'in')->latest('id')->limit(8)->get()
             ->reverse()->pluck('body')->all();
-        $result = $this->askModel($conversation, $message, $this->systemPrompt($conversation), [
+        $result = $this->interpret($conversation, $message, $this->systemPrompt($conversation), [
             'summary' => $conversation->summary,
-            'collected' => $conversation->collected_data ?: [],
+            'collected' => $collected,
             'recent_messages' => $recent,
             'current_message' => $text,
         ]);
-        $action = $this->allowedAction($conversation, $result, ['ask', 'save_details', 'request_approval', 'handoff']);
-        if ($action === null) {
-            return 'Beleza, vou chamar o pessoal do estúdio pra te ajudar com isso.';
-        }
+        $action = $result !== null ? $this->allowedAction($conversation, $result, ['ask', 'save_details', 'request_approval', 'handoff']) : null;
         if ($action === 'handoff') {
             $conversation->update(['human_takeover' => true, 'status' => 'human_takeover']);
 
             return 'Beleza, vou chamar o pessoal do estúdio pra falar com você.';
         }
-        $details = validator($result['details'] ?? [], [
+        $withoutModel = $action === null;
+        if ($withoutModel) {
+            // Gemini falhou ou saiu do protocolo: segue o roteiro sem IA em vez de ficar em silêncio.
+            if ($result !== null) {
+                $this->logFallback($conversation, $message, 'invalid_action');
+            }
+            if ($request !== null) {
+                return 'Fechou, anotei aqui! O pessoal do estúdio acompanha a conversa e te responde por aqui 🤙';
+            }
+            $result = ['action' => 'save_details', 'details' => $this->detailsWithoutModel($conversation, $collected, $text), 'reply' => ''];
+        }
+        $rules = [
             'name' => ['nullable', 'string', 'min:2', 'max:100'],
             'description' => ['nullable', 'string', 'min:5', 'max:3000'],
             'body_placement' => ['nullable', 'string', 'min:2', 'max:255'],
@@ -152,7 +154,14 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             'colors' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:3000'],
             'date_preference' => ['nullable', 'string', 'max:255'],
-        ])->validate();
+        ];
+        $validator = validator(is_array($result['details'] ?? null) ? $result['details'] : [], $rules);
+        if ($validator->fails()) {
+            // Campo com tipo/tamanho errado é descartado; os válidos seguem.
+            $this->logFallback($conversation, $message, 'invalid_details');
+        }
+        $details = array_intersect_key($validator->valid(), $rules);
+        $nameBefore = $collected['name'] ?? null;
         $data = array_filter(array_merge($conversation->collected_data ?: [], $details), fn ($value) => filled($value));
         $conversation->update(['collected_data' => $data,
             'summary' => mb_substr(implode('; ', array_map(
@@ -169,12 +178,108 @@ class TattooAIConversationService extends WhatsAppAIConversationService
 
             return 'Show, '.$this->firstName($data['name']).'! Já passei sua ideia pro tatuador. Ele dá uma olhada e te manda o orçamento por aqui 🤙';
         }
-        $reply = trim((string) ($result['reply'] ?? ''));
+        $reply = is_string($result['reply'] ?? null) ? trim($result['reply']) : '';
         if ($this->mentionsUnverifiedFacts($reply)) {
             $reply = '';
         }
+        if ($reply === '' && $withoutModel && $data['name'] !== $nameBefore) {
+            return 'Show, '.$this->displayFirstName($data['name']).'! '.$this->nextQuestion($data);
+        }
 
         return $reply !== '' ? mb_substr($reply, 0, 1000) : $this->nextQuestion($data);
+    }
+
+    /**
+     * Saudação e papo rápido ("bem e vc?") têm resposta pronta, sem Gemini.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function quickReply(TattooAiConversation $conversation, array $data, string $text): ?string
+    {
+        $normalized = $this->normalizedText($text);
+        $intent = match (true) {
+            $this->isGreeting($normalized) => 'greeting',
+            $this->isSmallTalk($normalized) => 'small_talk',
+            default => null,
+        };
+        if ($intent === null) {
+            return null;
+        }
+        Log::info('Tattoo AI quick reply.', ['company_id' => $conversation->company_id,
+            'conversation_id' => $conversation->id, 'intent' => $intent]);
+        $name = ! empty($data['name']) ? $this->displayFirstName((string) $data['name']) : null;
+        $opening = $intent === 'greeting'
+            ? ($name !== null ? 'Opa, '.$name.'! Tudo bem? ' : 'Opa, tudo bem? ')
+            : 'Tudo certo por aqui, valeu! ';
+
+        return $opening.($name === null ? 'Qual seu nome?' : $this->nextQuestion($data));
+    }
+
+    /**
+     * Sem a IA, a mensagem só preenche o campo que acabamos de perguntar
+     * (nome, ideia, local ou tamanho).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, string>
+     */
+    protected function detailsWithoutModel(TattooAiConversation $conversation, array $data, string $text): array
+    {
+        $asked = $this->normalizedText((string) $conversation->messages()->where('direction', 'out')->latest('id')->value('body'));
+        if (empty($data['name'])) {
+            $name = str_contains($asked, 'qual seu nome') || str_contains($asked, 'como voce se chama')
+                ? CustomerNameDetector::fromMessage($text) : null;
+
+            return $name !== null ? ['name' => $name] : [];
+        }
+
+        return match (true) {
+            empty($data['description']) && str_contains($asked, 'como voce imagina a tattoo') && mb_strlen($text) >= 5 => ['description' => mb_substr($text, 0, 3000)],
+            empty($data['body_placement']) && str_contains($asked, 'qual parte do corpo') && mb_strlen($text) >= 2 => ['body_placement' => mb_substr($text, 0, 255)],
+            empty($data['size_description']) && ! empty($data['description']) && ! empty($data['body_placement'])
+                && str_contains($asked, 'de que tamanho') && $text !== '' => ['size_description' => mb_substr($text, 0, 255)],
+            default => [],
+        };
+    }
+
+    protected function fallbackReply(TattooAiConversation $conversation, TattooAiMessage $message): ?string
+    {
+        if ($conversation->status === 'receipt_received') {
+            return 'Seu comprovante tá na conferência. Assim que confirmar o sinal, te aviso aqui.';
+        }
+        if ($conversation->tattoo_request_id !== null) {
+            return $this->instabilityMessage();
+        }
+        $data = $conversation->collected_data ?: [];
+
+        return empty($data['name']) ? 'Opa, tudo bem? Qual seu nome?' : $this->nextQuestion($data);
+    }
+
+    protected function instabilityMessage(): string
+    {
+        return 'Opa, deu uma travadinha aqui 😅 Me manda de novo sua mensagem?';
+    }
+
+    /**
+     * Comprovante sempre recebe resposta: se a leitura automática falhar, ele
+     * fica guardado pendente pra equipe conferir na mão.
+     */
+    protected function handleReceipt(TattooAiConversation $conversation, TattooQuote $quote, TattooAiMessage $message): string
+    {
+        try {
+            $receipt = $this->receipts->receive($conversation, $quote, (string) $message->provider_message_id, (string) $message->media_mime);
+        } catch (Throwable $exception) {
+            Log::warning('Tattoo receipt processing failed.', ['company_id' => $conversation->company_id,
+                'conversation_id' => $conversation->id, 'message_id' => $message->provider_message_id,
+                'stage' => 'receive', 'error_type' => $exception::class]);
+
+            return 'Opa, não consegui abrir esse arquivo aqui 😅 Me manda o comprovante de novo? Pode ser print ou PDF.';
+        }
+        $receipt = $this->receipts->analyzeOrFlag($receipt);
+        $conversation->update(['status' => 'receipt_received']);
+
+        return $receipt->receipt_analysis_status === 'compatible' || ($receipt->analysis['analysis_failed'] ?? false)
+            ? 'Recebi o comprovante! Vou conferir aqui e já te falo.'
+            : 'Recebi o comprovante, mas não consegui ler tudo direitinho. Vou conferir aqui e já te falo.';
     }
 
     protected function systemPrompt(TattooAiConversation $conversation): string

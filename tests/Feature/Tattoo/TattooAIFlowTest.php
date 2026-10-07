@@ -18,7 +18,6 @@ use App\Services\Tattoo\TattooAIConversationService;
 use App\Services\Tattoo\TattooAISchedulingService;
 use App\Services\Tattoo\TattooReceiptService;
 use App\Services\WhatsApp\WhatsAppHumanTakeover;
-use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -110,7 +109,7 @@ class TattooAIFlowTest extends TestCase
         $this->assertSame('Ana Maria', $conversation->collected_data['name']);
     }
 
-    public function test_unknown_action_does_not_execute_and_invalid_json_keeps_message_for_retry(): void
+    public function test_unknown_action_does_not_execute_and_flow_continues(): void
     {
         [$company, $instance, $phone] = $this->setupAI();
         Http::fake(function ($request) {
@@ -120,22 +119,26 @@ class TattooAIFlowTest extends TestCase
 
             return Http::response(['key' => ['id' => 'sent']]);
         });
-        $this->send($company, $instance, $phone, 'Oi', 'unknown');
+        $this->send($company, $instance, $phone, 'Quero uma tattoo', 'unknown');
         $this->assertDatabaseCount('tattoo_requests', 0);
-        $this->assertStringContainsString('chamar o pessoal', TattooAiMessage::query()->where('direction', 'out')->firstOrFail()->body);
-
+        $this->assertSame('Opa, tudo bem? Qual seu nome?', TattooAiMessage::query()->where('direction', 'out')->firstOrFail()->body);
+        $this->assertFalse((bool) TattooAiConversation::query()->firstOrFail()->human_takeover);
     }
 
-    public function test_invalid_json_keeps_message_for_retry(): void
+    public function test_invalid_json_still_replies_with_next_question(): void
     {
         [$company, $instance, $phone] = $this->setupAI();
-        Http::fake(['*generateContent' => Http::response(['candidates' => [['content' => ['parts' => [['text' => 'invalid']]]]]])]);
-        try {
-            $this->send($company, $instance, $phone, 'Nova ideia', 'invalid');
-            $this->fail('Expected invalid JSON exception.');
-        } catch (\RuntimeException) {
-            $this->assertDatabaseHas('tattoo_ai_messages', ['provider_message_id' => 'invalid', 'status' => 'received']);
-        }
+        Http::fake(function ($request) {
+            if (str_contains($request->url(), 'generateContent')) {
+                return Http::response(['candidates' => [['content' => ['parts' => [['text' => 'invalid']]]]]]);
+            }
+
+            return Http::response(['key' => ['id' => 'sent']]);
+        });
+        $this->send($company, $instance, $phone, 'Nova ideia', 'invalid');
+        $this->assertDatabaseHas('tattoo_ai_messages', ['provider_message_id' => 'invalid', 'status' => 'processed']);
+        $this->assertDatabaseHas('tattoo_ai_messages', ['provider_message_id' => 'reply:invalid', 'status' => 'sent',
+            'body' => 'Opa, tudo bem? Qual seu nome?']);
     }
 
     public function test_human_takeover_records_messages_without_calling_gemini_or_replying(): void
@@ -260,17 +263,20 @@ class TattooAIFlowTest extends TestCase
         $this->assertFalse($conversation->fresh()->human_takeover);
     }
 
-    public function test_gemini_failure_keeps_incoming_message_for_retry(): void
+    public function test_gemini_failure_still_replies_with_next_question(): void
     {
         [$company, $instance, $phone] = $this->setupAI();
-        Http::fake(['*generateContent' => Http::response(['error' => 'unavailable'], 503)]);
-        try {
-            $this->send($company, $instance, $phone, 'Quero uma tattoo', 'failed-1');
-            $this->fail('Expected API failure.');
-        } catch (RequestException) {
-            $this->assertDatabaseHas('tattoo_ai_messages', ['provider_message_id' => 'failed-1', 'status' => 'received']);
-            $this->assertDatabaseCount('tattoo_ai_messages', 1);
-        }
+        Http::fake(function ($request) {
+            if (str_contains($request->url(), 'generateContent')) {
+                return Http::response(['error' => 'unavailable'], 503);
+            }
+
+            return Http::response(['key' => ['id' => 'sent']]);
+        });
+        $this->send($company, $instance, $phone, 'Quero uma tattoo', 'failed-1');
+        $this->assertDatabaseHas('tattoo_ai_messages', ['provider_message_id' => 'failed-1', 'status' => 'processed']);
+        $this->assertDatabaseHas('tattoo_ai_messages', ['provider_message_id' => 'reply:failed-1', 'status' => 'sent',
+            'body' => 'Opa, tudo bem? Qual seu nome?']);
     }
 
     public function test_model_generated_price_is_not_sent_to_customer(): void

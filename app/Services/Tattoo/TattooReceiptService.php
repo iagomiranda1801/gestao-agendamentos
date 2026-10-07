@@ -13,14 +13,19 @@ use App\Services\AI\GeminiService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Support\CompanyDateTime;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 class TattooReceiptService
 {
     /** Diferença de relógio aceita entre o comprovante e o sistema. */
     public const CLOCK_TOLERANCE_MINUTES = 5;
+
+    public const ANALYSIS_FAILED_WARNING = 'Leitura automática falhou; confira o comprovante manualmente.';
 
     public function __construct(protected GeminiService $gemini, protected EvolutionApiClient $evolution) {}
 
@@ -63,7 +68,7 @@ class TattooReceiptService
             ]);
             $receipt->company_id = $conversation->company_id;
             $receipt->save();
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Storage::disk($disk)->delete($path);
             throw $exception;
         }
@@ -144,6 +149,33 @@ class TattooReceiptService
         NotifyTattooReceiptJob::dispatch($receipt->id);
 
         return $receipt->refresh();
+    }
+
+    /**
+     * Igual a analyze(), mas se a leitura automática falhar (Gemini fora do ar,
+     * cota, JSON inválido) o comprovante fica pendente pra conferência manual
+     * e a equipe é avisada mesmo assim.
+     */
+    public function analyzeOrFlag(TattooPaymentReceipt $receipt): TattooPaymentReceipt
+    {
+        try {
+            return $this->analyze($receipt);
+        } catch (Throwable $exception) {
+            Log::warning('Tattoo receipt analysis failed.', ['company_id' => $receipt->company_id,
+                'receipt_id' => $receipt->id, 'conversation_id' => $receipt->tattoo_ai_conversation_id,
+                'error_type' => $exception::class,
+                'http_status' => $exception instanceof RequestException ? $exception->response->status() : null]);
+            $receipt->refresh();
+            if ($receipt->analysis === null) {
+                $receipt->update([
+                    'analysis' => ['analysis_failed' => true, 'warnings' => [self::ANALYSIS_FAILED_WARNING]],
+                    'receipt_analysis_status' => 'pending',
+                ]);
+                NotifyTattooReceiptJob::dispatch($receipt->id);
+            }
+
+            return $receipt->refresh();
+        }
     }
 
     public static function normalizeTransactionId(mixed $value): ?string

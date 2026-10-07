@@ -18,13 +18,11 @@ use App\Services\WhatsApp\EvolutionApiClient;
 use App\Support\CompanyDateTime;
 use App\Support\CustomerNameDetector;
 use App\Support\PhoneNormalizer;
-use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
-use Throwable;
 
 /**
  * Atendimento com IA para estética e salão: descobre o nome, o serviço, a
@@ -59,23 +57,7 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
         return 'Beauty AI';
     }
 
-    /**
-     * Nenhuma mensagem fica sem resposta: se algo inesperado acontecer (Gemini
-     * fora do ar, cota esgotada, JSON estranho, erro interno), a cliente recebe
-     * a próxima pergunta do fluxo e o motivo fica registrado no log.
-     */
     protected function process(TattooAiConversation $conversation, TattooAiMessage $message): ?string
-    {
-        try {
-            return $this->respond($conversation, $message);
-        } catch (Throwable $exception) {
-            $this->logFallback($conversation, $message, 'unexpected_error', $exception);
-
-            return $this->safeReply($conversation->fresh() ?? $conversation, $message);
-        }
-    }
-
-    protected function respond(TattooAiConversation $conversation, TattooAiMessage $message): ?string
     {
         $company = $conversation->company;
         $text = trim((string) $message->body);
@@ -208,7 +190,7 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
      */
     protected function quickReply(TattooAiConversation $conversation, array $data, string $text, Collection $services): ?string
     {
-        $normalized = trim((string) preg_replace('/\s+/u', ' ', Str::lower(Str::ascii($text))));
+        $normalized = $this->normalizedText($text);
         $intent = match (true) {
             $this->isGreeting($normalized) => 'greeting',
             $this->isSmallTalk($normalized) => 'small_talk',
@@ -249,23 +231,6 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
         }
 
         return $this->prefixed($conversation, $opening, $this->nextStep($conversation, $data, $services));
-    }
-
-    protected function isGreeting(string $normalized): bool
-    {
-        return CustomerNameDetector::isGreeting($normalized)
-            || (bool) preg_match('/^(?:oi+e?|ola+|opa|oie|hey|hello|salve|e ai|eai|eae|bom dia|boa tarde|boa noite)(?:[,!. ]+(?:moca|moco|gente|pessoal|tudo bem|td bem|tudo bom|como vai))*[!.?, ]*$/u', $normalized);
-    }
-
-    protected function isSmallTalk(string $normalized): bool
-    {
-        $you = '(?:voce|vc|vcs|voces|ai|contigo)';
-
-        return (bool) preg_match('/^(?:(?:oi+|ola)[,! ]+)?(?:'
-            .'(?:e )?(?:tudo (?:bem|bom|certo|joia|otimo|tranquilo)|td (?:bem|bom)|como vai|como (?:voce|vc) (?:esta|ta))(?: (?:com|e) '.$you.')?'
-            .'|(?:(?:eu )?(?:to|tou|estou|ta) )?(?:bem|otimo|otima|tranquilo|tranquila|tudo (?:bem|bom|certo|otimo|joia|sim)|mais ou menos)(?: (?:gracas a deus|obrigad[oa]))?(?:,? (?:e )?(?:com )?'.$you.')?'
-            .'|e (?:com )?'.$you
-            .')[\s!.?,]*$/u', $normalized);
     }
 
     /** @param  Collection<int, Service>  $services */
@@ -310,62 +275,19 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
         return $mentioned->count() === 1 ? ['service_id' => (int) $mentioned->first()->id] : [];
     }
 
-    /**
-     * Chama o Gemini; qualquer falha (HTTP, cota, timeout, JSON inválido) vira
-     * null para o fluxo seguir sem a IA.
-     *
-     * @param  array<string, mixed>  $payload
-     * @return array<string, mixed>|null
-     */
-    protected function interpret(TattooAiConversation $conversation, TattooAiMessage $message, string $instruction, array $payload): ?array
+    protected function fallbackReply(TattooAiConversation $conversation, TattooAiMessage $message): ?string
     {
-        try {
-            return $this->askModel($conversation, $message, $instruction, $payload);
-        } catch (Throwable $exception) {
-            $this->logFallback($conversation, $message, 'model_unavailable', $exception);
-
-            return null;
+        $services = $this->scheduling->services($conversation->company);
+        if ($services->isEmpty()) {
+            return $this->handoff($conversation);
         }
+
+        return $this->nextStep($conversation, $conversation->collected_data ?: [], $services);
     }
 
-    /**
-     * Última rede de segurança: a próxima pergunta do fluxo, ou um pedido
-     * curto pra repetir se nem isso der certo.
-     */
-    protected function safeReply(TattooAiConversation $conversation, TattooAiMessage $message): string
+    protected function instabilityMessage(): string
     {
-        try {
-            $services = $this->scheduling->services($conversation->company);
-            if ($services->isEmpty()) {
-                return $this->handoff($conversation);
-            }
-
-            return $this->nextStep($conversation, $conversation->collected_data ?: [], $services);
-        } catch (Throwable $exception) {
-            $this->logFallback($conversation, $message, 'fallback_failed', $exception);
-
-            return 'Opa, tive uma instabilidade rapidinha aqui 😅 Pode me mandar sua mensagem de novo?';
-        }
-    }
-
-    protected function logFallback(TattooAiConversation $conversation, TattooAiMessage $message, string $reason, ?Throwable $exception = null): void
-    {
-        Log::warning('Beauty AI fallback reply.', [
-            'company_id' => $conversation->company_id, 'conversation_id' => $conversation->id,
-            'message_id' => $message->provider_message_id, 'reason' => $reason,
-            'error_type' => $exception ? $exception::class : null,
-            'http_status' => $exception instanceof RequestException ? $exception->response->status() : null,
-            'error' => $exception ? mb_substr($exception->getMessage(), 0, 300) : null,
-        ]);
-    }
-
-    /** Nome cadastrado todo em maiúsculas/minúsculas aparece como "Iago". */
-    protected function displayFirstName(string $name): string
-    {
-        $first = $this->firstName($name);
-
-        return $first === mb_strtoupper($first) || $first === mb_strtolower($first)
-            ? mb_convert_case(mb_strtolower($first), MB_CASE_TITLE, 'UTF-8') : $first;
+        return 'Opa, tive uma instabilidade rapidinha aqui 😅 Pode me mandar sua mensagem de novo?';
     }
 
     /**
