@@ -38,7 +38,8 @@ class NotifyTattooReceiptJob implements ShouldQueue
         Notification::make()->title('Comprovante PIX recebido')
             ->body(($receipt->request->client?->name ?? 'Cliente').' · Sinal esperado R$ '
                 .number_format((float) $receipt->quote->deposit_amount, 2, ',', '.')
-                .' · Leitura '.$receipt->receipt_analysis_status)
+                .' · Leitura '.$receipt->receipt_analysis_status
+                .(($receipt->analysis['warnings'] ?? []) !== [] ? ' · Alertas: '.implode('; ', $receipt->analysis['warnings']) : ''))
             ->actions([Action::make('view')->label('Conferir')->url($url)->markAsRead()])
             ->sendToDatabase($users->values());
     }
