@@ -120,6 +120,54 @@ class TattooAIFlowTest extends TestCase
         $this->assertSame(1, $request->images()->count());
     }
 
+    public function test_vague_idea_is_clarified_before_confirming_image_reference(): void
+    {
+        [$company, $instance, $phone] = $this->setupAI();
+        Storage::fake('local');
+        config(['filesystems.tattoo_disk' => 'local']);
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/L9sAAAAASUVORK5CYII=');
+        $descriptions = ['Bem e você? Imagina várias ideias', 'Bem e você? Uma rosa com folhas'];
+        Http::fake(function ($request) use ($png, &$descriptions) {
+            if (str_contains($request->url(), 'getBase64FromMediaMessage')) {
+                return Http::response(['base64' => base64_encode($png)]);
+            }
+            if (str_contains($request->url(), 'generateContent')) {
+                return Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode([
+                    'action' => 'save_details',
+                    'details' => ['description' => array_shift($descriptions)],
+                    'reply' => '',
+                ])]]]]]]);
+            }
+
+            return Http::response(['key' => ['id' => 'sent']]);
+        });
+        TattooAiConversation::query()->create([
+            'company_id' => $company->id, 'company_whatsapp_instance_id' => $instance->id,
+            'phone_normalized' => $phone, 'remote_jid' => $phone.'@s.whatsapp.net',
+            'status' => 'collecting_information', 'collected_data' => [
+                'name' => 'Ana', 'description' => 'Bem e você? Imagina várias ideias',
+                'body_placement' => 'Braço', 'size_description' => '8 cm', 'style' => 'Realismo',
+            ],
+        ]);
+
+        $this->send($company, $instance, $phone, '', 'vague-image', 'image/png');
+        $this->assertSame('Recebi a imagem, obrigado! Que desenho ou elementos você quer na tattoo? Pode descrever do seu jeito.',
+            TattooAiMessage::query()->where('provider_message_id', 'reply:vague-image')->value('body'));
+
+        $this->send($company, $instance, $phone, 'Imagina várias ideias', 'still-vague');
+        $this->assertStringContainsString('Que desenho ou elementos',
+            TattooAiMessage::query()->where('provider_message_id', 'reply:still-vague')->value('body'));
+        $this->assertDatabaseCount('tattoo_requests', 0);
+
+        $this->send($company, $instance, $phone, 'Uma rosa com folhas', 'clear-idea');
+        $conversation = TattooAiConversation::query()->firstOrFail();
+        $this->assertSame('Uma rosa com folhas', $conversation->collected_data['description']);
+        $this->assertSame('awaiting_confirmation', $conversation->status);
+        $summary = TattooAiMessage::query()->where('provider_message_id', 'reply:clear-idea')->value('body');
+        $this->assertStringContainsString('Ideia: Uma rosa com folhas', $summary);
+        $this->assertStringNotContainsString('Bem e você?', $summary);
+    }
+
     public function test_ai_asks_name_first_and_registers_client_as_soon_as_name_is_given(): void
     {
         [$company, $instance, $phone] = $this->setupAI();
@@ -202,10 +250,14 @@ class TattooAIFlowTest extends TestCase
         $user = $this->createCompanyUser($company);
         TattooAiConversation::query()->create(['company_id' => $company->id,
             'company_whatsapp_instance_id' => $instance->id, 'phone_normalized' => $phone,
-            'remote_jid' => $phone.'@s.whatsapp.net']);
+            'remote_jid' => $phone.'@s.whatsapp.net', 'status' => 'waiting_professional_quote']);
+        TattooAiConversation::query()->create(['company_id' => $company->id,
+            'company_whatsapp_instance_id' => $instance->id, 'phone_normalized' => $phone.'1',
+            'remote_jid' => $phone.'1@s.whatsapp.net', 'status' => 'human_takeover']);
         $this->authenticateForAppTenant($user, $company);
         $this->get(TattooAiConversationResource::getUrl('index'))
-            ->assertOk()->assertSee($phone);
+            ->assertOk()->assertSee($phone)->assertSee('Aguardando orçamento')
+            ->assertSee('Atendimento humano');
     }
 
     public function test_conversation_page_displays_messages_as_chat(): void

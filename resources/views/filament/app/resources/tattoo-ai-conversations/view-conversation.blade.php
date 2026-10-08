@@ -3,6 +3,7 @@
     use App\Filament\App\Resources\Clients\ClientResource;
     use App\Filament\App\Resources\Appointments\AppointmentResource;
     use App\Support\CompanyDateTime;
+    use App\Models\TattooAiConversation;
 
     $conversation = $this->getRecord()->fresh(['client', 'company', 'professional', 'appointment', 'request.professional', 'request.quotes']);
     $isTattoo = $conversation->company->isTattooStudio();
@@ -12,18 +13,6 @@
     $messages = $this->getChatMessages();
     $timezone = CompanyDateTime::timezone($conversation->company);
     $externallyPaused = $this->isExternallyPaused();
-    $statusLabels = [
-        'collecting_information' => 'Coletando informações',
-        'waiting_professional_quote' => 'Aguardando orçamento',
-        'waiting_payment_receipt' => 'Aguardando comprovante',
-        'receipt_received' => 'Comprovante em análise',
-        'payment_confirmed' => 'Sinal confirmado',
-        'ready_to_schedule' => 'Pronto para agendar',
-        'converted_to_appointment' => 'Agendado',
-        'human_takeover' => 'Atendimento humano',
-        'offering_slots' => 'Escolhendo horário',
-        'awaiting_confirmation' => 'Aguardando confirmação',
-    ];
 @endphp
 
 <x-filament-panels::page>
@@ -114,7 +103,7 @@
             <div class="tattoo-chat-detail-card">
                 <h2>Atendimento</h2>
                 <dl>
-                    <div><dt>Status</dt><dd>{{ $statusLabels[$conversation->status] ?? str_replace('_', ' ', $conversation->status) }}</dd></div>
+                    <div><dt>Status</dt><dd>{{ TattooAiConversation::statusLabel($conversation->status) }}</dd></div>
                     <div><dt>Última interação</dt><dd>{{ $conversation->last_interaction_at?->timezone($timezone)->format('d/m/Y H:i') ?: '—' }}</dd></div>
                     <div><dt>Profissional</dt><dd>{{ $request?->professional?->name ?: ($conversation->professional?->name ?: 'Ainda não atribuído') }}</dd></div>
                 </dl>

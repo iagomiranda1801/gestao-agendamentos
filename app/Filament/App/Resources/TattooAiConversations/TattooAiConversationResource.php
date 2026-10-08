@@ -100,7 +100,8 @@ class TattooAiConversationResource extends Resource
             TextColumn::make('last_interaction_at')->label('Última interação')->dateTime('d/m/Y H:i')->sortable(),
             TextColumn::make('client.name')->label('Cliente')->placeholder('A identificar'),
             TextColumn::make('phone_normalized')->label('Telefone')->searchable(),
-            TextColumn::make('status')->label('Status')->badge(),
+            TextColumn::make('status')->label('Status')->badge()
+                ->formatStateUsing(fn (?string $state): string => TattooAiConversation::statusLabel($state)),
             TextColumn::make('request.id')->label('Pedido')->placeholder('—')
                 ->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
             TextColumn::make('appointment.service_name_snapshot')->label('Último agendamento')->placeholder('—')

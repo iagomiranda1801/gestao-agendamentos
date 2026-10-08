@@ -8,7 +8,25 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TattooAiConversation extends Model
 {
+    public const STATUS_LABELS = [
+        'collecting_information' => 'Coletando informações',
+        'waiting_professional_quote' => 'Aguardando orçamento',
+        'waiting_payment_receipt' => 'Aguardando comprovante',
+        'receipt_received' => 'Comprovante em análise',
+        'payment_confirmed' => 'Sinal confirmado',
+        'ready_to_schedule' => 'Pronto para agendar',
+        'converted_to_appointment' => 'Agendado',
+        'human_takeover' => 'Atendimento humano',
+        'offering_slots' => 'Escolhendo horário',
+        'awaiting_confirmation' => 'Aguardando confirmação',
+    ];
+
     protected $guarded = ['id'];
+
+    public static function statusLabel(?string $status): string
+    {
+        return self::STATUS_LABELS[$status] ?? str_replace('_', ' ', $status ?? '');
+    }
 
     protected function casts(): array
     {

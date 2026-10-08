@@ -101,7 +101,7 @@ class TattooAIResilienceTest extends TestCase
         $this->assertSame('Tudo certo por aqui, valeu! Qual seu nome?', $this->send($company, $instance, 'bem e vc?', 't2'));
         $this->assertSame(0, $this->geminiCalls());
 
-        $this->assertSame('Show, Ana! Me conta como você imagina a tattoo?', $this->send($company, $instance, 'Ana Souza', 't3'));
+        $this->assertSame('Show, Ana! Que desenho ou elementos você quer na tattoo? Pode descrever do seu jeito.', $this->send($company, $instance, 'Ana Souza', 't3'));
         $this->assertDatabaseHas('clients', ['company_id' => $company->id, 'name' => 'Ana Souza', 'phone_normalized' => $this->phone]);
         $this->assertSame('Massa! E vai ser em qual parte do corpo?', $this->send($company, $instance, 'Uma rosa fineline com folhas', 't4'));
         $this->assertSame('E mais ou menos de que tamanho? Pode ser em cm mesmo.', $this->send($company, $instance, 'Antebraço', 't5'));
@@ -134,7 +134,7 @@ class TattooAIResilienceTest extends TestCase
             $this->geminiJson(['action' => 'execute_sql', 'reply' => 'ok']),
         ]);
 
-        $this->assertSame('Me conta como você imagina a tattoo?', $this->send($company, $instance, 'Quero fazer uma tattoo', 'w1'));
+        $this->assertSame('Que desenho ou elementos você quer na tattoo? Pode descrever do seu jeito.', $this->send($company, $instance, 'Quero fazer uma tattoo', 'w1'));
         $this->assertSame('Massa! E vai ser em qual parte do corpo?', $this->send($company, $instance, 'Um leão realista', 'w2'));
         $this->assertSame('E mais ou menos de que tamanho? Pode ser em cm mesmo.', $this->send($company, $instance, 'Nas costas', 'w3'));
         $this->assertSame('E mais ou menos de que tamanho? Pode ser em cm mesmo.', $this->send($company, $instance, 'uns 20', 'w4'));
