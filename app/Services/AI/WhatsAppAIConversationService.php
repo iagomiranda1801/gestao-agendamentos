@@ -28,7 +28,7 @@ use Throwable;
  */
 abstract class WhatsAppAIConversationService
 {
-    protected GeminiService $gemini;
+    protected CompanyAIService $gemini;
 
     protected EvolutionApiClient $evolution;
 

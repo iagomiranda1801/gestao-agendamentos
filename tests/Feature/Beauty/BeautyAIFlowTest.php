@@ -43,7 +43,8 @@ class BeautyAIFlowTest extends TestCase
         ]);
         $setup = $this->createBookableSetup($company);
         $setup['service']->update(['name' => 'Corte feminino', 'price' => 80]);
-        $this->enablePublicBooking($company, array_merge(['beauty_ai_enabled' => true, 'online_auto_confirm' => true], $settings));
+        $this->enablePublicBooking($company, array_merge(['beauty_ai_enabled' => true, 'online_auto_confirm' => true,
+            'ai_provider' => 'gemini', 'ai_model' => 'gemini-2.5-flash', 'ai_api_key' => 'test-key'], $settings));
         $instance = new CompanyWhatsAppInstance(['name' => 'Principal', 'instance_name' => 'beauty-test',
             'is_default' => true, 'status' => 'open']);
         $instance->company_id = $company->id;

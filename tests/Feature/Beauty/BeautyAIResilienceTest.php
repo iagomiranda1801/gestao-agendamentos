@@ -57,7 +57,8 @@ class BeautyAIResilienceTest extends TestCase
                 'professional_id' => $setup['professional']->getKey(), 'service_id' => $service->getKey(), 'is_active' => true,
             ]);
         }
-        $this->enablePublicBooking($company, ['beauty_ai_enabled' => true, 'online_auto_confirm' => true]);
+        $this->enablePublicBooking($company, ['beauty_ai_enabled' => true, 'online_auto_confirm' => true,
+            'ai_provider' => 'gemini', 'ai_model' => 'gemini-2.5-flash', 'ai_api_key' => 'test-key']);
         $instance = new CompanyWhatsAppInstance(['name' => 'Principal', 'instance_name' => 'beauty-resilience',
             'is_default' => true, 'status' => 'open']);
         $instance->company_id = $company->id;

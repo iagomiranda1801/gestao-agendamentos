@@ -59,6 +59,8 @@ class TattooReceiptFraudTest extends TestCase
     private function makeQuote(?Company $company = null, array $quoteAttributes = []): array
     {
         $company ??= $this->createSchedulingCompany(['business_profile' => CompanyProfile::TattooStudio]);
+        $company->schedulingSetting()->updateOrCreate([], ['ai_provider' => 'gemini',
+            'ai_model' => 'gemini-2.5-flash', 'ai_api_key' => 'test-key']);
         $instance = new CompanyWhatsAppInstance(['name' => 'Principal', 'instance_name' => 'fraud-'.Str::random(8),
             'is_default' => true, 'status' => 'open']);
         $instance->company_id = $company->id;

@@ -9,7 +9,7 @@ use App\Models\TattooAiConversation;
 use App\Models\TattooPaymentReceipt;
 use App\Models\TattooQuote;
 use App\Models\User;
-use App\Services\AI\GeminiService;
+use App\Services\AI\CompanyAIService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Support\CompanyDateTime;
 use Carbon\CarbonImmutable;
@@ -27,7 +27,7 @@ class TattooReceiptService
 
     public const ANALYSIS_FAILED_WARNING = 'Leitura automática falhou; confira o comprovante manualmente.';
 
-    public function __construct(protected GeminiService $gemini, protected EvolutionApiClient $evolution) {}
+    public function __construct(protected CompanyAIService $gemini, protected EvolutionApiClient $evolution) {}
 
     public function receive(TattooAiConversation $conversation, TattooQuote $quote, string $messageId, string $mime): TattooPaymentReceipt
     {

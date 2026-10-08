@@ -33,6 +33,8 @@ class TattooAIFlowTest extends TestCase
     private function setupAI(): array
     {
         $company = $this->createSchedulingCompany(['business_profile' => CompanyProfile::TattooStudio]);
+        $company->schedulingSetting()->updateOrCreate([], ['ai_provider' => 'gemini',
+            'ai_model' => 'gemini-2.5-flash', 'ai_api_key' => 'test-key']);
         $instance = new CompanyWhatsAppInstance(['name' => 'Principal', 'instance_name' => 'ai-test',
             'is_default' => true, 'status' => 'open']);
         $instance->company_id = $company->id;
@@ -59,7 +61,9 @@ class TattooAIFlowTest extends TestCase
                     1 => ['name' => 'Ana'],
                     2 => ['description' => 'Uma rosa com linhas finas'],
                     3 => ['body_placement' => 'Antebraço'],
-                    default => ['size_description' => '15 cm'],
+                    4 => ['size_description' => '15 cm'],
+                    5 => ['style' => 'Fine line'],
+                    default => [],
                 };
 
                 return Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode([
@@ -69,14 +73,51 @@ class TattooAIFlowTest extends TestCase
 
             return Http::response(['key' => ['id' => 'sent']]);
         });
-        foreach (['Ana', 'Quero uma rosa', 'No antebraço', '15 cm'] as $i => $text) {
+        foreach (['Ana', 'Quero uma rosa', 'No antebraço', '15 cm', 'Fine line', 'sem foto', 'sim'] as $i => $text) {
             $this->send($company, $instance, $phone, $text, 'm'.$i);
         }
-        $this->send($company, $instance, $phone, '15 cm', 'm3');
+        $this->send($company, $instance, $phone, 'sim', 'm6');
         $this->assertDatabaseCount('tattoo_requests', 1);
         $this->assertDatabaseCount('tattoo_quotes', 0);
         $this->assertSame('waiting_professional_quote', TattooAiConversation::query()->firstOrFail()->status);
-        $this->assertSame(4, TattooAiMessage::query()->where('direction', 'out')->count());
+        $this->assertSame(7, TattooAiMessage::query()->where('direction', 'out')->count());
+    }
+
+    public function test_reference_sent_first_is_kept_and_not_requested_again(): void
+    {
+        [$company, $instance, $phone] = $this->setupAI();
+        Storage::fake('local');
+        config(['filesystems.tattoo_disk' => 'local']);
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/L9sAAAAASUVORK5CYII=');
+        $details = [
+            ['name' => 'Ana'], ['description' => 'Uma rosa com folhas'],
+            ['body_placement' => 'Braço'], ['size_description' => '10 cm'], ['style' => 'Fine line'],
+        ];
+        Http::fake(function ($request) use ($png, &$details) {
+            if (str_contains($request->url(), 'getBase64FromMediaMessage')) {
+                return Http::response(['base64' => base64_encode($png)]);
+            }
+            if (str_contains($request->url(), 'generateContent')) {
+                return Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode([
+                    'action' => 'save_details', 'details' => array_shift($details), 'reply' => '',
+                ])]]]]]]);
+            }
+
+            return Http::response(['key' => ['id' => 'sent']]);
+        });
+
+        $this->send($company, $instance, $phone, '', 'image-first', 'image/png');
+        foreach (['Ana', 'Uma rosa com folhas', 'Braço', '10 cm', 'Fine line'] as $index => $body) {
+            $this->send($company, $instance, $phone, $body, 'early-'.$index);
+        }
+        $summary = TattooAiMessage::query()->where('provider_message_id', 'reply:early-4')->value('body');
+        $this->assertStringContainsString('imagem recebida', $summary);
+        $this->assertStringNotContainsString('Você tem alguma imagem', $summary);
+        $this->assertDatabaseCount('tattoo_requests', 0);
+
+        $this->send($company, $instance, $phone, 'sim', 'early-confirm');
+        $request = TattooRequest::query()->firstOrFail();
+        $this->assertSame(1, $request->images()->count());
     }
 
     public function test_ai_asks_name_first_and_registers_client_as_soon_as_name_is_given(): void

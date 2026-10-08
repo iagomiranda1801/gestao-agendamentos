@@ -14,7 +14,7 @@ Criados:
 
 - `database/migrations/2026_10_06_100000_create_tattoo_ai_tables.php`
 - `app/Models/TattooAiConversation.php`, `TattooAiMessage.php`, `TattooPaymentReceipt.php`
-- `app/Services/AI/GeminiService.php`
+- `app/Services/AI/CompanyAIService.php`
 - `app/Services/Tattoo/TattooAIConversationService.php`, `TattooReceiptService.php`, `TattooAISchedulingService.php`
 - `app/Jobs/NotifyTattooReceiptJob.php`
 - `app/Http/Controllers/TattooReceiptController.php`
@@ -40,7 +40,7 @@ A migração adiciona `tattoo_ai_enabled` e `tattoo_ai_prompt` às configuraçõ
 
 1. Ative **Bot de orçamentos no WhatsApp** e **Atendimento com IA (Gemini)** nas configurações da agenda da empresa de tatuagem. Sem a segunda opção, o bot anterior continua atendendo. Empresas de outros perfis não passam pela IA.
 2. O webhook continua apenas registrando e enfileirando. O job resolve a empresa e chama `TattooAIConversationService`. A mensagem recebida é salva antes de chamar Gemini. O ID do WhatsApp é único por empresa; respostas também usam uma chave derivada dele. Há lock por empresa/telefone.
-3. Gemini só retorna JSON de intenção, campos coletados e texto. O backend permite `ask`, `save_details`, `request_approval` e `handoff`, valida os campos e cria o pedido com os models existentes quando desenho, local e tamanho estiverem disponíveis. A IA não cria proposta com valor, executa SQL ou escolhe rotas. O prompt recebe até oito mensagens recentes e os dados estruturados, sem histórico ilimitado. Uma referência recebida cedo fica temporariamente em armazenamento privado e é vinculada ao pedido quando ele é criado.
+3. O provedor configurado pela empresa retorna JSON de intenção, campos coletados e texto. O backend permite `ask`, `save_details`, `request_approval` e `handoff`, valida os campos e só envia o pedido à análise depois de obter nome, desenho, local, tamanho, estilo e resposta sobre a referência, com resumo confirmado pelo cliente. `Não sei` para estilo e `sem foto` para referência são respostas válidas. A IA não cria proposta com valor, executa SQL ou escolhe rotas. O prompt recebe até oito mensagens recentes e os dados estruturados, sem histórico ilimitado. Uma referência recebida cedo fica temporariamente em armazenamento privado e é vinculada ao pedido quando ele é criado.
 4. O tatuador define e envia a proposta pela tela de orçamentos existente. Após o aceite explícito do cliente, o backend consulta a proposta aceita e a conta financeira ativa com PIX. Só envia chave, favorecido e sinal quando esses dados estão completos.
 5. Imagem/PDF do comprovante é baixado pela Evolution e salvo em disco privado. Gemini extrai dados em JSON. O backend compara valor e favorecido quando disponíveis e mantém `payment_status=receipt_received`. A equipe recebe notificação no painel e abre o arquivo pela rota autenticada. Só a ação humana **Confirmar sinal** marca `confirmed`; **Rejeitar comprovante** permite novo envio.
 6. Após confirmação, o backend lista opções consultadas em `AvailabilityService`. A escolha precisa corresponder a uma opção atual; `AppointmentService` valida de novo dentro da transação e cria o agendamento. O fluxo de criação manual também exige sinal confirmado nos pedidos originados pela IA quando houver sinal definido.
@@ -50,12 +50,12 @@ Nenhuma leitura de comprovante confirma crédito bancário. Respostas da IA que 
 
 ## Implantação e teste manual
 
-1. Configure no servidor `GEMINI_API_KEY` e, opcionalmente, `GEMINI_MODEL` (padrão `gemini-2.5-flash`) e `GEMINI_TIMEOUT` (padrão 30 segundos). A chave permanece apenas no `.env` do backend. Configure `TATTOO_FILESYSTEM_DISK` e a Evolution como já fazia.
+1. Em **Configurações da agenda** de cada empresa, escolha Gemini, OpenAI ou OpenRouter, informe o identificador do modelo e a chave de API da própria empresa. A chave é criptografada e não volta a ser exibida. Não há uso da chave global do servidor como alternativa. Opcionalmente, configure `AI_TIMEOUT` no servidor (padrão 30 segundos). Configure `TATTOO_FILESYSTEM_DISK` e a Evolution como já fazia. Empresas que já usavam a IA precisam preencher essas configurações; até lá, o fluxo mantém respostas de apoio sem chamar um provedor e avisa a equipe no painel.
 2. Execute `php artisan migrate --force` e `php artisan config:cache`.
 3. Mantenha um worker da fila: `php artisan queue:work --tries=5 --timeout=120` (ou Horizon no ambiente Redis). Ajuste `DB_QUEUE_RETRY_AFTER=180` ou `REDIS_QUEUE_RETRY_AFTER=180`, sempre acima do timeout do worker. Reinicie workers existentes com `php artisan queue:restart`.
 4. Na conta financeira padrão de recebimentos, preencha chave PIX e nome do favorecido. Ative a IA nas configurações da agenda da empresa.
 5. Pelo WhatsApp, envie uma ideia em mensagens separadas, foto de referência e tamanho. Confira a conversa em **Atendimentos IA** e o pedido em **Orçamentos de tatuagem**. Crie e envie uma proposta humana com sinal. Responda `aceito`, confira os dados PIX, envie imagem/PDF do comprovante e faça a conferência no painel. Confirme o sinal e peça horários; selecione um dos horários exatos exibidos.
 
-Decisões operacionais: escolher o modelo Gemini conforme cota e disponibilidade da conta Google; preencher PIX/favorecido; manter worker e armazenamento privado configurados; equipe conferir extrato bancário antes de confirmar qualquer sinal. Comprovante e resposta do provedor não são prova de liquidação.
+Decisões operacionais: cada empresa escolhe modelo e provedor conforme sua conta e cota; preencher PIX/favorecido; manter worker e armazenamento privado configurados; equipe conferir extrato bancário antes de confirmar qualquer sinal. Comprovante e resposta do provedor não são prova de liquidação. A leitura de comprovantes usa a mesma chave da empresa. Se falhar, o arquivo segue para conferência humana. Erros de autenticação, autorização ou cota geram aviso no painel aos responsáveis da empresa.
 
 Referências da API Gemini: [generateContent](https://ai.google.dev/gemini-api/docs/generate-content/text-generation), [saída estruturada](https://ai.google.dev/gemini-api/docs/generate-content/structured-output), [documentos PDF](https://ai.google.dev/gemini-api/docs/document-processing).

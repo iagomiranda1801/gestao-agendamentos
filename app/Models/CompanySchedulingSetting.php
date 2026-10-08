@@ -39,6 +39,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'whatsapp_bot_enabled',
     'tattoo_ai_enabled',
     'tattoo_ai_prompt',
+    'ai_provider',
+    'ai_model',
+    'ai_api_key',
     'beauty_ai_enabled',
     'beauty_ai_prompt',
     'whatsapp_instance',
@@ -55,6 +58,8 @@ class CompanySchedulingSetting extends Model
 {
     /** @use HasFactory<CompanySchedulingSettingFactory> */
     use HasFactory;
+
+    protected $hidden = ['ai_api_key'];
 
     protected $guarded = ['company_id'];
 
@@ -83,6 +88,7 @@ class CompanySchedulingSetting extends Model
             'whatsapp_notifications_enabled' => 'boolean',
             'whatsapp_bot_enabled' => 'boolean',
             'tattoo_ai_enabled' => 'boolean',
+            'ai_api_key' => 'encrypted',
             'beauty_ai_enabled' => 'boolean',
             'notify_professional_by_email' => 'boolean',
             'notify_professional_by_whatsapp' => 'boolean',

@@ -9,7 +9,7 @@ use App\Models\Company;
 use App\Models\Service;
 use App\Models\TattooAiConversation;
 use App\Models\TattooAiMessage;
-use App\Services\AI\GeminiService;
+use App\Services\AI\CompanyAIService;
 use App\Services\AI\WhatsAppAIConversationService;
 use App\Services\Scheduling\AppointmentSnapshotResolver;
 use App\Services\Scheduling\CompanyBusinessHoursService;
@@ -39,7 +39,7 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
         'date', 'period', 'offered_slots', 'selected_slot', 'booking_uuid'];
 
     public function __construct(
-        protected GeminiService $gemini,
+        protected CompanyAIService $gemini,
         protected EvolutionApiClient $evolution,
         protected BeautyAISchedulingService $scheduling,
         protected CompanySchedulingSettingService $settings,

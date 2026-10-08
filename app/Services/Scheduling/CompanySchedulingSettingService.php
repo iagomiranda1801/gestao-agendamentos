@@ -42,6 +42,10 @@ class CompanySchedulingSettingService
     {
         return DB::transaction(function () use ($company, $data): CompanySchedulingSetting {
             $setting = $this->getOrCreate($company);
+            if (array_key_exists('ai_provider', $data) && $data['ai_provider'] !== $setting->ai_provider
+                && filled($data['ai_provider']) && blank($data['ai_api_key'] ?? null)) {
+                throw ValidationException::withMessages(['ai_api_key' => 'Informe uma nova chave ao trocar o provedor de IA.']);
+            }
             $payload = $this->preparePayload($data);
 
             $this->validatePayload(array_merge($setting->getAttributes(), $payload));
@@ -99,6 +103,25 @@ class CompanySchedulingSettingService
      */
     protected function validatePayload(array $payload): void
     {
+        if (($payload['tattoo_ai_enabled'] ?? false) || ($payload['beauty_ai_enabled'] ?? false)) {
+            if (blank($payload['ai_provider'] ?? null) || blank($payload['ai_api_key'] ?? null)) {
+                throw ValidationException::withMessages(['ai_api_key' => 'Configure provedor e chave próprios antes de ativar a IA.']);
+            }
+        }
+        if (filled($payload['ai_provider'] ?? null)) {
+            if (! in_array($payload['ai_provider'], ['gemini', 'openai', 'openrouter'], true)) {
+                throw ValidationException::withMessages(['ai_provider' => 'Selecione um provedor de IA válido.']);
+            }
+            if (blank($payload['ai_api_key'] ?? null)) {
+                throw ValidationException::withMessages(['ai_api_key' => 'Informe a chave de API da empresa.']);
+            }
+            if (blank($payload['ai_model'] ?? null) || ! preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._:\/-]{0,119}$/', (string) $payload['ai_model'])) {
+                throw ValidationException::withMessages(['ai_model' => 'Informe um identificador de modelo válido.']);
+            }
+        }
+        if (blank($payload['ai_provider'] ?? null) && filled($payload['ai_api_key'] ?? null)) {
+            throw ValidationException::withMessages(['ai_provider' => 'Selecione o provedor da chave de IA.']);
+        }
         $allowedIntervals = [5, 10, 15, 20, 30, 60];
 
         if (isset($payload['slot_interval_minutes'])

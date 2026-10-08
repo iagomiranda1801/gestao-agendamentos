@@ -38,6 +38,8 @@ class WhatsAppAIReplyDelayTest extends TestCase
             'business_profile' => CompanyProfile::TattooStudio,
             'enabled_modules' => [CompanyModule::Scheduling->value, CompanyModule::WhatsApp->value],
         ]);
+        $company->schedulingSetting()->updateOrCreate([], ['ai_provider' => 'gemini',
+            'ai_model' => 'gemini-2.5-flash', 'ai_api_key' => 'test-key']);
         $instance = new CompanyWhatsAppInstance(['name' => 'Principal', 'instance_name' => 'delay-test',
             'is_default' => true, 'status' => 'open']);
         $instance->company_id = $company->id;

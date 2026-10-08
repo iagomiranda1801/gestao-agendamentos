@@ -30,6 +30,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Validation\ValidationException;
 use UnitEnum;
 
 class SchedulingSettingsPage extends Page
@@ -107,6 +108,10 @@ class SchedulingSettingsPage extends Page
             'whatsapp_bot_enabled' => $setting->whatsapp_bot_enabled,
             'tattoo_ai_enabled' => $setting->tattoo_ai_enabled,
             'tattoo_ai_prompt' => $setting->tattoo_ai_prompt,
+            'ai_provider' => $setting->ai_provider,
+            'ai_model' => $setting->ai_model,
+            'ai_api_key' => '',
+            'ai_clear_key' => false,
             'beauty_ai_enabled' => $setting->beauty_ai_enabled,
             'beauty_ai_prompt' => $setting->beauty_ai_prompt,
             'whatsapp_instance' => $setting->whatsapp_instance,
@@ -139,6 +144,23 @@ class SchedulingSettingsPage extends Page
         $company = Filament::getTenant();
 
         $data = $this->form->getState();
+        $setting = app(CompanySchedulingSettingService::class)->getOrCreate($company);
+        $newKey = trim((string) ($data['ai_api_key'] ?? ''));
+        $clearKey = (bool) ($data['ai_clear_key'] ?? false);
+        unset($data['ai_clear_key']);
+        if ($clearKey) {
+            $data['ai_api_key'] = null;
+            $data['ai_provider'] = null;
+            $data['ai_model'] = null;
+        } elseif ($newKey === '') {
+            unset($data['ai_api_key']);
+        } else {
+            $data['ai_api_key'] = $newKey;
+        }
+        if (($data['ai_provider'] ?? null) !== $setting->ai_provider && $newKey === ''
+            && ($data['ai_provider'] ?? null) !== null) {
+            throw ValidationException::withMessages(['data.ai_api_key' => 'Ao trocar o provedor, informe uma chave desse provedor.']);
+        }
 
         $businessHours = $data['business_hours'] ?? [];
         unset($data['business_hours']);
@@ -397,17 +419,28 @@ class SchedulingSettingsPage extends Page
                                 ? 'O bot coleta os detalhes da tatuagem e encaminha o pedido para análise no painel.'
                                 : 'Ao receber uma mensagem do cliente, o bot conduz o agendamento (serviço, profissional, data, horário e confirmação) sem sair do WhatsApp.')
                             ->columnSpanFull(),
-                        Toggle::make('tattoo_ai_enabled')->label('Atendimento com IA (Gemini)')
-                            ->helperText('Substitui o questionário do bot de tatuagem nesta empresa. Requer GEMINI_API_KEY no servidor.')
+                        Toggle::make('tattoo_ai_enabled')->label('Atendimento com IA')
+                            ->helperText('Substitui o questionário do bot de tatuagem. Usa a chave de IA da empresa configurada abaixo.')
                             ->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
                         Textarea::make('tattoo_ai_prompt')->label('Orientações adicionais para a IA')
                             ->maxLength(3000)->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
-                        Toggle::make('beauty_ai_enabled')->label('Atendimento com IA (Gemini)')
-                            ->helperText('A IA conversa com a cliente, mostra horários livres reais e marca o agendamento. Substitui o bot de menu nesta empresa. Requer agendamento online habilitado e GEMINI_API_KEY no servidor.')
+                        Toggle::make('beauty_ai_enabled')->label('Atendimento com IA')
+                            ->helperText('A IA conversa com a cliente, mostra horários livres reais e marca o agendamento. Usa a chave de IA da empresa configurada abaixo.')
                             ->visible(fn (): bool => (bool) Filament::getTenant()?->isSalon()),
                         Textarea::make('beauty_ai_prompt')->label('Informações e orientações para a IA')
                             ->helperText('Ex.: endereço, estacionamento, formas de pagamento e cuidados antes do procedimento. A IA só responde dúvidas com base no que estiver aqui; o resto ela passa para a equipe.')
                             ->maxLength(3000)->visible(fn (): bool => (bool) Filament::getTenant()?->isSalon()),
+                        Select::make('ai_provider')->label('Provedor de IA')
+                            ->options(['gemini' => 'Gemini', 'openai' => 'OpenAI', 'openrouter' => 'OpenRouter'])
+                            ->helperText('O consumo será feito na conta vinculada à chave informada.'),
+                        TextInput::make('ai_model')->label('Modelo')
+                            ->placeholder('Ex.: gemini-2.5-flash, gpt-4.1-mini, openai/gpt-4.1-mini')
+                            ->maxLength(120),
+                        TextInput::make('ai_api_key')->label('Chave de API da empresa')
+                            ->password()->maxLength(500)
+                            ->helperText('Deixe vazio para manter a chave salva. Ela não é exibida novamente.'),
+                        Toggle::make('ai_clear_key')->label('Remover chave salva')
+                            ->helperText('Desative o atendimento com IA antes de remover a chave.'),
                     ])
                     ->columns(1)
                     ->visible(fn (): bool => (new CompanySchedulingSettingPolicy)->update(

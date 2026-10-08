@@ -36,6 +36,8 @@ class TattooAIResilienceTest extends TestCase
     private function setupStudio(): array
     {
         $company = $this->createSchedulingCompany(['business_profile' => CompanyProfile::TattooStudio]);
+        $company->schedulingSetting()->updateOrCreate([], ['ai_provider' => 'gemini',
+            'ai_model' => 'gemini-2.5-flash', 'ai_api_key' => 'test-key']);
         $instance = new CompanyWhatsAppInstance(['name' => 'Principal', 'instance_name' => 'tattoo-resilience',
             'is_default' => true, 'status' => 'open']);
         $instance->company_id = $company->id;
@@ -103,7 +105,10 @@ class TattooAIResilienceTest extends TestCase
         $this->assertDatabaseHas('clients', ['company_id' => $company->id, 'name' => 'Ana Souza', 'phone_normalized' => $this->phone]);
         $this->assertSame('Massa! E vai ser em qual parte do corpo?', $this->send($company, $instance, 'Uma rosa fineline com folhas', 't4'));
         $this->assertSame('E mais ou menos de que tamanho? Pode ser em cm mesmo.', $this->send($company, $instance, 'Antebraço', 't5'));
-        $this->assertStringStartsWith('Show, Ana! Já passei sua ideia pro tatuador.', $this->send($company, $instance, '15 cm', 't6'));
+        $this->assertStringContainsString('Qual estilo', $this->send($company, $instance, '15 cm', 't6'));
+        $this->assertStringContainsString('referência ou inspiração', $this->send($company, $instance, 'fine line', 't7'));
+        $this->assertStringContainsString('Deixa eu confirmar', $this->send($company, $instance, 'sem foto', 't8'));
+        $this->assertStringContainsString('A equipe recebeu sua ideia', $this->send($company, $instance, 'sim', 't9'));
 
         $request = TattooRequest::query()->firstOrFail();
         $this->assertSame('Uma rosa fineline com folhas', $request->description);
@@ -111,9 +116,9 @@ class TattooAIResilienceTest extends TestCase
         $this->assertSame('15 cm', $request->size_description);
         $this->assertSame('awaiting_review', $request->status);
         $this->assertDatabaseCount('tattoo_quotes', 0);
-        $this->assertSame(4, $this->geminiCalls());
+        $this->assertSame(6, $this->geminiCalls());
         Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context = []) => $message === 'Tattoo AI fallback reply.'
-            && $context['reason'] === 'model_unavailable' && $context['http_status'] === 429)->times(4);
+            && $context['reason'] === 'model_unavailable' && $context['http_status'] === 429)->times(6);
     }
 
     public function test_server_error_invalid_json_and_wrong_types_never_leave_the_client_without_reply(): void
@@ -133,7 +138,9 @@ class TattooAIResilienceTest extends TestCase
         $this->assertSame('Massa! E vai ser em qual parte do corpo?', $this->send($company, $instance, 'Um leão realista', 'w2'));
         $this->assertSame('E mais ou menos de que tamanho? Pode ser em cm mesmo.', $this->send($company, $instance, 'Nas costas', 'w3'));
         $this->assertSame('E mais ou menos de que tamanho? Pode ser em cm mesmo.', $this->send($company, $instance, 'uns 20', 'w4'));
-        $this->assertStringStartsWith('Show, Bruno! Já passei sua ideia pro tatuador.', $this->send($company, $instance, '20 cm', 'w5'));
+        $this->assertStringContainsString('referência ou inspiração', $this->send($company, $instance, '20 cm', 'w5'));
+        $this->assertStringContainsString('Deixa eu confirmar', $this->send($company, $instance, 'sem foto', 'w6'));
+        $this->assertStringContainsString('A equipe recebeu sua ideia', $this->send($company, $instance, 'sim', 'w7'));
 
         $request = TattooRequest::query()->firstOrFail();
         $this->assertSame('Um leão realista', $request->description);
@@ -141,8 +148,8 @@ class TattooAIResilienceTest extends TestCase
         $this->assertSame('20 cm', $request->size_description);
         $this->assertStringContainsString('Realismo', (string) $request->notes);
         $this->assertFalse((bool) TattooAiConversation::query()->firstOrFail()->human_takeover);
-        $this->assertSame(5, $this->geminiCalls());
-        foreach (['model_unavailable' => 3, 'invalid_details' => 1, 'invalid_action' => 1] as $reason => $times) {
+        $this->assertSame(6, $this->geminiCalls());
+        foreach (['model_unavailable' => 4, 'invalid_details' => 1, 'invalid_action' => 1] as $reason => $times) {
             Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context = []) => $message === 'Tattoo AI fallback reply.'
                 && $context['reason'] === $reason)->times($times);
         }
@@ -213,9 +220,10 @@ class TattooAIResilienceTest extends TestCase
         $this->assertTrue($receipt->analysis['analysis_failed']);
         Storage::disk('local')->assertExists($receipt->path);
         $this->assertSame('receipt_received', TattooAiConversation::query()->firstOrFail()->status);
-        $notification = User::query()->findOrFail($admin->id)->notifications()->latest()->firstOrFail();
-        $this->assertStringContainsString(TattooReceiptService::ANALYSIS_FAILED_WARNING,
-            json_encode($notification->data, JSON_UNESCAPED_UNICODE));
+        $notifications = User::query()->findOrFail($admin->id)->notifications()->get();
+        $this->assertTrue($notifications->contains(fn ($notification) => str_contains(
+            json_encode($notification->data, JSON_UNESCAPED_UNICODE), TattooReceiptService::ANALYSIS_FAILED_WARNING,
+        )));
         Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context = []) => $message === 'Tattoo receipt analysis failed.'
             && $context['http_status'] === 429)->once();
 
