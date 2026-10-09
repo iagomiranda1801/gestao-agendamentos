@@ -13,6 +13,7 @@ use App\Services\PublicBooking\PublicClientLookupService;
 use App\Support\CompanyDateTime;
 use App\Support\CompanyTerminology;
 use App\Support\PhoneNormalizer;
+use App\Support\Segment;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -406,7 +407,7 @@ class BookingWizard extends Component
             ? $settings->booking_page_description
             : 'Agende seu horário online com '.($this->company->name).'.';
 
-        $canonicalUrl = route('public.booking.show', $this->company);
+        $canonicalUrl = Segment::route($this->company, 'public.booking.show', ['company' => $this->company]);
 
         return view('livewire.public-booking.booking-wizard', [
             'settings' => $settings,

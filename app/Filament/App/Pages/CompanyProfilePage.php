@@ -6,6 +6,7 @@ use App\Enums\CompanyRole;
 use App\Models\Company;
 use App\Models\User;
 use App\Services\Company\CompanyModuleService;
+use App\Support\Segment;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -220,10 +221,10 @@ class CompanyProfilePage extends Page
         $company ??= Filament::getTenant();
 
         if ($this->usesPublicOrdersChannel($company)) {
-            return route('public.orders.show', ['company' => $company->slug]);
+            return Segment::route($company, 'public.orders.show', ['company' => $company->slug]);
         }
 
-        return route('public.booking.show', ['company' => $company->slug]);
+        return Segment::route($company, 'public.booking.show', ['company' => $company->slug]);
     }
 
     protected function logoHelperText(): string

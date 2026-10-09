@@ -3,6 +3,7 @@
 use App\Providers\AppServiceProvider;
 use App\Providers\Filament\AdminPanelProvider;
 use App\Providers\Filament\AppPanelProvider;
+use App\Providers\Filament\SalonPanelProvider;
 use App\Providers\HorizonServiceProvider;
 use App\Providers\TelescopeServiceProvider;
 use Laravel\Horizon\HorizonApplicationServiceProvider;
@@ -12,6 +13,7 @@ return [
     AppServiceProvider::class,
     AdminPanelProvider::class,
     AppPanelProvider::class,
+    SalonPanelProvider::class,
     ...(class_exists(HorizonApplicationServiceProvider::class) ? [
         HorizonServiceProvider::class,
     ] : []),

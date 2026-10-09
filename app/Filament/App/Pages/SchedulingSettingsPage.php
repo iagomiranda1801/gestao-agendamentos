@@ -11,6 +11,7 @@ use App\Policies\CompanySchedulingSettingPolicy;
 use App\Services\Scheduling\CompanyBusinessHoursService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\WhatsApp\Automations\WhatsAppAutomationService;
+use App\Support\Segment;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -290,7 +291,7 @@ class SchedulingSettingsPage extends Page
                                 /** @var Company $company */
                                 $company = Filament::getTenant();
 
-                                return route('public.booking.show', ['company' => $company->slug]);
+                                return Segment::route($company, 'public.booking.show', ['company' => $company->slug]);
                             }),
                     ])
                     ->visible(function (): bool {
@@ -515,7 +516,7 @@ class SchedulingSettingsPage extends Page
     {
         /** @var Company $company */
         $company = Filament::getTenant();
-        $publicUrl = route('public.booking.show', ['company' => $company->slug]);
+        $publicUrl = Segment::route($company, 'public.booking.show', ['company' => $company->slug]);
 
         return [
             Action::make('copyPublicLink')

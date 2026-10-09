@@ -43,7 +43,7 @@ class EnsureCompanySubscriptionIsActive
 
     protected function isSubscriptionPage(Request $request): bool
     {
-        return $request->routeIs('filament.app.pages.assinatura')
+        return $request->routeIs('filament.*.pages.assinatura')
             || str_ends_with($request->path(), '/assinatura');
     }
 }

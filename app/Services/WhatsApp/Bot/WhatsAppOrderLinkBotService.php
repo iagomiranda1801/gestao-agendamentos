@@ -8,6 +8,7 @@ use App\Services\Company\CompanyModuleService;
 use App\Services\Orders\CompanyOrderSettingService;
 use App\Support\CompanyDateTime;
 use App\Support\PhoneNormalizer;
+use App\Support\Segment;
 use App\Support\WhatsAppInboundText;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -144,7 +145,7 @@ class WhatsAppOrderLinkBotService
 
     public function composeMessage(Company $company): string
     {
-        $url = route('public.orders.show', ['company' => $company->slug]);
+        $url = Segment::route($company, 'public.orders.show', ['company' => $company->slug]);
 
         return "Olá! Peça pelo cardápio da {$company->name}:\n{$url}";
     }

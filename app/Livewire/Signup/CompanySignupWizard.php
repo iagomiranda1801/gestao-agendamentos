@@ -6,6 +6,7 @@ use App\Enums\CompanyModule;
 use App\Enums\CompanyProfile;
 use App\Filament\App\Pages\Dashboard;
 use App\Services\Company\CompanyProvisioningService;
+use App\Support\Segment;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -51,7 +52,20 @@ class CompanySignupWizard extends Component
 
     public function mount(): void
     {
+        $this->businessProfile = $this->segmentProfile() ?? $this->businessProfile;
         $this->selectedModules = $this->profileModules($this->businessProfile);
+    }
+
+    public function segmentProfile(): ?string
+    {
+        $segment = Segment::current();
+
+        return $segment === null ? null : (Segment::get($segment, 'profiles', [])[0] ?? null);
+    }
+
+    public function hasSegmentProfile(): bool
+    {
+        return $this->segmentProfile() !== null;
     }
 
     public function updatedCompanyName(string $value): void
@@ -91,7 +105,8 @@ class CompanySignupWizard extends Component
 
     public function updatedBusinessProfile(string $value): void
     {
-        $this->selectedModules = $this->profileModules($value);
+        $this->businessProfile = $this->segmentProfile() ?? $value;
+        $this->selectedModules = $this->profileModules($this->businessProfile);
     }
 
     public function goToReviewStep(): void
@@ -113,6 +128,8 @@ class CompanySignupWizard extends Component
 
         $this->goToReviewStep();
 
+        $this->businessProfile = $this->segmentProfile() ?? $this->businessProfile;
+
         $result = $provisioningService->provision([
             'name' => $this->companyName,
             'slug' => $this->companySlug,
@@ -128,10 +145,13 @@ class CompanySignupWizard extends Component
 
         Auth::login($result['user']);
 
-        Filament::setCurrentPanel('app');
+        $segment = Segment::current();
+        $panelId = $segment !== null ? Segment::panelId($segment) : Segment::panelIdForCompany($result['company']);
+
+        Filament::setCurrentPanel($panelId);
         Filament::setTenant($result['company'], isQuiet: true);
 
-        $this->redirect(Dashboard::getUrl(['tenant' => $result['company']]));
+        $this->redirect(Dashboard::getUrl(['tenant' => $result['company']], panel: $panelId));
     }
 
     /**

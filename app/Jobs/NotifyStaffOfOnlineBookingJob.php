@@ -6,6 +6,7 @@ use App\Filament\App\Resources\Appointments\AppointmentResource;
 use App\Models\Appointment;
 use App\Services\Scheduling\AppointmentNotificationRecipientService;
 use App\Support\CompanyDateTime;
+use App\Support\Segment;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -46,7 +47,7 @@ class NotifyStaffOfOnlineBookingJob implements ShouldQueue
             $url = AppointmentResource::getUrl(
                 name: 'view',
                 parameters: ['record' => $appointment],
-                panel: 'app',
+                panel: Segment::panelIdForCompany($company),
                 tenant: $company,
             );
         } catch (Throwable) {

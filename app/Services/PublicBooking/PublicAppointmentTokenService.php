@@ -5,6 +5,7 @@ namespace App\Services\PublicBooking;
 use App\Enums\AppointmentOrigin;
 use App\Models\Appointment;
 use App\Models\AppointmentPublicAccessToken;
+use App\Support\Segment;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 
@@ -37,7 +38,7 @@ class PublicAppointmentTokenService
             return null;
         }
 
-        return route('public.appointment.manage', ['token' => $this->issue($appointment)]);
+        return Segment::route($appointment->company, 'public.appointment.manage', ['token' => $this->issue($appointment)]);
     }
 
     public function resolve(string $plainToken): ?AppointmentPublicAccessToken

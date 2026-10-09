@@ -23,6 +23,7 @@ use App\Services\Scheduling\AppointmentService;
 use App\Services\Scheduling\AppointmentStatusService;
 use App\Support\CompanyDateTime;
 use App\Support\CompanyTerminology;
+use App\Support\Segment;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Component;
@@ -64,7 +65,7 @@ trait InteractsWithAppointmentActions
 
                     $tokenService->revoke($record);
                     $plainToken = $tokenService->issue($record->refresh());
-                    $manageUrl = route('public.appointment.manage', ['token' => $plainToken]);
+                    $manageUrl = Segment::route($record->company, 'public.appointment.manage', ['token' => $plainToken]);
 
                     $this->js('navigator.clipboard.writeText('.json_encode($manageUrl).')');
 

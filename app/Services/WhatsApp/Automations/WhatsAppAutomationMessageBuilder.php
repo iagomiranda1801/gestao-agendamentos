@@ -8,13 +8,14 @@ use App\Models\Attendance;
 use App\Models\Client;
 use App\Models\Company;
 use App\Support\CompanyDateTime;
+use App\Support\Segment;
 use App\Support\VehiclePlate;
 
 class WhatsAppAutomationMessageBuilder
 {
     public function bookingUrl(Company $company): string
     {
-        return route('public.booking.show', ['company' => $company->slug]);
+        return Segment::route($company, 'public.booking.show', ['company' => $company->slug]);
     }
 
     public function render(

@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\App\Pages\Auth\Login as AppLogin;
 use App\Filament\App\Pages\Dashboard;
 use App\Http\Middleware\EnsureCompanySubscriptionIsActive;
+use App\Http\Middleware\RedirectToSegmentPanel;
 use App\Models\Company;
 use App\Support\Branding;
 use Filament\Http\Middleware\Authenticate;
@@ -28,11 +29,21 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AppPanelProvider extends PanelProvider
 {
+    protected function panelId(): string
+    {
+        return 'app';
+    }
+
+    protected function panelPath(): string
+    {
+        return 'app';
+    }
+
     public function panel(Panel $panel): Panel
     {
         return $panel
-            ->id('app')
-            ->path('app')
+            ->id($this->panelId())
+            ->path($this->panelPath())
             ->login(AppLogin::class)
             ->viteTheme('resources/css/filament/app/theme.css')
             ->maxContentWidth(Width::Full)
@@ -103,6 +114,7 @@ class AppPanelProvider extends PanelProvider
                 Authenticate::class,
             ])
             ->tenantMiddleware([
+                RedirectToSegmentPanel::class,
                 EnsureCompanySubscriptionIsActive::class,
             ], isPersistent: true);
     }

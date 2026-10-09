@@ -11,6 +11,10 @@ use App\Livewire\PublicOrders\OrderWizard;
 use App\Livewire\Signup\CompanySignupWizard;
 use Illuminate\Support\Facades\Route;
 
+Route::domain((string) config('segments.salon.domain'))->group(function (): void {
+    Route::redirect('/', '/painel');
+});
+
 Route::redirect('/', '/admin');
 
 Route::get('/cadastro', CompanySignupWizard::class)

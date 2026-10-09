@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\Order;
 use App\Policies\OrderPolicy;
 use App\Services\Orders\OrderService;
+use App\Support\Segment;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -194,7 +195,7 @@ class KitchenDisplayPage extends Page
             return null;
         }
 
-        return route('public.orders.show', ['company' => $tenant->slug]);
+        return Segment::route($tenant, 'public.orders.show', ['company' => $tenant->slug]);
     }
 
     protected function tenantCompany(): Company

@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Enums\CompanyRole;
+use App\Support\Segment;
 use Database\Factories\UserFactory;
+use Filament\Facades\Filament;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
@@ -58,7 +60,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
             return $this->isPlatformAdmin();
         }
 
-        if ($panel->getId() === 'app') {
+        if ($this->isCompanyPanel($panel)) {
             if ($this->is_super_admin) {
                 return false;
             }
@@ -81,15 +83,37 @@ class User extends Authenticatable implements FilamentUser, HasTenants
      */
     public function getTenants(Panel $panel): Collection
     {
-        if ($panel->getId() !== 'app') {
+        if (! $this->isCompanyPanel($panel)) {
             return collect();
         }
+
+        $segment = static::segmentForPanel($panel);
 
         return $this->companies()
             ->where('companies.is_active', true)
             ->wherePivot('is_active', true)
+            ->when($segment !== null, fn ($query) => $query->whereIn(
+                'companies.business_profile',
+                (array) Segment::get($segment, 'profiles', []),
+            ))
             ->orderBy('companies.name')
             ->get();
+    }
+
+    protected function isCompanyPanel(Panel $panel): bool
+    {
+        return $panel->getId() === Segment::DEFAULT_PANEL || static::segmentForPanel($panel) !== null;
+    }
+
+    protected static function segmentForPanel(?Panel $panel): ?string
+    {
+        foreach (Segment::keys() as $segment) {
+            if ($panel?->getId() === Segment::panelId($segment)) {
+                return $segment;
+            }
+        }
+
+        return null;
     }
 
     public function canAccessTenant(Model $tenant): bool
@@ -107,6 +131,12 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         }
 
         if ($this->is_super_admin) {
+            return false;
+        }
+
+        $segment = static::segmentForPanel(Filament::getCurrentPanel());
+
+        if ($segment !== null && ! Segment::acceptsCompany($segment, $tenant)) {
             return false;
         }
 

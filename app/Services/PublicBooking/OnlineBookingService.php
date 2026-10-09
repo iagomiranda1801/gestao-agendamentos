@@ -19,6 +19,7 @@ use App\Services\Scheduling\AvailabilityService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Support\CompanyDateTime;
 use App\Support\PublicBookingTextSanitizer;
+use App\Support\Segment;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -209,7 +210,7 @@ class OnlineBookingService
             }
 
             $plainToken = $this->tokenService->issue($appointment->refresh());
-            $manageUrl = route('public.appointment.manage', ['token' => $plainToken]);
+            $manageUrl = Segment::route($company, 'public.appointment.manage', ['token' => $plainToken]);
 
             DB::afterCommit(function () use ($appointment, $settings, $manageUrl): void {
                 event(new OnlineAppointmentCreated($appointment, $manageUrl));
@@ -278,7 +279,7 @@ class OnlineBookingService
             plainToken: $plainToken,
             confirmationCode: (string) $appointment->public_confirmation_code,
             manageUrl: $plainToken !== null
-                ? route('public.appointment.manage', ['token' => $plainToken])
+                ? Segment::route($appointment->company, 'public.appointment.manage', ['token' => $plainToken])
                 : null,
             whatsappQueued: false,
         );

@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Models\Professional;
 use App\Models\Service;
 use App\Services\PublicBooking\OnlineBookingCatalogService;
+use App\Support\Segment;
 
 class PersonalTrainerSetupService
 {
@@ -81,7 +82,7 @@ class PersonalTrainerSetupService
             'steps' => $steps,
             'templates' => $templates,
             'booking_url' => $hasOnlineService && $publicBookingEnabled
-                ? route('public.booking.show', ['company' => $company])
+                ? Segment::route($company, 'public.booking.show', ['company' => $company])
                 : null,
         ];
     }

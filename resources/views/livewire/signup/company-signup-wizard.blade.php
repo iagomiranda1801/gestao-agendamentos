@@ -8,7 +8,7 @@
 
     @if ($step === 'company')
         <h1 class="signup-title">Crie sua empresa</h1>
-        <p class="signup-subtitle">Comece com 7 dias grátis para testar o Agendaqui.</p>
+        <p class="signup-subtitle">Comece com 7 dias grátis para testar o {{ \App\Support\Branding::name() }}.</p>
 
         <div class="signup-grid signup-grid--2">
             <div class="signup-field">
@@ -54,18 +54,23 @@
     @endif
 
     @if ($step === 'modules')
-        <h1 class="signup-title">Como você trabalha?</h1>
-        <p class="signup-subtitle">Escolha um perfil para receber uma configuração inicial adequada ao seu negócio.</p>
+        @if ($this->hasSegmentProfile())
+            <h1 class="signup-title">Recursos do seu negócio</h1>
+            <p class="signup-subtitle">{{ $this->profileDescription() }}</p>
+        @else
+            <h1 class="signup-title">Como você trabalha?</h1>
+            <p class="signup-subtitle">Escolha um perfil para receber uma configuração inicial adequada ao seu negócio.</p>
 
-        <div class="signup-field signup-profile-field">
-            <label for="businessProfile">Perfil do negócio</label>
-            <select id="businessProfile" wire:model.live="businessProfile">
-                @foreach ($this->profileOptions() as $value => $label)
-                    <option value="{{ $value }}">{{ $label }}</option>
-                @endforeach
-            </select>
-            <small>{{ $this->profileDescription() }}</small>
-        </div>
+            <div class="signup-field signup-profile-field">
+                <label for="businessProfile">Perfil do negócio</label>
+                <select id="businessProfile" wire:model.live="businessProfile">
+                    @foreach ($this->profileOptions() as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+                <small>{{ $this->profileDescription() }}</small>
+            </div>
+        @endif
 
         <h2 class="signup-section-title">Recursos ativados</h2>
         <p class="signup-subtitle">Confira a sugestão e ajuste o que a empresa realmente precisa.</p>

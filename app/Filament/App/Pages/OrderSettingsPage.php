@@ -7,6 +7,7 @@ use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Models\Company;
 use App\Policies\CompanyOrderSettingPolicy;
 use App\Services\Orders\CompanyOrderSettingService;
+use App\Support\Segment;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -96,7 +97,7 @@ class OrderSettingsPage extends Page
             Section::make('Pedidos online')->schema([
                 Placeholder::make('public_link')
                     ->label('Link público')
-                    ->content(route('public.orders.show', ['company' => $company->slug])),
+                    ->content(Segment::route($company, 'public.orders.show', ['company' => $company->slug])),
                 Toggle::make('online_ordering_enabled')
                     ->label('Aceitar pedidos pelo link público'),
                 Toggle::make('pickup_enabled')
