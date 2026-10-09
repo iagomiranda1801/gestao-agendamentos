@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Salon\Pages\Auth;
+namespace App\Filament\Tattoo\Pages\Auth;
 
 use App\Filament\App\Pages\Auth\Login as AppLogin;
 use App\Filament\Concerns\InteractsWithSegmentBrand;
@@ -11,28 +11,28 @@ class Login extends AppLogin
 {
     use InteractsWithSegmentBrand;
 
-    protected string $view = 'filament.salon.pages.auth.login';
+    protected string $view = 'filament.tattoo.pages.auth.login';
 
     protected function segmentKey(): string
     {
-        return 'salon';
+        return 'tattoo';
     }
 
     protected function getEmailFormComponent(): Component
     {
         return parent::getEmailFormComponent()
-            ->extraAttributes(['class' => 'salon-auth-input']);
+            ->extraAttributes(['class' => 'tattoo-auth-input']);
     }
 
     protected function getPasswordFormComponent(): Component
     {
         return parent::getPasswordFormComponent()
-            ->extraAttributes(['class' => 'salon-auth-input']);
+            ->extraAttributes(['class' => 'tattoo-auth-input']);
     }
 
     protected function getAuthenticateFormAction(): Action
     {
         return parent::getAuthenticateFormAction()
-            ->extraAttributes(['class' => 'salon-auth-submit']);
+            ->extraAttributes(['class' => 'tattoo-auth-submit']);
     }
 }

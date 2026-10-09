@@ -16,12 +16,12 @@ class Branding
 
     public static function logoUrl(): string
     {
-        return asset((string) static::value('logo', 'images/aqui.png'));
+        return static::media('logo', 'images/aqui.png');
     }
 
     public static function faviconUrl(): string
     {
-        return asset((string) static::value('favicon', static::value('logo', 'images/aqui.png')));
+        return static::media('favicon', static::value('logo', 'images/aqui.png'));
     }
 
     public static function logoHeight(): string
@@ -48,5 +48,16 @@ class Branding
         }
 
         return config("branding.{$key}", $default);
+    }
+
+    public static function media(string $key, mixed $fallback = null): string
+    {
+        $segment = static::segment();
+
+        if ($segment !== null) {
+            return Segment::media($segment, $key) ?? asset((string) $fallback);
+        }
+
+        return asset((string) static::value($key, $fallback));
     }
 }

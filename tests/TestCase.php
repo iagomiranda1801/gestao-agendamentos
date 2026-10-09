@@ -5,6 +5,7 @@ namespace Tests;
 use App\Enums\CompanyRole;
 use App\Models\Company;
 use App\Models\User;
+use App\Support\Segment;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
@@ -22,6 +23,7 @@ abstract class TestCase extends BaseTestCase
         session()->flush();
 
         Filament::setCurrentPanel('admin');
+        Segment::flush();
     }
 
     protected function createSuperAdmin(array $attributes = []): User

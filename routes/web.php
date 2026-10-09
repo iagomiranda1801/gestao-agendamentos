@@ -15,6 +15,10 @@ Route::domain((string) config('segments.salon.domain'))->group(function (): void
     Route::redirect('/', '/painel');
 });
 
+Route::domain((string) config('segments.tattoo.domain'))->group(function (): void {
+    Route::redirect('/', '/painel');
+});
+
 Route::redirect('/', '/admin');
 
 Route::get('/cadastro', CompanySignupWizard::class)

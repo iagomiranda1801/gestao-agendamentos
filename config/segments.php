@@ -12,6 +12,7 @@ return [
     | Cada segmento é um produto próprio no seu subdomínio, sobre o mesmo banco
     | e as mesmas telas. O segmento só fica ativo (redirecionamentos e links
     | públicos pelo subdomínio) quando a variável de domínio está no .env.
+    | Nome, cores e textos do login podem ser alterados no painel admin.
     |
     */
 
@@ -23,6 +24,8 @@ return [
         'scheme' => env('SALON_SCHEME', parse_url((string) env('APP_URL', 'https://localhost'), PHP_URL_SCHEME) ?: 'https'),
 
         'panel' => 'salao',
+
+        'label' => 'Salão',
 
         'profiles' => [
             CompanyProfile::Salon->value,
@@ -64,6 +67,60 @@ return [
             'signup_text' => 'Ainda não usa?',
 
             'signup_link' => 'Criar conta do salão — 7 dias grátis',
+        ],
+    ],
+
+    'tattoo' => [
+        'enabled' => filled(env('TATTOO_DOMAIN')),
+
+        'domain' => env('TATTOO_DOMAIN') ?: 'estudio.localhost',
+
+        'scheme' => env('TATTOO_SCHEME', parse_url((string) env('APP_URL', 'https://localhost'), PHP_URL_SCHEME) ?: 'https'),
+
+        'panel' => 'estudio',
+
+        'label' => 'Tatuagem',
+
+        'profiles' => [
+            CompanyProfile::TattooStudio->value,
+        ],
+
+        'name' => env('TATTOO_BRAND_NAME', 'Agendaqui Estúdio'),
+
+        'tagline' => env('TATTOO_BRAND_TAGLINE', 'Gestão para estúdios de tatuagem'),
+
+        'logo' => 'images/estudio/logo.svg',
+
+        'favicon' => 'images/estudio/favicon.svg',
+
+        'logo_height' => '2.75rem',
+
+        'primary_color' => '#c9a227',
+
+        'login' => [
+            'eyebrow' => 'Para estúdios de tatuagem',
+
+            'headline' => 'Do orçamento',
+
+            'headline_accent' => 'à sessão marcada.',
+
+            'subtitle' => 'Pedidos com foto, conversa no WhatsApp, agenda e caixa no mesmo lugar.',
+
+            'image' => null,
+
+            'form_title' => 'Bem-vindo ao estúdio',
+
+            'form_subtitle' => 'Entre para ver os pedidos de hoje.',
+
+            'highlights' => [
+                ['title' => 'Orçamento com foto', 'description' => 'O cliente manda a ideia, você responde com valor e prazo.'],
+                ['title' => 'WhatsApp do estúdio', 'description' => 'A conversa e o pedido ficam juntos, sem planilha.'],
+                ['title' => 'Agenda das sessões', 'description' => 'Marca, confirma e conclui o procedimento no mesmo fluxo.'],
+            ],
+
+            'signup_text' => 'Ainda não tem estúdio aqui?',
+
+            'signup_link' => 'Criar conta do estúdio — 7 dias grátis',
         ],
     ],
 

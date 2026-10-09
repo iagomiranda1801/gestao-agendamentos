@@ -1,0 +1,456 @@
+@import '../app/theme.css';
+
+@source '../../../../app/Filament/Tattoo/**/*';
+@source '../../../../resources/views/filament/tattoo/**/*';
+
+/* -------------------------------------------------------------------------- */
+/* Cores do estúdio: a cor principal pode ser trocada no painel admin.        */
+/* -------------------------------------------------------------------------- */
+
+:root {
+    --tattoo-primary: #c9a227;
+    --tattoo-primary-strong: #e6c35a;
+    --tattoo-primary-soft: #2a2318;
+    --tattoo-ink: #f4efe6;
+    --tattoo-muted: #b3a898;
+    --tattoo-surface: #0f0d0b;
+    --tattoo-surface-alt: #171411;
+    --tattoo-card: #1c1814;
+    --tattoo-border: #3a3228;
+    --tattoo-sidebar: #14110e;
+    --tattoo-sidebar-active: #2a2318;
+    --tattoo-radius: 0.85rem;
+    --tattoo-font-display: 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+    --dashboard-action-border: color-mix(in srgb, var(--tattoo-primary) 28%, #1c1814);
+    --dashboard-action-bg: color-mix(in srgb, var(--tattoo-primary) 16%, #161310);
+    --dashboard-action-border-hover: color-mix(in srgb, var(--tattoo-primary) 45%, #1c1814);
+    --dashboard-action-bg-hover: color-mix(in srgb, var(--tattoo-primary) 22%, #161310);
+    --dashboard-action-icon: var(--tattoo-primary);
+    --dashboard-tone-primary-border: color-mix(in srgb, var(--tattoo-primary) 28%, #1c1814);
+    --dashboard-tone-primary-bg: color-mix(in srgb, var(--tattoo-primary) 16%, #161310);
+    --dashboard-tone-primary-text: var(--tattoo-primary);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Painel                                                                     */
+/* -------------------------------------------------------------------------- */
+
+.fi-body {
+    background: var(--tattoo-surface);
+    color: var(--tattoo-ink);
+    color-scheme: dark;
+}
+
+.fi-topbar,
+.fi-topbar-ctn > nav {
+    background: color-mix(in srgb, var(--tattoo-surface) 88%, transparent);
+    border-bottom: 1px solid var(--tattoo-border);
+    box-shadow: none;
+    backdrop-filter: blur(12px);
+}
+
+.fi-sidebar {
+    background: var(--tattoo-sidebar);
+    border-inline-end: 1px solid var(--tattoo-border);
+}
+
+.fi-sidebar-header {
+    background: transparent;
+    box-shadow: none;
+    border-bottom: 1px solid var(--tattoo-border);
+}
+
+.fi-sidebar-group-label {
+    color: var(--tattoo-muted);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.fi-sidebar-item-btn {
+    border-radius: 0.55rem;
+}
+
+.fi-sidebar-item-btn:hover {
+    background: var(--tattoo-surface-alt);
+}
+
+.fi-sidebar-item.fi-active .fi-sidebar-item-btn {
+    background: var(--tattoo-sidebar-active);
+}
+
+.fi-sidebar-item.fi-active .fi-sidebar-item-label,
+.fi-sidebar-item.fi-active .fi-sidebar-item-icon {
+    color: var(--tattoo-primary);
+}
+
+.fi-header-heading {
+    font-family: var(--tattoo-font-display);
+    color: var(--tattoo-ink);
+    letter-spacing: 0.01em;
+}
+
+.fi-section,
+.fi-ta-ctn,
+.fi-wi-stats-overview-stat,
+.fi-fo-tabs,
+.fi-modal-window {
+    border-radius: var(--tattoo-radius);
+    border-color: var(--tattoo-border);
+    background: var(--tattoo-card);
+    box-shadow: 0 8px 28px rgb(0 0 0 / 0.28);
+}
+
+.fi-btn {
+    border-radius: 0.45rem;
+}
+
+.fi-badge {
+    border-radius: 0.35rem;
+}
+
+.fi-input-wrp {
+    border-radius: 0.55rem;
+    border-color: var(--tattoo-border);
+    background: var(--tattoo-surface-alt);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Chat e orçamento                                                           */
+/* -------------------------------------------------------------------------- */
+
+.tattoo-chat-card,
+.tattoo-chat-detail-card {
+    background: var(--tattoo-card);
+    border-color: var(--tattoo-border);
+    box-shadow: 0 8px 28px rgb(0 0 0 / 0.28);
+}
+
+.tattoo-chat-header {
+    border-bottom-color: var(--tattoo-border);
+}
+
+.tattoo-chat-avatar {
+    background: var(--tattoo-primary-soft);
+    color: var(--tattoo-primary);
+}
+
+.tattoo-chat-heading strong {
+    color: var(--tattoo-ink);
+}
+
+.tattoo-chat-heading span,
+.tattoo-chat-meta,
+.tattoo-chat-empty,
+.tattoo-chat-load-more,
+.tattoo-chat-muted,
+.tattoo-chat-detail-card dt,
+.tattoo-chat-composer-actions span,
+.tattoo-chat-composer-locked {
+    color: var(--tattoo-muted);
+}
+
+.tattoo-chat-mode.is-ai {
+    background: var(--tattoo-primary-soft);
+    color: var(--tattoo-primary);
+}
+
+.tattoo-chat-thread {
+    background: #100e0c;
+}
+
+.tattoo-chat-bubble {
+    background: var(--tattoo-surface-alt);
+    border-color: var(--tattoo-border);
+    box-shadow: none;
+}
+
+.tattoo-chat-bubble.is-outgoing {
+    background: color-mix(in srgb, var(--tattoo-primary) 16%, #1c1814);
+    border-color: color-mix(in srgb, var(--tattoo-primary) 35%, #3a3228);
+}
+
+.tattoo-chat-sender,
+.tattoo-chat-bubble.is-outgoing .tattoo-chat-sender {
+    color: var(--tattoo-primary);
+}
+
+.tattoo-chat-bubble.is-incoming .tattoo-chat-sender,
+.tattoo-chat-text,
+.tattoo-chat-detail-card dd,
+.tattoo-chat-description,
+.tattoo-chat-detail-card h2 {
+    color: var(--tattoo-ink);
+}
+
+.tattoo-chat-attachment a,
+.tattoo-chat-detail-link,
+.tattoo-chat-load-more button {
+    color: var(--tattoo-primary);
+}
+
+.tattoo-chat-composer {
+    border-top-color: var(--tattoo-border);
+}
+
+.tattoo-chat-composer label {
+    color: var(--tattoo-ink);
+}
+
+.tattoo-chat-composer textarea {
+    background: var(--tattoo-surface);
+    border-color: var(--tattoo-border);
+    color: var(--tattoo-ink);
+}
+
+.tattoo-chat-composer textarea:focus {
+    border-color: var(--tattoo-primary);
+    outline-color: color-mix(in srgb, var(--tattoo-primary) 35%, transparent);
+}
+
+.agendaqui-dashboard,
+.agendaqui-dashboard__title,
+.agendaqui-dashboard-card__value,
+.agendaqui-dashboard-panel__title,
+.agendaqui-dashboard-list__title,
+.agendaqui-dashboard-action strong {
+    color: var(--tattoo-ink);
+}
+
+.agendaqui-dashboard-card,
+.agendaqui-dashboard-panel {
+    background: var(--tattoo-card);
+    border-color: var(--tattoo-border);
+}
+
+.agendaqui-dashboard-card__label,
+.agendaqui-dashboard-card__description,
+.agendaqui-dashboard-list__description,
+.agendaqui-dashboard-list__meta,
+.agendaqui-dashboard-empty,
+.agendaqui-dashboard__date,
+.agendaqui-dashboard-action small {
+    color: var(--tattoo-muted);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Tela de login                                                              */
+/* -------------------------------------------------------------------------- */
+
+.fi-simple-layout:has(.tattoo-auth) {
+    padding: 0;
+    min-height: 100dvh;
+}
+
+.fi-simple-layout:has(.tattoo-auth) .fi-simple-main-ctn,
+.fi-simple-layout:has(.tattoo-auth) .fi-simple-main {
+    width: 100%;
+    max-width: none;
+    min-height: 100dvh;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    border: 0;
+}
+
+.tattoo-auth {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(360px, 28rem);
+    min-height: 100dvh;
+    background: var(--tattoo-surface);
+    color: var(--tattoo-ink);
+    color-scheme: dark;
+}
+
+.tattoo-auth__story {
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--tattoo-primary) 18%, transparent), transparent 42%),
+        linear-gradient(160deg, #1a1612 0%, #0b0a09 100%);
+}
+
+.tattoo-auth__story-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.28;
+}
+
+.tattoo-auth__story-veil {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgb(11 10 9 / 0.15), rgb(11 10 9 / 0.72));
+}
+
+.tattoo-auth__story-copy {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 100%;
+    padding: clamp(2rem, 6vw, 5rem);
+}
+
+.tattoo-auth__logo {
+    height: 3rem;
+    width: auto;
+    margin-bottom: 2rem;
+}
+
+.tattoo-auth__eyebrow {
+    display: inline-flex;
+    width: fit-content;
+    margin-bottom: 1rem;
+    padding: 0.35rem 0.8rem;
+    border: 1px solid color-mix(in srgb, var(--tattoo-primary) 40%, transparent);
+    color: var(--tattoo-primary);
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+.tattoo-auth__headline {
+    margin: 0 0 1rem;
+    max-width: 14ch;
+    font-family: var(--tattoo-font-display);
+    font-size: clamp(2.6rem, 6vw, 4.6rem);
+    font-weight: 700;
+    line-height: 0.95;
+}
+
+.tattoo-auth__headline em {
+    display: block;
+    font-style: italic;
+    color: var(--tattoo-primary);
+}
+
+.tattoo-auth__subtitle {
+    margin: 0 0 2rem;
+    max-width: 28rem;
+    color: var(--tattoo-muted);
+    font-size: 1.02rem;
+    line-height: 1.6;
+}
+
+.tattoo-auth__highlights {
+    display: grid;
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.tattoo-auth__highlights strong {
+    display: block;
+    color: var(--tattoo-ink);
+}
+
+.tattoo-auth__highlights span {
+    color: var(--tattoo-muted);
+    font-size: 0.88rem;
+}
+
+.tattoo-auth__panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(1.75rem, 4vw, 3rem);
+    background: var(--tattoo-card);
+    border-inline-start: 1px solid var(--tattoo-border);
+}
+
+.tattoo-auth__panel-tagline {
+    margin: 0 0 0.75rem;
+    color: var(--tattoo-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.tattoo-auth__panel-title {
+    margin: 0 0 0.4rem;
+    font-family: var(--tattoo-font-display);
+    font-size: 2rem;
+}
+
+.tattoo-auth__panel-subtitle {
+    margin: 0 0 1.5rem;
+    color: var(--tattoo-muted);
+}
+
+.tattoo-auth .fi-simple-page,
+.tattoo-auth .fi-simple-page-content {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+}
+
+.tattoo-auth .fi-fo-field-label {
+    color: var(--tattoo-ink);
+}
+
+.tattoo-auth .fi-input-wrp {
+    background: #120f0d;
+    border-color: var(--tattoo-border);
+}
+
+.tattoo-auth .fi-input-wrp:focus-within {
+    border-color: var(--tattoo-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--tattoo-primary) 20%, transparent);
+}
+
+.tattoo-auth .fi-input {
+    color: var(--tattoo-ink);
+}
+
+.tattoo-auth .fi-ac-btn-action {
+    width: 100%;
+    min-height: 2.9rem;
+    border: 0;
+    border-radius: 0.45rem;
+    background: var(--tattoo-primary);
+    color: #14110d;
+    font-weight: 700;
+}
+
+.tattoo-auth__signup {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 1.5rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--tattoo-border);
+    color: var(--tattoo-muted);
+    font-size: 0.875rem;
+}
+
+.tattoo-auth__signup a {
+    color: var(--tattoo-primary);
+    font-weight: 600;
+}
+
+@media (max-width: 900px) {
+    .tattoo-auth {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .tattoo-auth__story {
+        min-height: 22rem;
+    }
+
+    .tattoo-auth__highlights {
+        display: none;
+    }
+
+    .tattoo-auth__panel {
+        border-inline-start: 0;
+        border-top: 1px solid var(--tattoo-border);
+    }
+}

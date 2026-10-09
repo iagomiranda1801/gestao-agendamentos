@@ -3,10 +3,19 @@
 namespace App\Support;
 
 use App\Models\Company;
+use App\Models\SegmentSetting;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 class Segment
 {
     public const DEFAULT_PANEL = 'app';
+
+    /** @var list<string> */
+    private const STRUCTURAL_KEYS = ['enabled', 'domain', 'scheme', 'panel', 'profiles', 'label'];
+
+    /** @var array<string, array<string, mixed>>|null */
+    private static ?array $settingsCache = null;
 
     /** @return list<string> */
     public static function keys(): array
@@ -14,9 +23,32 @@ class Segment
         return array_keys((array) config('segments', []));
     }
 
+    public static function flush(): void
+    {
+        static::$settingsCache = null;
+    }
+
     public static function get(string $segment, string $key, mixed $default = null): mixed
     {
-        return config("segments.{$segment}.{$key}", $default);
+        $configValue = config("segments.{$segment}.{$key}", $default);
+
+        if (in_array($key, self::STRUCTURAL_KEYS, true)) {
+            return $configValue;
+        }
+
+        $overlay = static::overlay($segment);
+
+        if ($key === 'login') {
+            return static::mergedLogin($configValue, $overlay);
+        }
+
+        $mapped = match ($key) {
+            'logo' => $overlay['logo'] ?? null,
+            'favicon' => $overlay['favicon'] ?? null,
+            default => $overlay[$key] ?? null,
+        };
+
+        return filled($mapped) ? $mapped : $configValue;
     }
 
     public static function isEnabled(?string $segment): bool
@@ -99,5 +131,82 @@ class Segment
         }
 
         return static::baseUrl($segment).route($name, $parameters, absolute: false);
+    }
+
+    public static function mediaUrl(?string $path): ?string
+    {
+        if (blank($path)) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+
+        if (str_starts_with($path, 'images/') || str_starts_with($path, '/')) {
+            return asset(ltrim($path, '/'));
+        }
+
+        return Storage::disk('public')->url($path);
+    }
+
+    public static function media(string $segment, string $key): ?string
+    {
+        return static::mediaUrl(static::get($segment, $key));
+    }
+
+    public static function themeColor(string $segment): string
+    {
+        $color = (string) static::get($segment, 'primary_color', '#126bff');
+
+        return preg_match('/^#[0-9A-Fa-f]{6}$/', $color) === 1 ? $color : '#126bff';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function overlay(string $segment): array
+    {
+        if (static::$settingsCache === null) {
+            static::$settingsCache = static::loadOverlays();
+        }
+
+        return static::$settingsCache[$segment] ?? [];
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private static function loadOverlays(): array
+    {
+        if (! app()->bound('db') || ! Schema::hasTable('segment_settings')) {
+            return [];
+        }
+
+        return SegmentSetting::query()
+            ->get()
+            ->mapWithKeys(fn (SegmentSetting $setting): array => [$setting->segment => $setting->overlay()])
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $overlay
+     * @return array<string, mixed>
+     */
+    private static function mergedLogin(mixed $configValue, array $overlay): array
+    {
+        $configLogin = is_array($configValue) ? $configValue : [];
+        $dbLogin = array_filter(
+            (array) ($overlay['login'] ?? []),
+            fn (mixed $value): bool => $value !== null && $value !== '',
+        );
+
+        $merged = array_replace_recursive($configLogin, $dbLogin);
+
+        if (filled($overlay['login_image_path'] ?? null)) {
+            $merged['image'] = $overlay['login_image_path'];
+        }
+
+        return $merged;
     }
 }

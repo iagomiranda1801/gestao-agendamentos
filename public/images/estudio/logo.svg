@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="56" viewBox="0 0 280 56" role="img" aria-label="Agendaqui Estúdio">
+  <rect x="2" y="4" width="48" height="48" rx="6" fill="#c9a227"/>
+  <path d="M14 40 V16 h8 l4 12 4-12 h8 v24 h-7 V24 l-5 16 h-4 l-5-16 v16z" fill="#14110d"/>
+  <text x="64" y="27" font-family="Georgia, 'Times New Roman', serif" font-size="21" font-weight="700" fill="#f4efe6">Agendaqui</text>
+  <text x="64" y="47" font-family="'Segoe UI', Arial, sans-serif" font-size="13" letter-spacing="5" fill="#c9a227">ESTUDIO</text>
+</svg>
