@@ -22,6 +22,14 @@
     --salon-sidebar-active: #f7e4ec;
     --salon-radius: 1.1rem;
     --salon-font-display: Georgia, 'Times New Roman', serif;
+    --dashboard-action-border: color-mix(in srgb, var(--salon-primary) 28%, white);
+    --dashboard-action-bg: var(--salon-primary-soft);
+    --dashboard-action-border-hover: color-mix(in srgb, var(--salon-primary) 45%, white);
+    --dashboard-action-bg-hover: color-mix(in srgb, var(--salon-primary) 18%, white);
+    --dashboard-action-icon: var(--salon-primary);
+    --dashboard-tone-primary-border: color-mix(in srgb, var(--salon-primary) 28%, white);
+    --dashboard-tone-primary-bg: var(--salon-primary-soft);
+    --dashboard-tone-primary-text: var(--salon-primary-strong);
 }
 
 /* -------------------------------------------------------------------------- */

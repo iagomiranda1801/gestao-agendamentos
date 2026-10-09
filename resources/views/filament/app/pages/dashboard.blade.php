@@ -84,17 +84,17 @@
             gap: 0.75rem;
             min-width: 0;
             padding: 0.875rem 1rem;
-            border: 1px solid rgb(191 219 254);
+            border: 1px solid var(--dashboard-action-border, rgb(191 219 254));
             border-radius: 0.5rem;
-            background: rgb(239 246 255);
+            background: var(--dashboard-action-bg, rgb(239 246 255));
             color: rgb(15 23 42);
             text-decoration: none;
             transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
         }
 
         .agendaqui-dashboard-action:hover {
-            border-color: rgb(18 107 255 / 0.55);
-            background: rgb(219 234 254);
+            border-color: var(--dashboard-action-border-hover, rgb(18 107 255 / 0.55));
+            background: var(--dashboard-action-bg-hover, rgb(219 234 254));
             transform: translateY(-1px);
         }
 
@@ -106,7 +106,7 @@
             width: 2rem;
             height: 2rem;
             border-radius: 0.375rem;
-            background: #126bff;
+            background: var(--dashboard-action-icon, #126bff);
             color: #fff;
             font-size: 1.25rem;
             line-height: 1;
@@ -187,9 +187,9 @@
         }
 
         .agendaqui-dashboard-tone--primary {
-            border-color: rgb(191 219 254);
-            background: rgb(239 246 255);
-            color: rgb(29 78 216);
+            border-color: var(--dashboard-tone-primary-border, rgb(191 219 254));
+            background: var(--dashboard-tone-primary-bg, rgb(239 246 255));
+            color: var(--dashboard-tone-primary-text, rgb(29 78 216));
         }
 
         .agendaqui-dashboard-tone--success {
