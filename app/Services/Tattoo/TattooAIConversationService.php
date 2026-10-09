@@ -27,6 +27,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         protected TattooReceiptService $receipts,
         protected TattooImageService $images,
         protected TattooAISchedulingService $scheduling,
+        protected TattooAIConversationRestartService $restarts,
     ) {}
 
     protected function handoffPrefixes(): array
@@ -49,6 +50,26 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             $conversation->update(['human_takeover' => true, 'status' => 'human_takeover']);
 
             return 'Fechou, já chamei o pessoal do estúdio pra falar com você.';
+        }
+        if ($request) {
+            $choicePending = (bool) ($conversation->collected_data['_request_choice_pending'] ?? false);
+            if (($choicePending && preg_match('/^(?:2|novo|nova|outro|outra)[!. ]*$/u', $normalized))
+                || preg_match('/^(?:(?:quero|queria|vamos|pode)\s+(?:(?:fazer|comecar|abrir|criar)\s+)?(?:(?:um|uma)\s+)?)?(?:novo pedido|nova tatuagem|outra tatuagem|outra tattoo)[!. ]*$/u', $normalized)) {
+                $name = $conversation->client?->name ?? ($conversation->collected_data['name'] ?? null);
+                $this->restarts->restartUnderLock($conversation);
+
+                return 'Claro! Vamos começar outro pedido. '.$this->nextQuestion($name ? ['name' => $name] : []);
+            }
+            if ($choicePending) {
+                $data = $conversation->collected_data ?: [];
+                unset($data['_request_choice_pending']);
+                $conversation->update(['collected_data' => $data]);
+            } elseif ($this->isGreeting($this->normalizedText($text)) || $this->isSmallTalk($this->normalizedText($text))) {
+                $conversation->update(['collected_data' => array_merge($conversation->collected_data ?: [],
+                    ['_request_choice_pending' => true])]);
+
+                return 'Você quer saber do pedido em andamento ou começar uma nova tatuagem? Responda *1* para o pedido atual ou *2* para um novo pedido.';
+            }
         }
         if ($quote && $quote->sent_at && $request->status === 'quote_sent'
             && preg_match('/^(aceito|aprovado|pode seguir|fechado|concordo|sim)[!. ]*$/u', $normalized)) {
@@ -146,7 +167,8 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             return $quick;
         }
 
-        $recent = $conversation->messages()->where('direction', 'in')->latest('id')->limit(8)->get()
+        $recent = $conversation->messages()->where('direction', 'in')
+            ->where('id', '>', $conversation->context_start_message_id ?? 0)->latest('id')->limit(8)->get()
             ->reverse()->pluck('body')->all();
         $result = $this->interpret($conversation, $message, $this->systemPrompt($conversation), [
             'summary' => $conversation->summary,
@@ -201,7 +223,8 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         if (isset($data['style']) && preg_match('/^(?:nao sei|nao tenho certeza|a definir|sem preferencia)[!. ]*$/u', $this->normalizedText((string) $data['style']))) {
             $data['style'] = 'A definir';
         }
-        $asked = $this->normalizedText((string) $conversation->messages()->where('direction', 'out')->latest('id')->value('body'));
+        $asked = $this->normalizedText((string) $conversation->messages()->where('direction', 'out')
+            ->where('id', '>', $conversation->context_start_message_id ?? 0)->latest('id')->value('body'));
         if (empty($data['style']) && str_contains($asked, 'qual estilo') && preg_match('/\b(nao sei|nao tenho certeza|a definir|sem preferencia)\b/u', $normalized)) {
             $data['style'] = 'A definir';
         }
@@ -276,7 +299,8 @@ class TattooAIConversationService extends WhatsAppAIConversationService
      */
     protected function detailsWithoutModel(TattooAiConversation $conversation, array $data, string $text): array
     {
-        $asked = $this->normalizedText((string) $conversation->messages()->where('direction', 'out')->latest('id')->value('body'));
+        $asked = $this->normalizedText((string) $conversation->messages()->where('direction', 'out')
+            ->where('id', '>', $conversation->context_start_message_id ?? 0)->latest('id')->value('body'));
         if (empty($data['name'])) {
             $name = str_contains($asked, 'qual seu nome') || str_contains($asked, 'como voce se chama')
                 ? CustomerNameDetector::fromMessage($text) : null;
@@ -435,7 +459,8 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             $request->save();
             $conversation->update(['client_id' => $client->id, 'tattoo_request_id' => $request->id,
                 'status' => 'waiting_professional_quote']);
-            foreach ($conversation->messages()->whereNotNull('media_path')->get() as $pending) {
+            foreach ($conversation->messages()->where('id', '>', $conversation->context_start_message_id ?? 0)
+                ->whereNotNull('media_path')->get() as $pending) {
                 $this->attachReference($conversation, $request, $pending);
                 Storage::disk($pending->media_disk)->delete($pending->media_path);
                 $pending->update(['media_disk' => null, 'media_path' => null]);

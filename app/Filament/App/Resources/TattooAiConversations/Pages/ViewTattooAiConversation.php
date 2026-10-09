@@ -5,7 +5,9 @@ namespace App\Filament\App\Resources\TattooAiConversations\Pages;
 use App\Filament\App\Resources\TattooAiConversations\TattooAiConversationResource;
 use App\Filament\App\Resources\TattooRequests\TattooRequestResource;
 use App\Models\TattooAiMessage;
+use App\Models\TattooRequestImage;
 use App\Models\WhatsAppContact;
+use App\Services\Tattoo\TattooAIConversationRestartService;
 use App\Services\Tattoo\TattooConversationTakeoverService;
 use App\Services\Tattoo\TattooManualReplyService;
 use App\Services\WhatsApp\WhatsAppHumanTakeover;
@@ -36,13 +38,17 @@ class ViewTattooAiConversation extends ViewRecord
 
     public function getChatMessages(): Collection
     {
-        return $this->getRecord()->messages()->latest('id')->limit($this->messageLimit)
+        return $this->getRecord()->messages()
+            ->where('id', '>', $this->getRecord()->context_start_message_id ?? 0)
+            ->latest('id')->limit($this->messageLimit)
             ->get()->reverse()->values();
     }
 
     public function hasOlderMessages(): bool
     {
-        return $this->getRecord()->messages()->count() > $this->messageLimit;
+        return $this->getRecord()->messages()
+            ->where('id', '>', $this->getRecord()->context_start_message_id ?? 0)
+            ->count() > $this->messageLimit;
     }
 
     public function loadOlderMessages(): void
@@ -56,8 +62,7 @@ class ViewTattooAiConversation extends ViewRecord
             return null;
         }
         $conversation = $this->getRecord();
-        $image = $conversation->request?->images()
-            ->where('company_id', $conversation->company_id)
+        $image = TattooRequestImage::query()->where('company_id', $conversation->company_id)
             ->where('whatsapp_message_id', $message->provider_message_id)->first();
         if ($image) {
             return route('tattoo.images.download', ['company' => $conversation->company, 'image' => $image]);
@@ -115,6 +120,16 @@ class ViewTattooAiConversation extends ViewRecord
                     app(WhatsAppHumanTakeover::class)->resume($conversation->instance->instance_name, $conversation->phone_normalized);
                     $conversation->update(['human_takeover' => false, 'status' => 'collecting_information']);
                     Notification::make()->success()->title('IA retomada para as próximas mensagens.')->send();
+                }),
+            Action::make('restart_test')->label('Iniciar nova conversa')->requiresConfirmation()
+                ->visible(fn () => TattooRequestResource::canManageRequests() && $this->getRecord()->company->isTattooStudio())
+                ->modalDescription('A conversa ficará vazia e a próxima mensagem iniciará um novo pedido com a IA. O histórico anterior ficará guardado, mas oculto no chat. Pedidos já criados serão preservados. Respostas pendentes e imagens temporárias serão descartadas.')
+                ->action(function (TattooAIConversationRestartService $restarts): void {
+                    abort_unless(TattooRequestResource::canManageRequests(), 403);
+                    $restarts->restart($this->getRecord());
+                    $this->getRecord()->refresh();
+                    $this->messageLimit = 80;
+                    Notification::make()->success()->title('Pronto para uma nova conversa no mesmo número.')->send();
                 }),
         ];
     }

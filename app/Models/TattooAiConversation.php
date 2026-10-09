@@ -30,7 +30,8 @@ class TattooAiConversation extends Model
 
     protected function casts(): array
     {
-        return ['human_takeover' => 'boolean', 'collected_data' => 'array', 'last_interaction_at' => 'datetime'];
+        return ['human_takeover' => 'boolean', 'collected_data' => 'array', 'last_interaction_at' => 'datetime',
+            'context_start_message_id' => 'integer'];
     }
 
     public function company(): BelongsTo
