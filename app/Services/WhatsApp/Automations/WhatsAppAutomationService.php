@@ -178,8 +178,7 @@ class WhatsAppAutomationService
             return;
         }
 
-        SendWhatsAppAfterSalesJob::dispatch($attendance->getKey())
-            ->delay(now()->addHours(max(1, (int) $automation->delay_value)));
+        SendWhatsAppAfterSalesJob::dispatch($attendance->getKey());
     }
 
     public function sendReminder(Appointment $appointment): bool
@@ -215,6 +214,7 @@ class WhatsAppAutomationService
             $attendance->client,
             $attendance->appointment,
             $attendance,
+            ignoreQuietHours: true,
         );
     }
 
@@ -266,7 +266,7 @@ class WhatsAppAutomationService
             }
         }
 
-        if ($send->type !== WhatsAppAutomationType::Reminder && $this->isQuietHours($company, $automation)) {
+        if ($send->type === WhatsAppAutomationType::WinBack && $this->isQuietHours($company, $automation)) {
             return;
         }
 
@@ -365,13 +365,12 @@ class WhatsAppAutomationService
             return 0;
         }
 
-        $dueBefore = now()->subHours((int) $automation->delay_value);
         $queued = 0;
 
         Attendance::query()
             ->with(['client', 'appointment'])
             ->where('company_id', $company->getKey())
-            ->where('completed_at', '<=', $dueBefore)
+            ->where('completed_at', '<=', now())
             ->where('completed_at', '>=', now()->subDays(7))
             ->whereDoesntHave('whatsappAutomationSends', function ($query) use ($automation): void {
                 $query->where('whatsapp_automation_id', $automation->getKey());
@@ -437,6 +436,7 @@ class WhatsAppAutomationService
         ?Appointment $appointment,
         ?Attendance $attendance,
         ?int $reminderHours = null,
+        bool $ignoreQuietHours = false,
     ): bool {
         $company = $automation->company ?? $appointment?->company ?? $attendance?->company ?? $client?->company;
 
@@ -444,7 +444,9 @@ class WhatsAppAutomationService
             return false;
         }
 
-        if ($automation->type !== WhatsAppAutomationType::Reminder && $this->isQuietHours($company, $automation)) {
+        if (! $ignoreQuietHours
+            && $automation->type !== WhatsAppAutomationType::Reminder
+            && $this->isQuietHours($company, $automation)) {
             return false;
         }
 

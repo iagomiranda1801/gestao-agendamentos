@@ -359,8 +359,49 @@ class WhatsAppAutomationTest extends TestCase
         app(WhatsAppAutomationService::class)->queueAfterSalesIfEnabled($attendance);
 
         Queue::assertPushed(SendWhatsAppAfterSalesJob::class, function (SendWhatsAppAfterSalesJob $job) use ($attendance): bool {
-            return $job->attendanceId === $attendance->getKey();
+            return $job->attendanceId === $attendance->getKey()
+                && $job->delay === null;
         });
+    }
+
+    public function test_after_sales_is_queued_immediately_by_process_due(): void
+    {
+        $setup = $this->createBookableSetup();
+        $this->enableOperationalWhatsApp($setup['company']);
+        $setup['client']->update(['phone' => '(11) 99999-0001']);
+
+        $this->enableAutomation($setup['company'], WhatsAppAutomationType::AfterSales, [
+            'is_enabled' => true,
+            'delay_value' => 2,
+        ]);
+
+        $appointment = Appointment::factory()
+            ->forCompany($setup['company'])
+            ->completed()
+            ->create([
+                'client_id' => $setup['client']->getKey(),
+                'professional_id' => $setup['professional']->getKey(),
+                'service_id' => $setup['service']->getKey(),
+                'start_at' => now()->subHour(),
+                'end_at' => now(),
+                'created_by' => $setup['admin']->getKey(),
+            ]);
+
+        Attendance::factory()
+            ->forAppointment($appointment)
+            ->create([
+                'completed_by' => $setup['admin']->getKey(),
+                'completed_at' => now(),
+            ]);
+
+        $queued = app(WhatsAppAutomationService::class)->processCompany($setup['company']);
+
+        $this->assertSame(1, $queued);
+        $this->assertDatabaseHas('whatsapp_automation_sends', [
+            'client_id' => $setup['client']->getKey(),
+            'type' => WhatsAppAutomationType::AfterSales->value,
+            'status' => WhatsAppAutomationSendStatus::Sent->value,
+        ]);
     }
 
     public function test_after_sales_skips_when_client_already_rebooked(): void
@@ -409,6 +450,47 @@ class WhatsAppAutomationTest extends TestCase
 
         $this->assertFalse($sent);
         $this->assertDatabaseCount('whatsapp_automation_sends', 0);
+    }
+
+    public function test_after_sales_sends_immediately_even_during_quiet_hours(): void
+    {
+        $setup = $this->createBookableSetup();
+        $this->enableOperationalWhatsApp($setup['company']);
+        $setup['client']->update(['phone' => '(11) 99999-0001']);
+
+        $this->enableAutomation($setup['company'], WhatsAppAutomationType::AfterSales, [
+            'is_enabled' => true,
+            'quiet_hours_start' => '08:00',
+            'quiet_hours_end' => '09:00',
+        ]);
+
+        $appointment = Appointment::factory()
+            ->forCompany($setup['company'])
+            ->completed()
+            ->create([
+                'client_id' => $setup['client']->getKey(),
+                'professional_id' => $setup['professional']->getKey(),
+                'service_id' => $setup['service']->getKey(),
+                'start_at' => now()->subHour(),
+                'end_at' => now(),
+                'created_by' => $setup['admin']->getKey(),
+            ]);
+
+        $attendance = Attendance::factory()
+            ->forAppointment($appointment)
+            ->create([
+                'completed_by' => $setup['admin']->getKey(),
+                'completed_at' => now(),
+            ]);
+
+        $sent = app(WhatsAppAutomationService::class)->sendAfterSales($attendance);
+
+        $this->assertTrue($sent);
+        $this->assertDatabaseHas('whatsapp_automation_sends', [
+            'attendance_id' => $attendance->getKey(),
+            'type' => WhatsAppAutomationType::AfterSales->value,
+            'status' => WhatsAppAutomationSendStatus::Sent->value,
+        ]);
     }
 
     public function test_campaign_inactive_audience_uses_last_visit_and_opt_in(): void

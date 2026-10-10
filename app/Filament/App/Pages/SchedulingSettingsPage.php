@@ -126,7 +126,6 @@ class SchedulingSettingsPage extends Page
             'reminder_quiet_hours_start' => substr((string) $reminder->quiet_hours_start, 0, 5),
             'reminder_quiet_hours_end' => substr((string) $reminder->quiet_hours_end, 0, 5),
             'after_sales_enabled' => $afterSales->is_enabled,
-            'after_sales_delay_value' => $afterSales->delay_value,
             'after_sales_template' => $afterSales->message_template,
             'business_hours' => $hours !== [] ? $hours : [
                 [
@@ -176,7 +175,6 @@ class SchedulingSettingsPage extends Page
             ],
             'after_sales' => [
                 'is_enabled' => (bool) ($data['after_sales_enabled'] ?? false),
-                'delay_value' => (int) ($data['after_sales_delay_value'] ?? 2),
                 'message_template' => $data['after_sales_template'] ?? '',
                 'quiet_hours_start' => $data['reminder_quiet_hours_start'] ?? '08:00',
                 'quiet_hours_end' => $data['reminder_quiet_hours_end'] ?? '20:00',
@@ -190,7 +188,6 @@ class SchedulingSettingsPage extends Page
             $data['reminder_quiet_hours_start'],
             $data['reminder_quiet_hours_end'],
             $data['after_sales_enabled'],
-            $data['after_sales_delay_value'],
             $data['after_sales_template'],
         );
 
@@ -449,7 +446,7 @@ class SchedulingSettingsPage extends Page
                         app(CompanySchedulingSettingService::class)->getOrCreate(Filament::getTenant()),
                     )),
                 Section::make('Lembrete e pós-venda no WhatsApp')
-                    ->description('Envia dois avisos: cerca de 24 e 12 horas antes, inclusive à noite. Exige confirmação WhatsApp ligada. Reconquista fica em Marketing.')
+                    ->description('Envia dois avisos: cerca de 24 e 12 horas antes, inclusive à noite. O agradecimento sai na conclusão do atendimento. Exige confirmação WhatsApp ligada. Reconquista fica em Marketing.')
                     ->schema([
                         Toggle::make('reminder_enabled')
                             ->label('Enviar avisos 24 e 12 horas antes do horário')
@@ -470,13 +467,8 @@ class SchedulingSettingsPage extends Page
                             ->columnSpanFull(),
                         Toggle::make('after_sales_enabled')
                             ->label('Enviar agradecimento após o atendimento')
+                            ->helperText('Envia na hora em que o atendimento é concluído.')
                             ->live(),
-                        TextInput::make('after_sales_delay_value')
-                            ->label('Horas após a conclusão')
-                            ->numeric()
-                            ->minValue(1)
-                            ->maxValue(168)
-                            ->required(fn (Get $get): bool => (bool) $get('after_sales_enabled')),
                         Textarea::make('after_sales_template')
                             ->label('Modelo do pós-venda')
                             ->helperText('Texto neutro (obrigado + link). Promoções devem ir para reconquista, com aceite.')
