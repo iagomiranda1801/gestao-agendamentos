@@ -25,6 +25,14 @@ class AdminPanelAccessTest extends TestCase
             ->assertOk();
     }
 
+    public function test_admin_login_works_on_hosts_other_than_app_url(): void
+    {
+        $this->withoutVite();
+
+        $this->get('http://agendequi.solucoesdigitais.com.br/admin/login')
+            ->assertOk();
+    }
+
     public function test_regular_user_cannot_access_admin_panel(): void
     {
         $user = User::factory()->create();

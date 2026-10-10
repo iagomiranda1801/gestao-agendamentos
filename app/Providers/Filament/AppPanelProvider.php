@@ -5,10 +5,10 @@ namespace App\Providers\Filament;
 use App\Filament\App\Pages\Auth\Login as AppLogin;
 use App\Filament\App\Pages\Dashboard;
 use App\Http\Middleware\EnsureCompanySubscriptionIsActive;
+use App\Http\Middleware\EnsureNotSegmentHost;
 use App\Http\Middleware\RedirectToSegmentPanel;
 use App\Models\Company;
 use App\Support\Branding;
-use App\Support\Segment;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -42,7 +42,7 @@ class AppPanelProvider extends PanelProvider
 
     protected function panelDomain(): ?string
     {
-        return Segment::mainHost();
+        return null;
     }
 
     public function panel(Panel $panel): Panel
@@ -109,6 +109,7 @@ class AppPanelProvider extends PanelProvider
                 AccountWidget::class,
             ])
             ->middleware([
+                ...($this->panelId() === 'app' ? [EnsureNotSegmentHost::class] : []),
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,

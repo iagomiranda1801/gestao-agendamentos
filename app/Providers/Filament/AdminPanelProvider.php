@@ -4,8 +4,8 @@ namespace App\Providers\Filament;
 
 use App\Filament\Admin\Pages\Auth\Login;
 use App\Filament\Admin\Pages\Dashboard;
+use App\Http\Middleware\EnsureNotSegmentHost;
 use App\Support\Branding;
-use App\Support\Segment;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -32,7 +32,6 @@ class AdminPanelProvider extends PanelProvider
         return $panel
             ->id('admin')
             ->path('admin')
-            ->domain(Segment::mainHost())
             ->login(Login::class)
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->maxContentWidth(Width::Full)
@@ -57,6 +56,7 @@ class AdminPanelProvider extends PanelProvider
                 AccountWidget::class,
             ])
             ->middleware([
+                EnsureNotSegmentHost::class,
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
