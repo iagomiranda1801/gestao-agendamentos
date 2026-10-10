@@ -34,7 +34,7 @@ class ProductsTable
                     ->sortable(),
                 TextColumn::make('reference_unit_cost')
                     ->label('Custo unitário de referência')
-                    ->money('BRL', locale: 'pt_BR', decimalPlaces: 6)
+                    ->money('BRL', locale: 'pt_BR', decimalPlaces: 2)
                     ->sortable(),
                 TextColumn::make('sale_price')
                     ->label('Preço de venda')
@@ -42,17 +42,17 @@ class ProductsTable
                     ->sortable(),
                 TextColumn::make('minimum_stock')
                     ->label('Estoque mínimo')
-                    ->numeric(decimalPlaces: 4)
+                    ->numeric(decimalPlaces: 2)
                     ->sortable(),
                 TextColumn::make('current_stock')
                     ->label('Estoque atual')
                     ->state(fn (Product $record): string => $record->getCurrentStockQuantity())
-                    ->numeric(decimalPlaces: 4)
+                    ->numeric(decimalPlaces: 2)
                     ->toggleable(),
                 TextColumn::make('average_cost')
                     ->label('Custo médio')
                     ->state(fn (Product $record): string => $record->getCurrentAverageUnitCost())
-                    ->money('BRL', locale: 'pt_BR', decimalPlaces: 6)
+                    ->money('BRL', locale: 'pt_BR', decimalPlaces: 2)
                     ->toggleable(),
                 TextColumn::make('stock_value')
                     ->label('Valor em estoque')

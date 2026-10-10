@@ -73,7 +73,7 @@ class ProductForm
                             ->label('Custo unitário de referência')
                             ->numeric()
                             ->prefix('R$')
-                            ->step(0.000001)
+                            ->step(0.01)
                             ->minValue(0)
                             ->default(0)
                             ->required(),
@@ -89,7 +89,7 @@ class ProductForm
                         TextInput::make('minimum_stock')
                             ->label('Estoque mínimo')
                             ->numeric()
-                            ->step(0.0001)
+                            ->step(0.01)
                             ->minValue(0)
                             ->default(0)
                             ->required(),

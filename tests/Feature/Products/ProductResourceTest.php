@@ -37,6 +37,25 @@ class ProductResourceTest extends TestCase
             ->assertCanSeeTableRecords(Product::where('company_id', $company->id)->get());
     }
 
+    public function test_product_list_shows_money_and_stock_with_two_decimals(): void
+    {
+        $company = $this->createCompany(['slug' => 'estudio-ana']);
+        $admin = $this->createCompanyUser($company);
+        Product::factory()->forCompany($company)->create([
+            'name' => 'Tinta preta',
+            'reference_unit_cost' => 10,
+            'minimum_stock' => 1,
+        ]);
+
+        $this->authenticateForAppTenant($admin, $company);
+
+        Livewire::test(ListProducts::class)
+            ->assertSuccessful()
+            ->assertSee('10,00')
+            ->assertDontSee('10,000000')
+            ->assertDontSee('1,0000');
+    }
+
     public function test_manager_can_list_products(): void
     {
         $company = $this->createCompany(['slug' => 'estudio-ana']);
