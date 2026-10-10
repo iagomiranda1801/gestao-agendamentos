@@ -20,23 +20,6 @@
     </header>
 
     <main class="tattoo-auth__stage">
-        <section class="tattoo-auth__card" aria-labelledby="tattoo-auth-title">
-            <h1 id="tattoo-auth-title" class="tattoo-auth__card-title">{{ $content['form_title'] ?? 'Entrar' }}</h1>
-
-            @if (filled($content['form_subtitle'] ?? null))
-                <p class="tattoo-auth__card-subtitle">{{ $content['form_subtitle'] }}</p>
-            @endif
-
-            <div class="tattoo-auth__form">
-                {{ $this->content }}
-            </div>
-
-            <div class="tattoo-auth__signup">
-                <span>{{ $content['signup_text'] ?? 'Ainda não tem conta?' }}</span>
-                <a href="{{ route('signup.company') }}">{{ $content['signup_link'] ?? 'Criar conta' }}</a>
-            </div>
-        </section>
-
         <section class="tattoo-auth__story" aria-label="{{ $brand['name'] }}">
             @if ($content['image'])
                 <img src="{{ $content['image'] }}" alt="" aria-hidden="true" class="tattoo-auth__story-image">
@@ -72,6 +55,23 @@
                     @endforeach
                 </ol>
             @endif
+        </section>
+
+        <section class="tattoo-auth__card" aria-labelledby="tattoo-auth-title">
+            <h1 id="tattoo-auth-title" class="tattoo-auth__card-title">{{ $content['form_title'] ?? 'Entrar' }}</h1>
+
+            @if (filled($content['form_subtitle'] ?? null))
+                <p class="tattoo-auth__card-subtitle">{{ $content['form_subtitle'] }}</p>
+            @endif
+
+            <div class="tattoo-auth__form">
+                {{ $this->content }}
+            </div>
+
+            <div class="tattoo-auth__signup">
+                <span>{{ $content['signup_text'] ?? 'Ainda não tem conta?' }}</span>
+                <a href="{{ route('signup.company') }}">{{ $content['signup_link'] ?? 'Criar conta' }}</a>
+            </div>
         </section>
     </main>
 

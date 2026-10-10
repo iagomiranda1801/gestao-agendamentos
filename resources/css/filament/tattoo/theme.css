@@ -452,13 +452,16 @@
     z-index: 1;
     display: grid;
     flex: 1;
-    grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
-    gap: clamp(1.75rem, 5vw, 4.5rem);
+    grid-template-columns: minmax(0, 28rem) minmax(320px, 400px);
+    justify-content: center;
     align-items: center;
+    gap: clamp(2rem, 5vw, 4rem);
     padding: 0.5rem clamp(1.5rem, 5vw, 4.5rem) 2.5rem;
 }
 
 .tattoo-auth__card {
+    width: 100%;
+    max-width: 400px;
     padding: clamp(1.35rem, 2.5vw, 2rem);
     border: 1px solid var(--tattoo-border);
     border-radius: calc(var(--tattoo-radius) + 0.35rem);
@@ -482,7 +485,7 @@
 
 .tattoo-auth__story {
     position: relative;
-    max-width: 34rem;
+    max-width: 28rem;
 }
 
 .tattoo-auth__story-image {
@@ -648,13 +651,11 @@
 @media (max-width: 900px) {
     .tattoo-auth__stage {
         grid-template-columns: minmax(0, 1fr);
-        gap: 2rem;
         justify-items: center;
     }
 
     .tattoo-auth__card {
-        width: 100%;
-        max-width: 400px;
+        order: -1;
     }
 
     .tattoo-auth__story {
