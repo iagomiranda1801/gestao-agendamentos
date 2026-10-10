@@ -1,6 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="280" height="56" viewBox="0 0 280 56" role="img" aria-label="Agendaqui Estúdio">
-  <rect x="2" y="4" width="48" height="48" rx="6" fill="#c9a227"/>
-  <path d="M14 40 V16 h8 l4 12 4-12 h8 v24 h-7 V24 l-5 16 h-4 l-5-16 v16z" fill="#14110d"/>
-  <text x="64" y="27" font-family="Georgia, 'Times New Roman', serif" font-size="21" font-weight="700" fill="#f4efe6">Agendaqui</text>
-  <text x="64" y="47" font-family="'Segoe UI', Arial, sans-serif" font-size="13" letter-spacing="5" fill="#c9a227">ESTUDIO</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="56" viewBox="0 0 300 56" role="img" aria-label="Agendaqui Estudio">
+  <circle cx="28" cy="28" r="23.5" fill="#14110d" stroke="#c9a227" stroke-width="1.8"/>
+  <path d="M28 10 V28.5" fill="none" stroke="#c9a227" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M24 16 H32" fill="none" stroke="#c9a227" stroke-width="2" stroke-linecap="round"/>
+  <path d="M24.5 19.5 H31.5" fill="none" stroke="#c9a227" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M24.5 23 H31.5" fill="none" stroke="#c9a227" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M28 28.5 L24.2 38.5 H31.8 Z" fill="#c9a227"/>
+  <ellipse cx="28" cy="44.2" rx="3.4" ry="4.4" fill="#e6c35a"/>
+  <text x="64" y="26" font-family="Georgia, 'Times New Roman', serif" font-size="22" font-weight="700" fill="#f4efe6">Agendaqui</text>
+  <text x="64" y="46" font-family="Georgia, 'Times New Roman', serif" font-size="12" letter-spacing="5" fill="#c9a227">ESTUDIO</text>
 </svg>

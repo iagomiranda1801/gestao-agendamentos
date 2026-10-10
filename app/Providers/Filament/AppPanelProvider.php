@@ -8,6 +8,7 @@ use App\Http\Middleware\EnsureCompanySubscriptionIsActive;
 use App\Http\Middleware\RedirectToSegmentPanel;
 use App\Models\Company;
 use App\Support\Branding;
+use App\Support\Segment;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -39,11 +40,17 @@ class AppPanelProvider extends PanelProvider
         return 'app';
     }
 
+    protected function panelDomain(): ?string
+    {
+        return Segment::mainHost();
+    }
+
     public function panel(Panel $panel): Panel
     {
         return $panel
             ->id($this->panelId())
             ->path($this->panelPath())
+            ->domain($this->panelDomain())
             ->login(AppLogin::class)
             ->viteTheme('resources/css/filament/app/theme.css')
             ->maxContentWidth(Width::Full)

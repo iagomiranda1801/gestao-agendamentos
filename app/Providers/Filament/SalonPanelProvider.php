@@ -19,10 +19,14 @@ class SalonPanelProvider extends AppPanelProvider
         return 'painel';
     }
 
+    protected function panelDomain(): ?string
+    {
+        return (string) Segment::get('salon', 'domain');
+    }
+
     public function panel(Panel $panel): Panel
     {
         return parent::panel($panel)
-            ->domain((string) Segment::get('salon', 'domain'))
             ->login(SalonLogin::class)
             ->viteTheme('resources/css/filament/salao/theme.css')
             ->brandLogoHeight((string) Segment::get('salon', 'logo_height'))

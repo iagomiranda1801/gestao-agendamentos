@@ -56,6 +56,11 @@ class Segment
         return $segment !== null && (bool) static::get($segment, 'enabled', false);
     }
 
+    public static function mainHost(): string
+    {
+        return (string) (parse_url((string) config('app.url'), PHP_URL_HOST) ?: 'localhost');
+    }
+
     public static function current(): ?string
     {
         if (! app()->bound('request')) {
@@ -144,7 +149,7 @@ class Segment
         }
 
         if (str_starts_with($path, 'images/') || str_starts_with($path, '/')) {
-            return asset(ltrim($path, '/'));
+            return '/'.ltrim($path, '/');
         }
 
         return Storage::disk('public')->url($path);

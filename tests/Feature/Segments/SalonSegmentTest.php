@@ -34,7 +34,7 @@ class SalonSegmentTest extends TestCase
             ->assertSee('Headline do salão de teste')
             ->assertSee('images/salao/logo.svg', false);
 
-        $this->get('/app/login')
+        $this->get(rtrim((string) config('app.url'), '/').'/app/login')
             ->assertOk()
             ->assertSee('agendaqui-login-shell', false)
             ->assertDontSee('salon-auth', false);
@@ -43,6 +43,13 @@ class SalonSegmentTest extends TestCase
     public function test_salon_domain_root_redirects_to_salon_panel(): void
     {
         $this->get("http://{$this->salonHost}/")->assertRedirect("http://{$this->salonHost}/painel");
+    }
+
+    public function test_admin_and_app_are_not_available_on_salon_domain(): void
+    {
+        $this->get("http://{$this->salonHost}/admin/login")->assertNotFound();
+        $this->get("http://{$this->salonHost}/admin")->assertNotFound();
+        $this->get("http://{$this->salonHost}/app/login")->assertNotFound();
     }
 
     public function test_salon_company_can_open_salon_panel(): void

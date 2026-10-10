@@ -35,7 +35,7 @@ class TattooSegmentTest extends TestCase
             ->assertSee('Headline do estúdio de teste')
             ->assertSee('images/estudio/logo.svg', false);
 
-        $this->get('/app/login')
+        $this->get(rtrim((string) config('app.url'), '/').'/app/login')
             ->assertOk()
             ->assertSee('agendaqui-login-shell', false)
             ->assertDontSee('tattoo-auth', false)
@@ -45,6 +45,13 @@ class TattooSegmentTest extends TestCase
     public function test_tattoo_domain_root_redirects_to_tattoo_panel(): void
     {
         $this->get("http://{$this->tattooHost}/")->assertRedirect("http://{$this->tattooHost}/painel");
+    }
+
+    public function test_admin_and_app_are_not_available_on_tattoo_domain(): void
+    {
+        $this->get("http://{$this->tattooHost}/admin/login")->assertNotFound();
+        $this->get("http://{$this->tattooHost}/admin")->assertNotFound();
+        $this->get("http://{$this->tattooHost}/app/login")->assertNotFound();
     }
 
     public function test_tattoo_company_can_open_tattoo_panel(): void
