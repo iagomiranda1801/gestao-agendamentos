@@ -73,9 +73,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
 
     public function isPlatformAdmin(): bool
     {
-        return $this->is_active
-            && $this->is_super_admin
-            && ! $this->hasActiveCompanyMembership();
+        return $this->is_active && $this->is_super_admin;
     }
 
     /**

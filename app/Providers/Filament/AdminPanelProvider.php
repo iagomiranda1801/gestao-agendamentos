@@ -4,9 +4,9 @@ namespace App\Providers\Filament;
 
 use App\Filament\Admin\Pages\Auth\Login;
 use App\Filament\Admin\Pages\Dashboard;
+use App\Http\Middleware\AuthenticateAdminPanel;
 use App\Http\Middleware\EnsureNotSegmentHost;
 use App\Support\Branding;
-use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -68,7 +68,7 @@ class AdminPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->authMiddleware([
-                Authenticate::class,
+                AuthenticateAdminPanel::class,
             ])
             ->navigationGroups([
                 'Gestão de Agendamentos',

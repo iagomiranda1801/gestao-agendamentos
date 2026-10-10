@@ -39,7 +39,7 @@ class AdminPanelAccessTest extends TestCase
 
         $this->actingAs($user)
             ->get('/admin')
-            ->assertForbidden();
+            ->assertRedirect('/admin/login');
     }
 
     public function test_company_admin_can_access_app_but_not_admin_panel(): void
@@ -49,13 +49,13 @@ class AdminPanelAccessTest extends TestCase
 
         $this->actingAs($companyAdmin)
             ->get('/admin')
-            ->assertForbidden();
+            ->assertRedirect('/admin/login');
 
         $this->assertFalse($companyAdmin->canAccessPanel(Filament::getPanel('admin')));
         $this->assertTrue($companyAdmin->canAccessPanel(Filament::getPanel('app')));
     }
 
-    public function test_company_user_marked_as_super_admin_cannot_access_admin_panel(): void
+    public function test_super_admin_with_company_membership_can_access_admin_panel(): void
     {
         $company = $this->createCompany();
         $companyUser = $this->createCompanyUser($company, [
@@ -64,10 +64,10 @@ class AdminPanelAccessTest extends TestCase
 
         $this->actingAs($companyUser)
             ->get('/admin')
-            ->assertForbidden();
+            ->assertOk();
 
-        $this->assertFalse($companyUser->canAccessPanel(Filament::getPanel('admin')));
-        $this->assertFalse($companyUser->isPlatformAdmin());
+        $this->assertTrue($companyUser->canAccessPanel(Filament::getPanel('admin')));
+        $this->assertTrue($companyUser->isPlatformAdmin());
     }
 
     public function test_inactive_user_cannot_access_admin_panel(): void
@@ -76,7 +76,7 @@ class AdminPanelAccessTest extends TestCase
 
         $this->actingAs($user)
             ->get('/admin')
-            ->assertForbidden();
+            ->assertRedirect('/admin/login');
     }
 
     public function test_regular_user_cannot_access_company_resource(): void
