@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\EvolutionWebhookController;
+use App\Http\Controllers\PwaController;
 use App\Http\Controllers\PrintDentalTreatmentPlanController;
 use App\Http\Controllers\TattooImageController;
 use App\Http\Controllers\TattooQuotePdfController;
@@ -24,6 +25,12 @@ Route::redirect('/', '/admin');
 Route::get('/cadastro', CompanySignupWizard::class)
     ->middleware('throttle:5,1')
     ->name('signup.company');
+
+Route::get('/manifest.webmanifest', [PwaController::class, 'panelManifest'])->name('pwa.manifest.panel');
+Route::get('/agendar/{company:slug}/manifest.webmanifest', [PwaController::class, 'bookingManifest'])->name('pwa.manifest.booking');
+Route::get('/pedir/{company:slug}/manifest.webmanifest', [PwaController::class, 'ordersManifest'])->name('pwa.manifest.orders');
+Route::get('/offline', [PwaController::class, 'offline'])->name('pwa.offline');
+Route::get('/sw.js', [PwaController::class, 'serviceWorker'])->name('pwa.sw');
 
 Route::get('/agendar/{company:slug}', BookingWizard::class)->name('public.booking.show');
 Route::get('/pedir/{company:slug}', OrderWizard::class)->name('public.orders.show');

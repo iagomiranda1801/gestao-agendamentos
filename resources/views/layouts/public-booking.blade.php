@@ -9,6 +9,13 @@
 
         <link rel="icon" type="image/png" href="{{ \App\Support\Branding::faviconUrl() }}">
 
+        @if (isset($company))
+            @include('pwa.head', [
+                'company' => $company,
+                'surface' => request()->routeIs('public.orders.show') ? 'orders' : 'booking',
+            ])
+        @endif
+
         @fonts
 
         @vite(['resources/css/public-booking.css'])

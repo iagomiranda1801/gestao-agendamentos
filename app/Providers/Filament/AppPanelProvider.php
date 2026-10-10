@@ -77,6 +77,7 @@ class AppPanelProvider extends PanelProvider
                 Css::make('panel-fixes', resource_path('css/filament-panel-fixes.css')),
             ])
             ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => view('filament.hooks.segment-theme-tokens')->render())
+            ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => view('pwa.head', ['surface' => 'panel'])->render())
             ->renderHook(PanelsRenderHook::SCRIPTS_AFTER, fn (): string => view('filament.hooks.notification-fallback')->render())
             ->renderHook(PanelsRenderHook::AUTH_LOGIN_FORM_AFTER, fn (): string => view('filament.hooks.app-login-signup-link')->render())
             ->renderHook(PanelsRenderHook::BODY_START, fn (): string => view('filament.hooks.trial-banner')->render())
