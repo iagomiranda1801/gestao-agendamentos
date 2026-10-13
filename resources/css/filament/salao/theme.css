@@ -221,13 +221,19 @@
     z-index: 1;
     display: grid;
     flex: 1;
-    grid-template-columns: minmax(340px, 440px) minmax(0, 1fr);
-    gap: clamp(2rem, 6vw, 6rem);
+    grid-template-columns: minmax(320px, 400px) minmax(0, 32rem);
+    justify-content: center;
     align-items: center;
+    gap: clamp(2rem, 5vw, 4rem);
+    width: 100%;
+    max-width: 72rem;
+    margin-inline: auto;
     padding: 1rem clamp(1.5rem, 5vw, 4.5rem) 3rem;
 }
 
 .salon-auth__card {
+    width: 100%;
+    max-width: 400px;
     padding: clamp(1.5rem, 3vw, 2.25rem);
     border: 1px solid var(--salon-border);
     border-radius: calc(var(--salon-radius) + 0.6rem);
@@ -321,7 +327,7 @@
 
 .salon-auth__story {
     position: relative;
-    max-width: 36rem;
+    max-width: 32rem;
 }
 
 .salon-auth__story-image {
@@ -405,8 +411,9 @@
 @media (max-width: 960px) {
     .salon-auth__stage {
         grid-template-columns: minmax(0, 1fr);
-        gap: 2.5rem;
+        justify-content: center;
         justify-items: center;
+        gap: 2.5rem;
     }
 
     .salon-auth__card {
