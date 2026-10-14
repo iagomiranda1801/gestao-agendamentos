@@ -185,6 +185,11 @@ class Company extends Model
         return $this->hasMany(Client::class);
     }
 
+    public function externalIntegrations(): HasMany
+    {
+        return $this->hasMany(ExternalIntegration::class);
+    }
+
     /**
      * @return HasMany<Professional, $this>
      */

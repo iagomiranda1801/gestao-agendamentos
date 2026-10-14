@@ -19,7 +19,10 @@ use App\Models\User;
 use App\Observers\AdminAuditObserver;
 use App\Services\WhatsApp\Automations\WhatsAppAutomationService;
 use Filament\Facades\Filament;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -37,6 +40,19 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('external-integrations', function (Request $request): array {
+            $identity = hash('sha256', (string) $request->bearerToken());
+
+            return [
+                Limit::perMinute(60)->by('integration-ip:'.$request->ip())->response(
+                    fn (Request $request, array $headers) => response()->json(['success' => false, 'message' => 'Limite de requisições excedido.'], 429, $headers),
+                ),
+                Limit::perMinute(30)->by('integration-key:'.$identity)->response(
+                    fn (Request $request, array $headers) => response()->json(['success' => false, 'message' => 'Limite de requisições excedido.'], 429, $headers),
+                ),
+            ];
+        });
+
         config(['livewire.temporary_file_upload.disk' => 'local']);
 
         Company::observe(AdminAuditObserver::class);
