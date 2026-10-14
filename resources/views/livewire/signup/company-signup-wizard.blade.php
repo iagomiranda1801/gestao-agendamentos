@@ -72,21 +72,56 @@
             </div>
         @endif
 
+        @php
+            $billingInterval = $this->selectedBillingInterval();
+            $modulePrices = $this->modulePrices();
+            $selectedTotal = $this->formatPrice($this->selectedTotalCents());
+            $priceSuffix = $billingInterval->signupPriceSuffix();
+            $totalSuffix = $billingInterval->signupTotalSuffix();
+        @endphp
+
+        <h2 class="signup-section-title">Plano de cobrança</h2>
+        <p class="signup-subtitle">Semestral e anual saem mais baratos. Você pode mudar depois com a equipe.</p>
+
+        <div class="signup-billing-options">
+            @foreach ($this->billingIntervalOptions() as $value => $label)
+                @php($hint = \App\Enums\BillingInterval::from($value)->savingsHint())
+                <label class="signup-billing-option">
+                    <input type="radio" name="billingInterval" value="{{ $value }}" wire:model.live="billingInterval">
+                    <span class="signup-billing-option__body">
+                        <span class="signup-billing-option__title">{{ $label }}</span>
+                        @if ($hint)
+                            <span class="signup-billing-option__hint">{{ $hint }}</span>
+                        @endif
+                    </span>
+                </label>
+            @endforeach
+        </div>
+
         <h2 class="signup-section-title">Recursos ativados</h2>
         <p class="signup-subtitle">Confira a sugestão e ajuste o que a empresa realmente precisa.</p>
 
         <div class="signup-modules">
             @foreach ($this->moduleOptions() as $value => $label)
                 <label class="signup-module">
-                    <input type="checkbox" value="{{ $value }}" wire:model="selectedModules">
-                    <span>
+                    <input type="checkbox" value="{{ $value }}" wire:model.live="selectedModules">
+                    <span class="signup-module__body">
                         <span class="signup-module__title">{{ $label }}</span>
                         <span class="signup-module__desc">{{ $this->moduleDescriptions()[$value] ?? '' }}</span>
                     </span>
+                    <span class="signup-module__price">{{ $this->formatPrice($modulePrices[$value] ?? 0) }}{{ $priceSuffix }}</span>
                 </label>
             @endforeach
         </div>
         @error('selectedModules') <div class="signup-error">{{ $message }}</div> @enderror
+
+        <div class="signup-total">
+            <div>
+                <strong>Total estimado</strong>
+                <p>7 dias grátis. Depois, {{ $selectedTotal }} {{ $totalSuffix }}.</p>
+            </div>
+            <span class="signup-total__value">{{ $selectedTotal }}{{ $priceSuffix }}</span>
+        </div>
 
         <div class="signup-actions">
             <button type="button" class="signup-btn signup-btn--secondary" wire:click="goToCompanyStep">Voltar</button>
@@ -145,6 +180,12 @@
             <dd>
                 {{ collect($selectedModules)->map(fn ($value) => $this->moduleOptions()[$value] ?? $value)->join(', ') }}
             </dd>
+
+            <dt>Plano</dt>
+            <dd>{{ $this->billingIntervalOptions()[$this->billingInterval] ?? $this->billingInterval }}</dd>
+
+            <dt>Depois do trial</dt>
+            <dd>{{ $this->formatPrice($this->selectedTotalCents()) }}{{ $this->selectedBillingInterval()->signupPriceSuffix() }}</dd>
 
             <dt>Administrador</dt>
             <dd>{{ $adminName }} — {{ $adminEmail }}</dd>

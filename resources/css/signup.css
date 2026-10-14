@@ -157,6 +157,54 @@ body.signup-body {
     margin-top: 1.25rem;
 }
 
+.signup-billing-options {
+    display: grid;
+    gap: 0.65rem;
+    margin-bottom: 0.5rem;
+}
+
+@media (min-width: 640px) {
+    .signup-billing-options {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.signup-billing-option {
+    display: flex;
+    gap: 0.65rem;
+    align-items: flex-start;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid var(--signup-border);
+    border-radius: 0.75rem;
+    cursor: pointer;
+}
+
+.signup-billing-option:has(input:checked) {
+    border-color: var(--signup-primary);
+    background: #fffbeb;
+}
+
+.signup-billing-option input {
+    margin-top: 0.15rem;
+}
+
+.signup-billing-option__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.signup-billing-option__title {
+    font-weight: 600;
+    font-size: 0.92rem;
+}
+
+.signup-billing-option__hint {
+    color: #166534;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
 .signup-module {
     border: 1px solid var(--signup-border);
     border-radius: 0.75rem;
@@ -170,6 +218,14 @@ body.signup-body {
     margin-top: 0.2rem;
 }
 
+.signup-module__body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
 .signup-module__title {
     font-weight: 600;
 }
@@ -177,6 +233,38 @@ body.signup-body {
 .signup-module__desc {
     color: var(--signup-muted);
     font-size: 0.875rem;
+}
+
+.signup-module__price {
+    flex-shrink: 0;
+    font-weight: 600;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.signup-total {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid #fde68a;
+    border-radius: 0.75rem;
+    background: #fffbeb;
+}
+
+.signup-total p {
+    margin: 0.2rem 0 0;
+    color: var(--signup-muted);
+    font-size: 0.85rem;
+}
+
+.signup-total__value {
+    flex-shrink: 0;
+    font-weight: 700;
+    font-size: 1.05rem;
+    white-space: nowrap;
 }
 
 .signup-actions {

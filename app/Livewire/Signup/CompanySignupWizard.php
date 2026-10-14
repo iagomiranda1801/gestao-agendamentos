@@ -2,10 +2,12 @@
 
 namespace App\Livewire\Signup;
 
+use App\Enums\BillingInterval;
 use App\Enums\CompanyModule;
 use App\Enums\CompanyProfile;
 use App\Filament\App\Pages\Dashboard;
 use App\Services\Company\CompanyProvisioningService;
+use App\Services\Company\CompanySubscriptionService;
 use App\Support\Segment;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
@@ -41,6 +43,8 @@ class CompanySignupWizard extends Component
 
     /** @var list<string> */
     public array $selectedModules = [];
+
+    public string $billingInterval = BillingInterval::Monthly->value;
 
     public string $adminName = '';
 
@@ -138,6 +142,7 @@ class CompanySignupWizard extends Component
             'timezone' => $this->timezone,
             'business_profile' => $this->businessProfile,
             'enabled_modules' => $this->selectedModules,
+            'billing_interval' => $this->selectedBillingInterval(),
             'admin_name' => $this->adminName,
             'admin_email' => $this->adminEmail,
             'admin_password' => $this->adminPassword,
@@ -160,6 +165,43 @@ class CompanySignupWizard extends Component
     public function moduleOptions(): array
     {
         return CompanyModule::options();
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public function modulePrices(): array
+    {
+        return collect($this->subscriptions()->quoteItems(
+            array_keys($this->moduleOptions()),
+            $this->selectedBillingInterval(),
+        ))->mapWithKeys(fn (array $item): array => [$item['module'] => $item['price_cents']])->all();
+    }
+
+    public function selectedTotalCents(): int
+    {
+        return $this->subscriptions()->quoteCents($this->selectedModules, $this->selectedBillingInterval());
+    }
+
+    public function selectedBillingInterval(): BillingInterval
+    {
+        return BillingInterval::tryFrom($this->billingInterval) ?? BillingInterval::Monthly;
+    }
+
+    /** @return array<string, string> */
+    public function billingIntervalOptions(): array
+    {
+        return BillingInterval::options();
+    }
+
+    public function formatPrice(int $cents): string
+    {
+        return $this->subscriptions()->formatReais($cents);
+    }
+
+    protected function subscriptions(): CompanySubscriptionService
+    {
+        return app(CompanySubscriptionService::class);
     }
 
     /**

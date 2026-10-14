@@ -9,39 +9,20 @@ use Illuminate\Database\Seeder;
 
 class ModulePriceSeeder extends Seeder
 {
-    /**
-     * Faixa entrada: mensal; semestral = 5×; anual = 10×.
-     *
-     * @var array<string, int>
-     */
-    private const MONTHLY_CENTS = [
-        CompanyModule::Scheduling->value => 4900,
-        CompanyModule::Sales->value => 3900,
-        CompanyModule::Finance->value => 3900,
-        CompanyModule::Stock->value => 2500,
-        CompanyModule::ClinicalRecords->value => 4900,
-        CompanyModule::WhatsApp->value => 1900,
-        CompanyModule::Marketing->value => 3900,
-        CompanyModule::Orders->value => 4900,
-    ];
+    /** Preço mensal mínimo por módulo (R$ 49,90). */
+    public const MONTHLY_CENTS = 4990;
 
     public function run(): void
     {
-        foreach (self::MONTHLY_CENTS as $module => $monthlyCents) {
+        foreach (CompanyModule::cases() as $module) {
             foreach (BillingInterval::cases() as $interval) {
-                $multiplier = match ($interval) {
-                    BillingInterval::Monthly => 1,
-                    BillingInterval::Semiannual => 5,
-                    BillingInterval::Annual => 10,
-                };
-
                 ModulePrice::query()->updateOrCreate(
                     [
-                        'module' => $module,
+                        'module' => $module->value,
                         'interval' => $interval->value,
                     ],
                     [
-                        'price_cents' => $monthlyCents * $multiplier,
+                        'price_cents' => self::MONTHLY_CENTS * $interval->catalogMonthlyMultiplier(),
                     ],
                 );
             }

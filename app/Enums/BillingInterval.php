@@ -27,6 +27,45 @@ enum BillingInterval: string
     }
 
     /**
+     * Meses pagos no catálogo para este ciclo (ex.: semestral = 4 meses por 6 de uso).
+     */
+    public function catalogMonthlyMultiplier(): int
+    {
+        return match ($this) {
+            self::Monthly => 1,
+            self::Semiannual => 4,
+            self::Annual => 8,
+        };
+    }
+
+    public function savingsHint(): ?string
+    {
+        return match ($this) {
+            self::Monthly => null,
+            self::Semiannual => '2 meses grátis',
+            self::Annual => '4 meses grátis',
+        };
+    }
+
+    public function signupPriceSuffix(): string
+    {
+        return match ($this) {
+            self::Monthly => '/mês',
+            self::Semiannual => '/semestre',
+            self::Annual => '/ano',
+        };
+    }
+
+    public function signupTotalSuffix(): string
+    {
+        return match ($this) {
+            self::Monthly => 'por mês',
+            self::Semiannual => 'a cada 6 meses',
+            self::Annual => 'por ano',
+        };
+    }
+
+    /**
      * @return array<string, string>
      */
     public static function options(): array

@@ -62,6 +62,6 @@ class RestaurantProfileTest extends TestCase
             ->first();
 
         $this->assertNotNull($monthly);
-        $this->assertSame(4900, $monthly->price_cents);
+        $this->assertSame(4990, $monthly->price_cents);
     }
 }

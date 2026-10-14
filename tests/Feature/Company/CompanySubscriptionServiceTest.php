@@ -40,7 +40,7 @@ class CompanySubscriptionServiceTest extends TestCase
             BillingInterval::Monthly,
         );
 
-        $this->assertSame(3900, $cents);
+        $this->assertSame(4990, $cents);
     }
 
     public function test_quote_for_finance_only_uses_annual_price(): void
@@ -50,7 +50,7 @@ class CompanySubscriptionServiceTest extends TestCase
             BillingInterval::Annual,
         );
 
-        $this->assertSame(39000, $cents);
+        $this->assertSame(39920, $cents);
     }
 
     public function test_quote_sums_scheduling_and_finance(): void
@@ -60,7 +60,7 @@ class CompanySubscriptionServiceTest extends TestCase
             BillingInterval::Monthly,
         );
 
-        $this->assertSame(8800, $cents);
+        $this->assertSame(9980, $cents);
     }
 
     public function test_legacy_active_company_without_period_end_is_allowed(): void
@@ -136,11 +136,11 @@ class CompanySubscriptionServiceTest extends TestCase
 
         $this->assertSame('AQ-2026-0001', $invoice->number);
         $this->assertSame(PlatformInvoiceStatus::Open, $invoice->status);
-        $this->assertSame(3900, $invoice->amount_cents);
+        $this->assertSame(4990, $invoice->amount_cents);
         $this->assertCount(1, $invoice->items);
         $this->assertSame(CompanyModule::Sales->value, $invoice->items[0]['module']);
         $this->assertSame('Vendas/PDV', $invoice->items[0]['label']);
-        $this->assertSame(3900, $invoice->items[0]['price_cents']);
+        $this->assertSame(4990, $invoice->items[0]['price_cents']);
         $this->assertTrue($invoice->due_at?->equalTo(now()->addDays(3)));
         $this->assertTrue($invoice->period_start?->equalTo(now()));
         $this->assertTrue($invoice->period_end?->equalTo(now()->addMonth()));
@@ -160,10 +160,10 @@ class CompanySubscriptionServiceTest extends TestCase
         $this->assertSame(9900, $invoice->amount_cents);
         $this->assertCount(2, $invoice->items);
         $this->assertSame(CompanyModule::Sales->value, $invoice->items[0]['module']);
-        $this->assertSame(3900, $invoice->items[0]['price_cents']);
+        $this->assertSame(4990, $invoice->items[0]['price_cents']);
         $this->assertSame('adjustment', $invoice->items[1]['module']);
         $this->assertSame('Ajuste', $invoice->items[1]['label']);
-        $this->assertSame(6000, $invoice->items[1]['price_cents']);
+        $this->assertSame(4910, $invoice->items[1]['price_cents']);
     }
 
     public function test_issue_invoice_with_same_catalog_amount_has_no_adjustment(): void
@@ -173,9 +173,9 @@ class CompanySubscriptionServiceTest extends TestCase
             'billing_interval' => BillingInterval::Monthly,
         ]);
 
-        $invoice = app(CompanySubscriptionService::class)->issueInvoice($company, amountCents: 3900);
+        $invoice = app(CompanySubscriptionService::class)->issueInvoice($company, amountCents: 4990);
 
-        $this->assertSame(3900, $invoice->amount_cents);
+        $this->assertSame(4990, $invoice->amount_cents);
         $this->assertCount(1, $invoice->items);
     }
 
@@ -261,7 +261,7 @@ class CompanySubscriptionServiceTest extends TestCase
 
         Livewire::test(EditCompany::class, ['record' => $company->getKey()])
             ->callAction('issueInvoice', [
-                'amount' => '39.00',
+                'amount' => '49.90',
             ])
             ->assertHasNoActionErrors();
 
@@ -275,7 +275,7 @@ class CompanySubscriptionServiceTest extends TestCase
         $company->refresh();
 
         $this->assertSame(SubscriptionStatus::Active, $company->subscription_status);
-        $this->assertSame(3900, $company->quoted_price_cents);
+        $this->assertSame(4990, $company->quoted_price_cents);
         $this->assertSame(PlatformInvoiceStatus::Paid, $invoice->fresh()->status);
         $this->assertTrue($company->current_period_end?->equalTo(now()->addMonth()));
     }
@@ -296,7 +296,7 @@ class CompanySubscriptionServiceTest extends TestCase
         $company->refresh();
 
         $this->assertSame(SubscriptionStatus::Active, $company->subscription_status);
-        $this->assertSame(3900, $company->quoted_price_cents);
+        $this->assertSame(4990, $company->quoted_price_cents);
         $this->assertTrue($company->current_period_end?->equalTo(now()->addMonth()));
         $this->assertTrue($invoice->fresh()->paid_at?->equalTo(now()));
         $this->assertTrue(app(CompanyModuleService::class)->isAccessAllowed($company));
@@ -316,13 +316,13 @@ class CompanySubscriptionServiceTest extends TestCase
         $invoice = $service->issueInvoice($company);
 
         $this->assertTrue($invoice->due_at?->equalTo($periodEnd));
-        $this->assertSame(39000, $invoice->amount_cents);
+        $this->assertSame(39920, $invoice->amount_cents);
 
         $service->payInvoice($invoice);
         $company->refresh();
 
         $this->assertTrue($company->current_period_end?->equalTo($periodEnd->copy()->addMonthsNoOverflow(12)));
-        $this->assertSame(39000, $company->quoted_price_cents);
+        $this->assertSame(39920, $company->quoted_price_cents);
     }
 
     public function test_quoted_snapshot_does_not_change_when_catalog_price_changes(): void
@@ -342,7 +342,7 @@ class CompanySubscriptionServiceTest extends TestCase
             ->where('interval', BillingInterval::Monthly->value)
             ->update(['price_cents' => 9900]);
 
-        $this->assertSame(3900, $company->fresh()->quoted_price_cents);
+        $this->assertSame(4990, $company->fresh()->quoted_price_cents);
         $this->assertSame(9900, $service->quoteCents(
             [CompanyModule::Sales],
             BillingInterval::Monthly,
@@ -366,7 +366,7 @@ class CompanySubscriptionServiceTest extends TestCase
             ->assertOk()
             ->assertSee($invoice->number)
             ->assertSee('Vendas/PDV')
-            ->assertSee('R$ 39,00')
+            ->assertSee('R$ 49,90')
             ->assertSee('Pague');
     }
 

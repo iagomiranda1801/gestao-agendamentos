@@ -2,6 +2,7 @@
 
 namespace App\Services\Company;
 
+use App\Enums\BillingInterval;
 use App\Enums\CompanyModule;
 use App\Enums\CompanyProfile;
 use App\Enums\CompanyRole;
@@ -39,6 +40,7 @@ class CompanyProvisioningService
      *     timezone?: string,
      *     business_profile?: CompanyProfile|string,
      *     enabled_modules?: list<CompanyModule|string>,
+     *     billing_interval?: BillingInterval|string|null,
      *     subscription_status?: SubscriptionStatus,
      *     trial_ends_at?: \DateTimeInterface|null,
      *     admin_name: string,
@@ -83,6 +85,10 @@ class CompanyProvisioningService
 
             $subscriptionStatus = $data['subscription_status'] ?? SubscriptionStatus::Trial;
             $trialEndsAt = $data['trial_ends_at'] ?? ($subscriptionStatus === SubscriptionStatus::Trial ? now()->addDays(7) : null);
+            $billingInterval = $data['billing_interval'] ?? BillingInterval::Monthly;
+            $billingInterval = $billingInterval instanceof BillingInterval
+                ? $billingInterval
+                : BillingInterval::tryFrom((string) $billingInterval) ?? BillingInterval::Monthly;
 
             $company = Company::query()->create([
                 'name' => $data['name'],
@@ -93,6 +99,7 @@ class CompanyProvisioningService
                 'timezone' => $data['timezone'] ?? 'America/Sao_Paulo',
                 'is_active' => true,
                 'enabled_modules' => $modules->map(fn (CompanyModule $module) => $module->value)->all(),
+                'billing_interval' => $billingInterval,
                 'subscription_status' => $subscriptionStatus,
                 'trial_ends_at' => $trialEndsAt,
             ]);

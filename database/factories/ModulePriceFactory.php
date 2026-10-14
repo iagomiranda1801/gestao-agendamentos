@@ -22,7 +22,7 @@ class ModulePriceFactory extends Factory
         return [
             'module' => CompanyModule::Scheduling,
             'interval' => BillingInterval::Monthly,
-            'price_cents' => 4900,
+            'price_cents' => 4990,
         ];
     }
 }

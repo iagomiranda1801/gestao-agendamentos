@@ -10,6 +10,7 @@ use App\Livewire\Signup\CompanySignupWizard;
 use App\Models\Company;
 use App\Models\User;
 use App\Services\Company\CompanyProvisioningService;
+use Database\Seeders\ModulePriceSeeder;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -20,6 +21,7 @@ class CompanySignupTest extends TestCase
         parent::setUp();
 
         $this->withoutVite();
+        $this->seed(ModulePriceSeeder::class);
     }
 
     public function test_signup_page_is_accessible(): void
@@ -77,5 +79,31 @@ class CompanySignupTest extends TestCase
         $this->assertNotNull($company);
         $this->assertNotNull($user);
         $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_modules_step_shows_monthly_prices_and_selected_total(): void
+    {
+        Livewire::test(CompanySignupWizard::class)
+            ->set('companyName', 'Estúdio Preço')
+            ->set('companySlug', 'estudio-preco')
+            ->call('goToModulesStep')
+            ->assertSee('R$ 49,90/mês')
+            ->assertSee('Total estimado')
+            ->assertSee('2 meses grátis')
+            ->set('selectedModules', [
+                CompanyModule::Scheduling->value,
+                CompanyModule::WhatsApp->value,
+            ])
+            ->assertSee('R$ 99,80/mês')
+            ->set('billingInterval', 'annual')
+            ->assertSee('R$ 798,40/ano')
+            ->call('goToAdminStep')
+            ->set('adminName', 'Ana Admin')
+            ->set('adminEmail', 'ana@estudio-preco.test')
+            ->set('adminPassword', 'Password123!')
+            ->set('adminPasswordConfirmation', 'Password123!')
+            ->call('goToReviewStep')
+            ->assertSee('Depois do trial')
+            ->assertSee('R$ 798,40/ano');
     }
 }

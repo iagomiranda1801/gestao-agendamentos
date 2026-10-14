@@ -16,7 +16,7 @@ Quem quer só PDV ou só Financeiro não é forçado a um pacote.
 ## 2. Decisões de produto
 
 1. O preço da empresa é a **soma** dos módulos ativos no ciclo escolhido. Não há SKU de pacote cobrado.
-2. Ciclos: mensal (1 mês), semestral (6 meses = 5× o mensal, 1 mês grátis), anual (12 meses = 10× o mensal, 2 meses grátis).
+2. Ciclos: mensal (1 mês), semestral (6 meses = 4× o mensal, 2 meses grátis), anual (12 meses = 8× o mensal, 4 meses grátis).
 3. Catálogo de preços no banco (`module_prices`), não hardcoded. Superadmin altera quando quiser.
 4. Pagamento não passa pelo Agendaqui nesta versão. O admin **marca a fatura como paga** depois do PIX.
 5. Ao pagar a fatura, grava **snapshot** do valor (`quoted_price_cents` e itens da fatura). Mudança no catálogo não altera o contrato vigente até a próxima renovação.
@@ -34,26 +34,19 @@ Lacunas cobertas por esta spec: Ativa não vencia; não havia preço, ciclo nem 
 
 ## 4. Preços iniciais (faixa entrada, BRL)
 
-Mensal sugerido; semestral = ×5; anual = ×10. Persistidos em **centavos**.
+Mínimo **R$ 49,90/módulo/mês**; semestral = ×4; anual = ×8. Persistidos em **centavos**.
 
 | Módulo | Mensal | Semestral | Anual |
 |--------|--------|-----------|-------|
-| Agenda | 49 | 245 | 490 |
-| Vendas/PDV | 39 | 195 | 390 |
-| Financeiro | 39 | 195 | 390 |
-| Estoque | 25 | 125 | 250 |
-| Prontuário clínico | 49 | 245 | 490 |
-| WhatsApp operacional | 19 | 95 | 190 |
-| Marketing | 39 | 195 | 390 |
-| Pedidos | 49 | 245 | 490 |
+| Qualquer módulo | 49,90 | 199,60 | 399,20 |
 
 Exemplos:
 
-- Só PDV mensal → **R$ 39**
-- Só Financeiro anual → **R$ 390**
-- Agenda + WhatsApp mensal → **R$ 68**
-- Completo (todos) mensal → **R$ 308**
-- Completo anual → **R$ 3.080**
+- Só PDV mensal → **R$ 49,90**
+- Só Financeiro anual → **R$ 399,20**
+- Agenda + WhatsApp mensal → **R$ 99,80**
+- Completo (8 módulos) mensal → **R$ 399,20**
+- Completo anual → **R$ 3.193,60**
 
 Se o WhatsApp “vier junto” com a Agenda, zere o preço do WhatsApp no admin.
 
