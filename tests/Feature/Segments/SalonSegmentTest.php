@@ -52,6 +52,23 @@ class SalonSegmentTest extends TestCase
         $this->get("http://{$this->salonHost}/app/login")->assertNotFound();
     }
 
+    public function test_salon_alias_host_serves_the_salon_panel(): void
+    {
+        $alias = 'tabbeleza.tabinfo.com.br';
+
+        $this->assertContains($alias, Segment::hosts('salon'));
+
+        $this->get("http://{$alias}/")
+            ->assertRedirect("http://{$alias}/painel");
+
+        $this->get("http://{$alias}/painel/login")
+            ->assertOk()
+            ->assertSee('salon-auth', false);
+
+        $this->get("http://{$alias}/admin/login")->assertNotFound();
+        $this->get("http://{$alias}/app/login")->assertNotFound();
+    }
+
     public function test_salon_company_can_open_salon_panel(): void
     {
         $company = $this->createCompany(['slug' => 'salao-bela', 'business_profile' => CompanyProfile::Salon]);

@@ -12,7 +12,7 @@ class Segment
     public const DEFAULT_PANEL = 'app';
 
     /** @var list<string> */
-    private const STRUCTURAL_KEYS = ['enabled', 'domain', 'scheme', 'panel', 'profiles', 'label'];
+    private const STRUCTURAL_KEYS = ['enabled', 'domain', 'aliases', 'scheme', 'panel', 'profiles', 'label'];
 
     /** @var array<string, array<string, mixed>>|null */
     private static ?array $settingsCache = null;
@@ -77,12 +77,32 @@ class Segment
         }
 
         foreach (static::keys() as $segment) {
-            if (strcasecmp($host, (string) static::get($segment, 'domain')) === 0) {
-                return $segment;
+            foreach (static::hosts($segment) as $candidate) {
+                if (strcasecmp($host, $candidate) === 0) {
+                    return $segment;
+                }
             }
         }
 
         return null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function hosts(string $segment): array
+    {
+        $hosts = [];
+
+        foreach ([static::get($segment, 'domain'), ...(array) static::get($segment, 'aliases', [])] as $host) {
+            $host = strtolower(trim((string) $host));
+
+            if ($host !== '' && ! in_array($host, $hosts, true)) {
+                $hosts[] = $host;
+            }
+        }
+
+        return $hosts;
     }
 
     public static function forCompany(?Company $company): ?string

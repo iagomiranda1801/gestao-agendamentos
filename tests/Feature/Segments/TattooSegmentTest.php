@@ -127,7 +127,7 @@ class TattooSegmentTest extends TestCase
         $builder = app(WhatsAppAutomationMessageBuilder::class);
 
         $this->assertSame("https://{$this->tattooHost}/agendar/estudio-ink", $builder->bookingUrl($tattoo));
-        $this->assertSame(route('public.booking.show', ['company' => 'salao-bela']), $builder->bookingUrl($salon));
+        $this->assertSame('https://salao.localhost/agendar/salao-bela', $builder->bookingUrl($salon));
     }
 
     public function test_salon_without_saved_settings_keeps_config_brand(): void

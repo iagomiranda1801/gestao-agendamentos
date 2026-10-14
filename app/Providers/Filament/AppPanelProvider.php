@@ -6,9 +6,11 @@ use App\Filament\App\Pages\Auth\Login as AppLogin;
 use App\Filament\App\Pages\Dashboard;
 use App\Http\Middleware\EnsureCompanySubscriptionIsActive;
 use App\Http\Middleware\EnsureNotSegmentHost;
+use App\Http\Middleware\EnsureSegmentHost;
 use App\Http\Middleware\RedirectToSegmentPanel;
 use App\Models\Company;
 use App\Support\Branding;
+use App\Support\Segment;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -110,6 +112,7 @@ class AppPanelProvider extends PanelProvider
             ])
             ->middleware([
                 ...($this->panelId() === 'app' ? [EnsureNotSegmentHost::class] : []),
+                ...($this->panelId() === Segment::panelId('salon') ? [EnsureSegmentHost::class.':salon'] : []),
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,

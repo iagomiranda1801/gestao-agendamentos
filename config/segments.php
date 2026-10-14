@@ -17,9 +17,14 @@ return [
     */
 
     'salon' => [
-        'enabled' => filled(env('SALON_DOMAIN')),
+        'enabled' => filled(env('SALON_DOMAIN')) || filled(env('SALON_DOMAIN_ALIASES')),
 
         'domain' => env('SALON_DOMAIN') ?: 'salao.localhost',
+
+        'aliases' => array_values(array_filter(array_map(
+            trim(...),
+            explode(',', (string) env('SALON_DOMAIN_ALIASES', '')),
+        ))),
 
         'scheme' => env('SALON_SCHEME', parse_url((string) env('APP_URL', 'https://localhost'), PHP_URL_SCHEME) ?: 'https'),
 

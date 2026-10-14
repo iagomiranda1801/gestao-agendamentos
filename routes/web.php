@@ -10,11 +10,14 @@ use App\Livewire\PublicBooking\BookingWizard;
 use App\Livewire\PublicBooking\ManageAppointment;
 use App\Livewire\PublicOrders\OrderWizard;
 use App\Livewire\Signup\CompanySignupWizard;
+use App\Support\Segment;
 use Illuminate\Support\Facades\Route;
 
-Route::domain((string) config('segments.salon.domain'))->group(function (): void {
-    Route::redirect('/', '/painel');
-});
+foreach (Segment::hosts('salon') as $salonHost) {
+    Route::domain($salonHost)->group(function (): void {
+        Route::redirect('/', '/painel');
+    });
+}
 
 Route::domain((string) config('segments.tattoo.domain'))->group(function (): void {
     Route::redirect('/', '/painel');
