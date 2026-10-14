@@ -40,6 +40,7 @@ use Filament\Schemas\Components\View as ViewComponent;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\Routing\Exception\RouteNotFoundException;
 use UnitEnum;
 
 class CalendarPage extends Page
@@ -121,15 +122,21 @@ class CalendarPage extends Page
             ],
         );
 
-        return array_map(function (array $event) use ($company): array {
+        $panelId = Filament::getCurrentPanel()?->getId();
+
+        return array_map(function (array $event) use ($company, $panelId): array {
             if (($event['extendedProps']['type'] ?? null) === 'schedule_block') {
                 return $event;
             }
 
-            $event['extendedProps']['viewUrl'] = AppointmentResource::getUrl('view', [
-                'tenant' => $company,
-                'record' => $event['id'],
-            ]);
+            try {
+                $event['extendedProps']['viewUrl'] = AppointmentResource::getUrl('view', [
+                    'tenant' => $company,
+                    'record' => $event['id'],
+                ], panel: $panelId);
+            } catch (RouteNotFoundException) {
+                unset($event['extendedProps']['viewUrl']);
+            }
 
             return $event;
         }, $events);

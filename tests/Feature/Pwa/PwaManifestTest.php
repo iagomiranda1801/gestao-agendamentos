@@ -71,7 +71,7 @@ class PwaManifestTest extends TestCase
         $this->get('/sw.js')
             ->assertOk()
             ->assertHeader('Service-Worker-Allowed', '/')
-            ->assertSee('agendaqui-pwa-v1', false)
+            ->assertSee('agendaqui-pwa-v2', false)
             ->assertSee('/offline', false);
     }
 

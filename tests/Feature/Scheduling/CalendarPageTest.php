@@ -3,12 +3,16 @@
 namespace Tests\Feature\Scheduling;
 
 use App\Enums\AppointmentStatus;
+use App\Enums\CompanyProfile;
 use App\Enums\CompanyRole;
 use App\Enums\ScheduleBlockType;
+use App\Filament\App\Pages\CalendarPage;
 use App\Models\Professional;
 use App\Services\Scheduling\AppointmentService;
 use App\Services\Scheduling\ScheduleBlockService;
 use Carbon\CarbonImmutable;
+use Filament\Facades\Filament;
+use Livewire\Livewire;
 use Tests\Concerns\CreatesSchedulingFixtures;
 use Tests\TestCase;
 
@@ -219,5 +223,106 @@ class CalendarPageTest extends TestCase
 
         $this->get(route('filament.app.pages.agenda', ['tenant' => $setup['company']]))
             ->assertSuccessful();
+    }
+
+    public function test_salon_calendar_events_do_not_embed_filament_view_url(): void
+    {
+        $setup = $this->createBookableSetup($this->createSchedulingCompany([
+            'slug' => 'salao-bela',
+            'business_profile' => CompanyProfile::Salon,
+        ]));
+
+        app(AppointmentService::class)->createInternalAppointment(
+            $setup['company'],
+            $setup['admin'],
+            $setup['client'],
+            $setup['professional'],
+            $setup['service'],
+            $setup['localStart'],
+        );
+
+        $events = app(AppointmentService::class)->fetchCalendarEvents(
+            $setup['company'],
+            $setup['admin'],
+            $setup['localStart']->startOfDay()->utc(),
+            $setup['localStart']->endOfDay()->utc(),
+        );
+
+        $this->assertCount(1, $events);
+        $this->assertArrayNotHasKey('viewUrl', $events[0]['extendedProps']);
+    }
+
+    public function test_salon_calendar_page_fetch_events_builds_view_url_for_salon_panel(): void
+    {
+        $setup = $this->createBookableSetup($this->createSchedulingCompany([
+            'slug' => 'salao-bela',
+            'business_profile' => CompanyProfile::Salon,
+        ]));
+
+        $appointment = app(AppointmentService::class)->createInternalAppointment(
+            $setup['company'],
+            $setup['admin'],
+            $setup['client'],
+            $setup['professional'],
+            $setup['service'],
+            $setup['localStart'],
+        );
+
+        $this->actingAs($setup['admin']);
+        app()->setLocale('pt_BR');
+
+        $panel = Filament::getPanel('salao');
+        Filament::setCurrentPanel($panel);
+        $panel->boot();
+        Filament::setServingStatus(true);
+        Filament::setTenant($setup['company'], isQuiet: true);
+
+        $events = Livewire::test(CalendarPage::class)
+            ->instance()
+            ->fetchEvents(
+                $setup['localStart']->startOfDay()->utc()->toIso8601String(),
+                $setup['localStart']->endOfDay()->utc()->toIso8601String(),
+            );
+
+        $this->assertCount(1, $events);
+        $this->assertStringContainsString(
+            '/painel/empresa/salao-bela/agendamentos/',
+            $events[0]['extendedProps']['viewUrl'],
+        );
+        $this->assertStringContainsString((string) $appointment->getKey(), $events[0]['extendedProps']['viewUrl']);
+    }
+
+    public function test_salon_company_on_app_panel_fetch_events_uses_app_view_url(): void
+    {
+        $setup = $this->createBookableSetup($this->createSchedulingCompany([
+            'slug' => 'salao-bela',
+            'business_profile' => CompanyProfile::Salon,
+        ]));
+
+        $appointment = app(AppointmentService::class)->createInternalAppointment(
+            $setup['company'],
+            $setup['admin'],
+            $setup['client'],
+            $setup['professional'],
+            $setup['service'],
+            $setup['localStart'],
+        );
+
+        $this->authenticateForAppTenant($setup['admin'], $setup['company']);
+
+        $events = Livewire::test(CalendarPage::class)
+            ->instance()
+            ->fetchEvents(
+                $setup['localStart']->startOfDay()->utc()->toIso8601String(),
+                $setup['localStart']->endOfDay()->utc()->toIso8601String(),
+            );
+
+        $this->assertCount(1, $events);
+        $this->assertStringContainsString(
+            '/app/empresa/salao-bela/agendamentos/',
+            $events[0]['extendedProps']['viewUrl'],
+        );
+        $this->assertStringContainsString((string) $appointment->getKey(), $events[0]['extendedProps']['viewUrl']);
+        $this->assertStringNotContainsString('/painel/', $events[0]['extendedProps']['viewUrl']);
     }
 }

@@ -4,6 +4,7 @@ namespace Tests\Feature\Segments;
 
 use App\Enums\CompanyModule;
 use App\Enums\CompanyProfile;
+use App\Filament\App\Pages\CalendarPage;
 use App\Filament\App\Pages\Dashboard;
 use App\Livewire\Signup\CompanySignupWizard;
 use App\Models\Company;
@@ -67,6 +68,23 @@ class SalonSegmentTest extends TestCase
 
         $this->get("http://{$alias}/admin/login")->assertNotFound();
         $this->get("http://{$alias}/app/login")->assertNotFound();
+    }
+
+    public function test_salon_agenda_opens_on_alias_host_without_leaving_that_host(): void
+    {
+        $alias = 'tabbeleza.tabinfo.com.br';
+        $company = $this->createCompany(['slug' => 'salao-bela', 'business_profile' => CompanyProfile::Salon]);
+        $user = $this->createCompanyUser($company);
+
+        $this->actingAs($user)
+            ->get("http://{$alias}/painel/empresa/salao-bela/agenda")
+            ->assertOk()
+            ->assertSee('scheduling-calendar', false);
+
+        $this->assertSame(
+            "http://{$alias}/painel/empresa/salao-bela/agenda",
+            CalendarPage::getUrl(['tenant' => $company], panel: 'salao'),
+        );
     }
 
     public function test_salon_company_can_open_salon_panel(): void

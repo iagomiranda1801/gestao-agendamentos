@@ -1,4 +1,4 @@
-const CACHE = 'agendaqui-pwa-v1';
+const CACHE = 'agendaqui-pwa-v2';
 const PRECACHE = ['/offline'];
 
 self.addEventListener('install', (event) => {

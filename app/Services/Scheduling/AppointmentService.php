@@ -17,7 +17,6 @@ use App\Models\ScheduleBlock;
 use App\Models\Service;
 use App\Models\User;
 use App\Support\CompanyDateTime;
-use App\Support\Segment;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -568,10 +567,6 @@ class AppointmentService
                 'service' => $appointment->service_name_snapshot,
                 'professional' => $appointment->professional->name,
                 'editable' => $appointment->canBeRescheduled(),
-                'viewUrl' => route('filament.'.Segment::panelIdForCompany($company).'.resources.agendamentos.view', [
-                    'tenant' => $company,
-                    'record' => $appointment,
-                ]),
             ],
         ];
     }
