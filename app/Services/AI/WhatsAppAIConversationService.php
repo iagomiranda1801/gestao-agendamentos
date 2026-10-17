@@ -397,7 +397,7 @@ abstract class WhatsAppAIConversationService
         }
 
         $updates = ['client_id' => $client->id];
-        if (! $this->isPlaceholderName($client->name)) {
+        if (! $this->isPlaceholderName($client->name) && $this->canPrefillCollectedName($conversation, $client->name)) {
             $updates['collected_data'] = array_merge($conversation->collected_data ?: [], ['name' => $client->name]);
         }
         if ((int) $conversation->client_id !== (int) $client->id || isset($updates['collected_data'])) {
@@ -428,5 +428,10 @@ abstract class WhatsAppAIConversationService
     {
         return preg_match('/^(?:Cliente WhatsApp|Contato)\s*\d+$/iu', trim($name)) === 1
             || ctype_digit(trim($name));
+    }
+
+    protected function canPrefillCollectedName(TattooAiConversation $conversation, string $name): bool
+    {
+        return true;
     }
 }

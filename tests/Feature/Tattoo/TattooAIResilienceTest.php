@@ -86,6 +86,11 @@ class TattooAIResilienceTest extends TestCase
         return (string) TattooAiMessage::query()->where('provider_message_id', 'reply:'.$id)->value('body');
     }
 
+    private function assistantAskName(Company $company): string
+    {
+        return 'Oi! Sou a assistente do estúdio *'.$company->name.'*. Vou te atender daqui até o tatuador entrar na conversa. Qual seu nome?';
+    }
+
     private function geminiCalls(): int
     {
         return Http::recorded(fn (Request $request) => str_contains($request->url(), 'generateContent'))->count();
@@ -97,12 +102,13 @@ class TattooAIResilienceTest extends TestCase
         Log::spy();
         $this->fakeHttp([]);
 
-        $this->assertSame('Opa, tudo bem? Qual seu nome?', $this->send($company, $instance, 'Oi', 't1'));
+        $this->assertSame($this->assistantAskName($company), $this->send($company, $instance, 'Oi', 't1'));
         $this->assertSame('Tudo certo por aqui, valeu! Qual seu nome?', $this->send($company, $instance, 'bem e vc?', 't2'));
         $this->assertSame(0, $this->geminiCalls());
 
-        $this->assertSame('Show, Ana! Que desenho ou elementos você quer na tattoo? Pode descrever do seu jeito.', $this->send($company, $instance, 'Ana Souza', 't3'));
+        $this->assertStringContainsString('preferência de artista', $this->send($company, $instance, 'Ana Souza', 't3'));
         $this->assertDatabaseHas('clients', ['company_id' => $company->id, 'name' => 'Ana Souza', 'phone_normalized' => $this->phone]);
+        $this->assertSame('Que desenho ou elementos você quer na tattoo? Pode descrever do seu jeito.', $this->send($company, $instance, 'sem preferência', 't3b'));
         $this->assertSame('Massa! E vai ser em qual parte do corpo?', $this->send($company, $instance, 'Uma rosa fineline com folhas', 't4'));
         $this->assertSame('E mais ou menos de que tamanho? Pode ser em cm mesmo.', $this->send($company, $instance, 'Antebraço', 't5'));
         $this->assertStringContainsString('Qual estilo', $this->send($company, $instance, '15 cm', 't6'));
@@ -116,9 +122,34 @@ class TattooAIResilienceTest extends TestCase
         $this->assertSame('15 cm', $request->size_description);
         $this->assertSame('awaiting_review', $request->status);
         $this->assertDatabaseCount('tattoo_quotes', 0);
-        $this->assertSame(6, $this->geminiCalls());
+        $this->assertSame(7, $this->geminiCalls());
         Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context = []) => $message === 'Tattoo AI fallback reply.'
-            && $context['reason'] === 'model_unavailable' && $context['http_status'] === 429)->times(6);
+            && $context['reason'] === 'model_unavailable' && $context['http_status'] === 429)->times(7);
+    }
+
+    public function test_off_script_date_and_small_talk_name_do_not_repeat_the_opening(): void
+    {
+        [$company, $instance] = $this->setupStudio();
+        $this->fakeHttp([]);
+
+        $this->assertSame($this->assistantAskName($company), $this->send($company, $instance, 'Oi', 'n1'));
+        $this->assertSame(
+            'Anotei janeiro. Qual seu nome?',
+            $this->send($company, $instance, 'Pra mim fica melhor em janeiro, o dia que estiver disponível', 'n2'),
+        );
+        $this->assertSame(
+            'Pra mim fica melhor em janeiro, o dia que estiver disponível',
+            TattooAiConversation::query()->firstOrFail()->collected_data['date_preference'] ?? null,
+        );
+        $this->assertSame(
+            'Show, Kauã! Você tem preferência de artista? Se não tiver, pode dizer *sem preferência*.',
+            $this->send($company, $instance, 'tudo bem, me chamo Kauã', 'n3'),
+        );
+        $this->assertDatabaseHas('clients', [
+            'company_id' => $company->id,
+            'name' => 'Kauã',
+            'phone_normalized' => $this->phone,
+        ]);
     }
 
     public function test_server_error_invalid_json_and_wrong_types_never_leave_the_client_without_reply(): void
@@ -134,19 +165,20 @@ class TattooAIResilienceTest extends TestCase
             $this->geminiJson(['action' => 'execute_sql', 'reply' => 'ok']),
         ]);
 
-        $this->assertSame('Que desenho ou elementos você quer na tattoo? Pode descrever do seu jeito.', $this->send($company, $instance, 'Quero fazer uma tattoo', 'w1'));
+        $this->assertStringContainsString('preferência de artista', $this->send($company, $instance, 'Quero fazer uma tattoo', 'w1'));
+        $this->assertSame('Que desenho ou elementos você quer na tattoo? Pode descrever do seu jeito.', $this->send($company, $instance, 'sem preferência', 'w1b'));
         $this->assertSame('Massa! E vai ser em qual parte do corpo?', $this->send($company, $instance, 'Um leão realista', 'w2'));
         $this->assertSame('E mais ou menos de que tamanho? Pode ser em cm mesmo.', $this->send($company, $instance, 'Nas costas', 'w3'));
-        $this->assertSame('E mais ou menos de que tamanho? Pode ser em cm mesmo.', $this->send($company, $instance, 'uns 20', 'w4'));
-        $this->assertStringContainsString('referência ou inspiração', $this->send($company, $instance, '20 cm', 'w5'));
-        $this->assertStringContainsString('Deixa eu confirmar', $this->send($company, $instance, 'sem foto', 'w6'));
-        $this->assertStringContainsString('A equipe recebeu sua ideia', $this->send($company, $instance, 'sim', 'w7'));
+        $this->assertStringContainsString('referência ou inspiração', $this->send($company, $instance, 'uns 20', 'w4'));
+        $this->assertStringContainsString('Deixa eu confirmar', $this->send($company, $instance, 'sem foto', 'w5'));
+        $this->assertStringContainsString('A equipe recebeu sua ideia', $this->send($company, $instance, 'sim', 'w6'));
 
         $request = TattooRequest::query()->firstOrFail();
         $this->assertSame('Um leão realista', $request->description);
         $this->assertSame('Nas costas', $request->body_placement);
-        $this->assertSame('20 cm', $request->size_description);
+        $this->assertSame('uns 20', $request->size_description);
         $this->assertStringContainsString('Realismo', (string) $request->notes);
+        $this->assertStringContainsString('Preferência de artista: Sem preferência', (string) $request->notes);
         $this->assertFalse((bool) TattooAiConversation::query()->firstOrFail()->human_takeover);
         $this->assertSame(6, $this->geminiCalls());
         foreach (['model_unavailable' => 4, 'invalid_details' => 1, 'invalid_action' => 1] as $reason => $times) {
@@ -162,7 +194,7 @@ class TattooAIResilienceTest extends TestCase
         $this->fakeHttp([]);
 
         // Referência antes do pedido: a mídia não baixa, mas o roteiro segue.
-        $this->assertSame('Opa, tudo bem? Qual seu nome?', $this->send($company, $instance, '', 'x1', 'image/jpeg'));
+        $this->assertSame($this->assistantAskName($company), $this->send($company, $instance, '', 'x1', 'image/jpeg'));
 
         $client = Client::factory()->forCompany($company)->create(['name' => 'Carla', 'phone' => $this->phone]);
         $request = new TattooRequest(['client_id' => $client->id, 'description' => 'Rosa', 'body_placement' => 'Braço',

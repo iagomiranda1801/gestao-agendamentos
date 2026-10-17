@@ -155,7 +155,8 @@ class TattooRequestResource extends Resource
                     app(TattooRequestDeletionService::class)->delete(Filament::getTenant(), $record);
                     Notification::make()->success()->title('Pedido de orçamento excluído.')->send();
                 }),
-        ])->recordUrl(fn (TattooRequest $record) => self::getUrl('edit', ['record' => $record]));
+        ])->defaultSort('created_at', 'desc')
+            ->recordUrl(fn (TattooRequest $record) => self::getUrl('edit', ['record' => $record]));
     }
 
     public static function statuses(): array

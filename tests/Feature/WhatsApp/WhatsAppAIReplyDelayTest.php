@@ -77,6 +77,11 @@ class WhatsAppAIReplyDelayTest extends TestCase
             ->map(fn (array $pair) => $pair[0]);
     }
 
+    private function assistantAskName(Company $company): string
+    {
+        return 'Oi! Sou a assistente do estúdio *'.$company->name.'*. Vou te atender daqui até o tatuador entrar na conversa. Qual seu nome?';
+    }
+
     public function test_reply_is_queued_with_human_delay_within_bounds_and_shows_typing(): void
     {
         [$company, $instance] = $this->setupStudio();
@@ -101,7 +106,7 @@ class WhatsAppAIReplyDelayTest extends TestCase
         $this->assertSame('sent', $this->replyStatus('b1'));
         $request = $this->sentTexts()->sole();
         $this->assertSame(4000, $request['delay']);
-        $this->assertSame('Opa, tudo bem? Qual seu nome?', $request['text']);
+        $this->assertSame($this->assistantAskName($company), $request['text']);
     }
 
     public function test_zero_delay_disables_it_and_sends_inline_without_typing(): void
@@ -154,7 +159,7 @@ class WhatsAppAIReplyDelayTest extends TestCase
 
         // Eco da nossa própria mensagem, mesmo chegando depois da janela de 20 s.
         $this->travel(25)->seconds();
-        $webhooks->handle($this->payload($jidPhone, 'Opa, tudo bem? Qual seu nome?', true, 'echo-1'));
+        $webhooks->handle($this->payload($jidPhone, $this->assistantAskName($company), true, 'echo-1'));
         $this->assertFalse($takeover->isPaused('delay-test', $this->phone));
 
         // Saudação automática do WhatsApp Business logo após o cliente continua sem pausar.
@@ -192,7 +197,7 @@ class WhatsAppAIReplyDelayTest extends TestCase
         (new SendWhatsAppAIReplyJob($second->service, $second->messageId, $second->typingMs))->handle();
         $this->assertSame('sent', $this->replyStatus('o1'));
         $this->assertSame('sent', $this->replyStatus('o2'));
-        $this->assertSame(['Opa, tudo bem? Qual seu nome?', 'Tudo certo por aqui, valeu! Qual seu nome?'],
+        $this->assertSame([$this->assistantAskName($company), 'Tudo certo por aqui, valeu! Qual seu nome?'],
             $this->sentTexts()->map(fn (Request $request) => $request['text'])->values()->all());
     }
 

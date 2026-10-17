@@ -8,6 +8,7 @@ use App\Enums\WhatsAppBotConversationState;
 use App\Filament\App\Resources\Appointments\AppointmentResource;
 use App\Filament\App\Resources\Appointments\Pages\CreateAppointment;
 use App\Filament\App\Resources\TattooRequests\Pages\EditTattooRequest;
+use App\Filament\App\Resources\TattooRequests\Pages\ListTattooRequests;
 use App\Filament\App\Resources\TattooRequests\TattooRequestResource;
 use App\Jobs\HandleWhatsAppInboundMessageJob;
 use App\Models\Client;
@@ -317,6 +318,41 @@ class TattooQuoteFlowTest extends TestCase
             ->assertOk()
             ->assertSee('30/09/2026 18:10')
             ->assertDontSee('30/09/2026 21:10');
+    }
+
+    public function test_quote_list_shows_newest_requests_first(): void
+    {
+        $company = $this->createSchedulingCompany(['business_profile' => CompanyProfile::TattooStudio]);
+        $user = $this->createCompanyUser($company);
+        $this->authenticateForAppTenant($user, $company);
+        $client = Client::factory()->forCompany($company)->create();
+
+        $older = new TattooRequest([
+            'client_id' => $client->id,
+            'description' => 'Pedido antigo',
+            'body_placement' => 'Braço',
+            'source' => 'manual',
+            'status' => 'awaiting_review',
+        ]);
+        $older->company_id = $company->id;
+        $older->save();
+        $older->created_at = now()->subDay();
+        $older->save();
+
+        $newer = new TattooRequest([
+            'client_id' => $client->id,
+            'description' => 'Pedido novo',
+            'body_placement' => 'Perna',
+            'source' => 'manual',
+            'status' => 'awaiting_review',
+        ]);
+        $newer->company_id = $company->id;
+        $newer->save();
+
+        $this->assertSame(
+            [$newer->id, $older->id],
+            Livewire::test(ListTattooRequests::class)->instance()->getTableRecords()->pluck('id')->all(),
+        );
     }
 
     public function test_approving_quote_redirects_to_appointment_and_downloads_pdf(): void

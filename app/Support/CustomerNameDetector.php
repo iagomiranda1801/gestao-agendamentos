@@ -28,9 +28,17 @@ final class CustomerNameDetector
             return null;
         }
 
+        $smallTalk = '(?:oi+|ol[aá]|opa|e ai|eae|bom dia|boa tarde|boa noite|tudo bem|td bem|beleza|blz|tudo certo)';
+        $nameIntro = '(?:(?:o\s+)?meu nome [eé]|me chamo|pode me chamar de|me chama de|aqui [eé] (?:o|a)|sou (?:o|a)|sou|[eé] (?:o|a))';
+
         $candidate = trim($text);
-        $candidate = (string) preg_replace('/^(?:(?:oi+|ol[aá]|opa|bom dia|boa tarde|boa noite)[,!.\s]+)?(?:(?:o\s+)?meu nome [eé]|me chamo|pode me chamar de|me chama de|aqui [eé] (?:o|a)|sou (?:o|a)|sou|[eé] (?:o|a))\s+/iu', '', $candidate);
+        $candidate = (string) preg_replace('/^(?:'.$smallTalk.'[,!.\s]+)+/iu', '', $candidate);
+        $candidate = (string) preg_replace('/^'.$nameIntro.'\s+/iu', '', $candidate);
         $candidate = trim((string) preg_replace('/[\s!.,;:]+$/u', '', $candidate));
+
+        if (! self::isPlausible($candidate) && preg_match('/(?:'.$nameIntro.')\s+(.+)$/iu', trim($text), $matches) === 1) {
+            $candidate = trim((string) preg_replace('/[\s!.,;:]+$/u', '', $matches[1]));
+        }
 
         if (! self::isPlausible($candidate)) {
             return null;
