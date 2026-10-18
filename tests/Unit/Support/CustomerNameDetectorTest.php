@@ -21,6 +21,7 @@ class CustomerNameDetectorTest extends TestCase
     {
         return [
             'plain' => ['Ana Souza', 'Ana Souza'],
+            'single' => ['Paulo', 'Paulo'],
             'me_chamo' => ['me chamo Kauã', 'Kauã'],
             'small_talk_then_name' => ['tudo bem, me chamo Kauã', 'Kauã'],
             'blz_prefix' => ['blz, meu nome é Maria', 'Maria'],
@@ -43,6 +44,7 @@ class CustomerNameDetectorTest extends TestCase
             'tattoo_idea' => ['quero uma tattoo de lobo'],
             'price' => ['quanto custa?'],
             'date' => ['Pra mim fica melhor em janeiro, o dia que estiver disponível'],
+            'idea_phrase' => ['Pensei em algo assim'],
         ];
     }
 }

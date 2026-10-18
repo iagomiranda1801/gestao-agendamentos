@@ -142,7 +142,7 @@ class TattooAIResilienceTest extends TestCase
             TattooAiConversation::query()->firstOrFail()->collected_data['date_preference'] ?? null,
         );
         $this->assertSame(
-            'Show, Kauã! Você tem preferência de artista? Se não tiver, pode dizer *sem preferência*.',
+            'Show, Kauã! Você tem preferência de artista? Se tiver, me fala qual. Se não tiver, pode dizer *sem preferência*.',
             $this->send($company, $instance, 'tudo bem, me chamo Kauã', 'n3'),
         );
         $this->assertDatabaseHas('clients', [

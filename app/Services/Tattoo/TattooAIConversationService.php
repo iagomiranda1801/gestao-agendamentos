@@ -243,6 +243,8 @@ class TattooAIConversationService extends WhatsAppAIConversationService
                 ?? $this->mentionedStudioProfessional((string) $data['artist_preference'], $conversation->company_id);
             if ($matched !== null) {
                 $data['artist_preference'] = $matched;
+            } else {
+                unset($data['artist_preference']);
             }
         }
         $asked = $this->normalizedText((string) $conversation->messages()->where('direction', 'out')
@@ -264,7 +266,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             'summary' => mb_substr(implode('; ', array_map(
                 fn ($key, $value) => $key.': '.$value, array_keys($data), array_values($data),
             )), 0, 3000)]);
-        if (! empty($data['name'])) {
+        if (! empty($data['name']) && CustomerNameDetector::isPlausible((string) $data['name'])) {
             $this->saveClient($conversation, $data['name']);
         }
         if (empty($data['name'])) {
@@ -345,6 +347,9 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             if ($this->looksLikeDatePreference($text)) {
                 $details['date_preference'] = mb_substr($text, 0, 255);
             }
+            if ($name === null && $askedName && $this->hasUsableDescription($text)) {
+                $details['description'] = mb_substr($text, 0, 3000);
+            }
 
             return $details;
         }
@@ -398,7 +403,17 @@ class TattooAIConversationService extends WhatsAppAIConversationService
      */
     protected function sanitizeCollectedName(TattooAiConversation $conversation, array $data, string $text, mixed $nameBefore): array
     {
+        $clearedImplausible = false;
+        if ($this->isImplausibleCollectedName($nameBefore)) {
+            $nameBefore = null;
+            $clearedImplausible = true;
+        }
         $proposed = isset($data['name']) ? (string) $data['name'] : null;
+        if ($this->isImplausibleCollectedName($proposed)) {
+            unset($data['name']);
+            $proposed = null;
+            $clearedImplausible = true;
+        }
         $explicit = $this->isExplicitSelfName($text);
         $artist = $this->matchingStudioProfessional($proposed, $conversation->company_id)
             ?? $this->mentionedStudioProfessional($text, $conversation->company_id);
@@ -411,6 +426,21 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             if (empty($data['artist_preference'])) {
                 $data['artist_preference'] = $artist;
             }
+        }
+
+        $recovered = CustomerNameDetector::fromMessage($text);
+        if ($proposed === null && $recovered !== null && ! $explicit
+            && $this->matchingStudioProfessional($recovered, $conversation->company_id) !== null) {
+            if (empty($data['artist_preference'])) {
+                $data['artist_preference'] = $this->matchingStudioProfessional($recovered, $conversation->company_id);
+            }
+
+            return $data;
+        }
+        if ($proposed === null && $recovered !== null && $clearedImplausible) {
+            $data['name'] = $recovered;
+
+            return $data;
         }
 
         if ($proposed === null || (filled($nameBefore) && (string) $nameBefore === $proposed)) {
@@ -445,7 +475,13 @@ class TattooAIConversationService extends WhatsAppAIConversationService
 
     protected function canPrefillCollectedName(TattooAiConversation $conversation, string $name): bool
     {
-        return $this->matchingStudioProfessional($name, $conversation->company_id) === null;
+        return CustomerNameDetector::isPlausible($name)
+            && $this->matchingStudioProfessional($name, $conversation->company_id) === null;
+    }
+
+    protected function isImplausibleCollectedName(mixed $name): bool
+    {
+        return filled($name) && ! CustomerNameDetector::isPlausible((string) $name);
     }
 
     protected function isExplicitSelfName(string $text): bool
@@ -550,7 +586,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             return $artist;
         }
         if ($askedArtist && ($name = CustomerNameDetector::fromMessage($text)) !== null) {
-            return $this->matchingStudioProfessional($name, $conversation->company_id) ?? $name;
+            return $this->matchingStudioProfessional($name, $conversation->company_id);
         }
 
         return null;
@@ -611,7 +647,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             .'Se o cliente perguntar se é robô, diga com honestidade que é a assistente do estúdio e que a equipe acompanha a conversa. '
             .'Retorne JSON com action (ask, save_details, request_approval ou handoff), details e reply. '
             .'Peça o nome logo no início. Só preencha details.name quando o cliente informar o próprio nome explicitamente; nunca deduza o nome de uma ideia de tatuagem. '
-            .'Pergunte a preferência de artista e preencha details.artist_preference com o nome do tatuador citado ou "Sem preferência". Nunca confirme horário, disponibilidade ou que o tatuador aceitou o pedido; a equipe faz a atribuição. '
+            .'Pergunte se o cliente tem preferência de artista e qual seria, sem citar os tatuadores do estúdio. Preencha details.artist_preference só com o nome que o cliente falar ou "Sem preferência". Nunca confirme horário, disponibilidade ou que o tatuador aceitou o pedido; a equipe faz a atribuição. '
             .'Aproveite o que já foi informado. Colete desenho, local, tamanho, estilo e imagem de referência ou inspiração; o cliente pode não saber o estilo ou não ter imagem. '
             .'Em details.description, registre apenas o desenho ou os elementos que o cliente deseja tatuar. Exclua cumprimentos e conversa casual. Se a ideia estiver vaga, como "várias ideias" ou "quero uma tatuagem", deixe description vazio e pergunte quais elementos ele imagina. Não deduza o desenho a partir da imagem de referência. '
             .'details aceita name, artist_preference, description, body_placement, size_description, style, colors, notes, date_preference. '
@@ -625,7 +661,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
     {
         return match (true) {
             empty($data['name']) => 'Qual seu nome?',
-            empty($data['artist_preference']) => $this->artistPreferenceQuestion($conversation),
+            empty($data['artist_preference']) => $this->artistPreferenceQuestion(),
             ! $this->hasUsableDescription($data['description'] ?? null) => 'Que desenho ou elementos você quer na tattoo? Pode descrever do seu jeito.',
             empty($data['body_placement']) => 'Massa! E vai ser em qual parte do corpo?',
             empty($data['size_description']) => 'E mais ou menos de que tamanho? Pode ser em cm mesmo.',
@@ -635,25 +671,9 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         };
     }
 
-    protected function artistPreferenceQuestion(?TattooAiConversation $conversation): string
+    protected function artistPreferenceQuestion(): string
     {
-        $names = $conversation !== null ? $this->studioProfessionalNames($conversation->company_id) : [];
-        $list = $names === [] ? '' : ' Temos '.$this->joinNames($names).'.';
-
-        return 'Você tem preferência de artista?'.$list.' Se não tiver, pode dizer *sem preferência*.';
-    }
-
-    /**
-     * @param  list<string>  $names
-     */
-    protected function joinNames(array $names): string
-    {
-        if (count($names) === 1) {
-            return $names[0];
-        }
-        $last = array_pop($names);
-
-        return implode(', ', $names).' e '.$last;
+        return 'Você tem preferência de artista? Se tiver, me fala qual. Se não tiver, pode dizer *sem preferência*.';
     }
 
     protected function replyAsksForMissingDetail(string $reply, array $data, TattooAiConversation $conversation): bool

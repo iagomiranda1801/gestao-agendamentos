@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
  */
 final class CustomerNameDetector
 {
-    private const NOT_A_NAME = '/\b(quero|queria|gostaria|preciso|tatuagem|tattoo|tatuar|tatoo|orcamento|preco|valor|quanto|custa|agendar|agenda|horario|marcar|fazer|desenho|braco|perna|costas|obrigad[oa]|sim|nao|ok|blz|beleza|tudo|bem|aqui|voces|vcs|voce|vc|informacao|informacoes|duvida|menu|atendente|humano|unha|unhas|cabelo|corte|cortar|escova|progressiva|manicure|pedicure|mao|maos|pe|pes|sobrancelha|sobrancelhas|cilios|depilacao|maquiagem|make|luzes|mechas|tintura|pintar|hidratacao|limpeza|pele|massagem|design|gel|alongamento|servico|servicos|amanha|hoje|semana|manha|tarde|noite|segunda|terca|quarta|quinta|sexta|sabado|domingo|pode|qualquer|tanto|faz)\b/u';
+    private const NOT_A_NAME = '/\b(quero|queria|gostaria|preciso|tatuagem|tattoo|tatuar|tatoo|orcamento|preco|valor|quanto|custa|agendar|agenda|horario|marcar|fazer|desenho|braco|perna|costas|obrigad[oa]|sim|nao|ok|blz|beleza|tudo|bem|aqui|voces|vcs|voce|vc|informacao|informacoes|duvida|menu|atendente|humano|unha|unhas|cabelo|corte|cortar|escova|progressiva|manicure|pedicure|mao|maos|pe|pes|sobrancelha|sobrancelhas|cilios|depilacao|maquiagem|make|luzes|mechas|tintura|pintar|hidratacao|limpeza|pele|massagem|design|gel|alongamento|servico|servicos|amanha|hoje|semana|manha|tarde|noite|segunda|terca|quarta|quinta|sexta|sabado|domingo|pode|qualquer|tanto|faz|pensei|imagino|penso|algo|assim|tipo|mais|menos|um|uma|de|em|com)\b/u';
 
     public static function isGreeting(string $text): bool
     {

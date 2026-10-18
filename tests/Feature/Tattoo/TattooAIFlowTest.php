@@ -65,10 +65,11 @@ class TattooAIFlowTest extends TestCase
                 $body = count(TattooAiMessage::query()->where('direction', 'in')->get());
                 $details = match ($body) {
                     1 => ['name' => 'Ana'],
-                    2 => ['description' => 'Uma rosa com linhas finas'],
-                    3 => ['body_placement' => 'Antebraço'],
-                    4 => ['size_description' => '15 cm'],
-                    5 => ['style' => 'Fine line'],
+                    2 => ['artist_preference' => 'Sem preferência'],
+                    3 => ['description' => 'Uma rosa com linhas finas'],
+                    4 => ['body_placement' => 'Antebraço'],
+                    5 => ['size_description' => '15 cm'],
+                    6 => ['style' => 'Fine line'],
                     default => [],
                 };
 
@@ -79,14 +80,14 @@ class TattooAIFlowTest extends TestCase
 
             return Http::response(['key' => ['id' => 'sent']]);
         });
-        foreach (['Ana', 'Quero uma rosa', 'No antebraço', '15 cm', 'Fine line', 'sem foto', 'sim'] as $i => $text) {
+        foreach (['Ana', 'sem preferência', 'Quero uma rosa', 'No antebraço', '15 cm', 'Fine line', 'sem foto', 'sim'] as $i => $text) {
             $this->send($company, $instance, $phone, $text, 'm'.$i);
         }
-        $this->send($company, $instance, $phone, 'sim', 'm6');
+        $this->send($company, $instance, $phone, 'sim', 'm7'); // mesmo id: não gera segunda resposta
         $this->assertDatabaseCount('tattoo_requests', 1);
         $this->assertDatabaseCount('tattoo_quotes', 0);
         $this->assertSame('waiting_professional_quote', TattooAiConversation::query()->firstOrFail()->status);
-        $this->assertSame(7, TattooAiMessage::query()->where('direction', 'out')->count());
+        $this->assertSame(8, TattooAiMessage::query()->where('direction', 'out')->count());
     }
 
     public function test_reference_sent_first_is_kept_and_not_requested_again(): void
@@ -96,7 +97,7 @@ class TattooAIFlowTest extends TestCase
         config(['filesystems.tattoo_disk' => 'local']);
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/L9sAAAAASUVORK5CYII=');
         $details = [
-            ['name' => 'Ana'], ['description' => 'Uma rosa com folhas'],
+            ['name' => 'Ana'], ['artist_preference' => 'Sem preferência'], ['description' => 'Uma rosa com folhas'],
             ['body_placement' => 'Braço'], ['size_description' => '10 cm'], ['style' => 'Fine line'],
         ];
         Http::fake(function ($request) use ($png, &$details) {
@@ -113,10 +114,10 @@ class TattooAIFlowTest extends TestCase
         });
 
         $this->send($company, $instance, $phone, '', 'image-first', 'image/png');
-        foreach (['Ana', 'Uma rosa com folhas', 'Braço', '10 cm', 'Fine line'] as $index => $body) {
+        foreach (['Ana', 'sem preferência', 'Uma rosa com folhas', 'Braço', '10 cm', 'Fine line'] as $index => $body) {
             $this->send($company, $instance, $phone, $body, 'early-'.$index);
         }
-        $summary = TattooAiMessage::query()->where('provider_message_id', 'reply:early-4')->value('body');
+        $summary = TattooAiMessage::query()->where('provider_message_id', 'reply:early-5')->value('body');
         $this->assertStringContainsString('imagem recebida', $summary);
         $this->assertStringNotContainsString('Você tem alguma imagem', $summary);
         $this->assertDatabaseCount('tattoo_requests', 0);
@@ -226,8 +227,11 @@ class TattooAIFlowTest extends TestCase
 
         $this->send($company, $instance, $phone, 'Oi', 'pref-0');
         $this->send($company, $instance, $phone, 'Ana', 'pref-1');
-        $this->assertStringContainsString('Temos Gustavo', (string) TattooAiMessage::query()
-            ->where('provider_message_id', 'reply:pref-1')->value('body'));
+        $artistQuestion = (string) TattooAiMessage::query()
+            ->where('provider_message_id', 'reply:pref-1')->value('body');
+        $this->assertStringContainsString('Se tiver, me fala qual', $artistQuestion);
+        $this->assertStringNotContainsString('Temos Gustavo', $artistQuestion);
+        $this->assertStringNotContainsString('Gustavo', $artistQuestion);
 
         $this->send($company, $instance, $phone, 'Gustavo', 'pref-2');
         $conversation = TattooAiConversation::query()->firstOrFail();
@@ -250,6 +254,73 @@ class TattooAIFlowTest extends TestCase
             TattooAiMessage::query()->where('provider_message_id', 'reply:ws-1')->value('body'),
         );
         Http::assertNotSent(fn ($request) => str_contains($request->url(), 'generateContent'));
+    }
+
+    public function test_idea_phrase_is_not_saved_as_the_client_name(): void
+    {
+        [$company, $instance, $phone] = $this->setupAI();
+        Http::fake(fn () => Http::response(['key' => ['id' => 'sent']]));
+
+        $this->send($company, $instance, $phone, 'Oi', 'idea-0');
+        $this->send($company, $instance, $phone, 'Pensei em algo assim', 'idea-1');
+
+        $conversation = TattooAiConversation::query()->firstOrFail();
+        $this->assertArrayNotHasKey('name', $conversation->collected_data ?? []);
+        $this->assertSame('Pensei em algo assim', $conversation->collected_data['description'] ?? null);
+        $this->assertDatabaseMissing('clients', ['company_id' => $company->id, 'name' => 'Pensei em algo assim']);
+        $this->assertStringContainsString('Qual seu nome?', (string) TattooAiMessage::query()
+            ->where('provider_message_id', 'reply:idea-1')->value('body'));
+    }
+
+    public function test_paulo_after_bad_name_is_the_client_not_the_artist(): void
+    {
+        [$company, $instance, $phone] = $this->setupAI();
+        Professional::factory()->forCompany($company)->create(['name' => 'Gustavo']);
+        Professional::factory()->forCompany($company)->create(['name' => 'Lucas']);
+        Http::fake(fn () => Http::response(['key' => ['id' => 'sent']]));
+
+        TattooAiConversation::query()->create([
+            'company_id' => $company->id,
+            'company_whatsapp_instance_id' => $instance->id,
+            'phone_normalized' => $phone,
+            'remote_jid' => $phone.'@s.whatsapp.net',
+            'status' => 'collecting_information',
+            'collected_data' => ['name' => 'Pensei em algo assim', 'description' => 'Pensei em algo assim'],
+        ]);
+        $conversation = TattooAiConversation::query()->firstOrFail();
+        $conversation->messages()->create([
+            'company_id' => $company->id,
+            'provider_message_id' => 'out-artist',
+            'direction' => 'out',
+            'status' => 'sent',
+            'body' => 'Você tem preferência de artista? Se tiver, me fala qual. Se não tiver, pode dizer *sem preferência*.',
+        ]);
+
+        $this->send($company, $instance, $phone, 'Paulo', 'fix-paulo');
+
+        $conversation->refresh();
+        $this->assertSame('Paulo', $conversation->collected_data['name']);
+        $this->assertArrayNotHasKey('artist_preference', $conversation->collected_data ?? []);
+        $this->assertDatabaseHas('clients', ['company_id' => $company->id, 'name' => 'Paulo', 'phone_normalized' => $phone]);
+        $this->assertStringContainsString('preferência de artista', (string) TattooAiMessage::query()
+            ->where('provider_message_id', 'reply:fix-paulo')->value('body'));
+    }
+
+    public function test_gustavo_on_artist_question_is_preference_not_client_name(): void
+    {
+        [$company, $instance, $phone] = $this->setupAI();
+        Professional::factory()->forCompany($company)->create(['name' => 'Gustavo']);
+        Http::fake(fn () => Http::response(['key' => ['id' => 'sent']]));
+
+        $this->send($company, $instance, $phone, 'Oi', 'gust-0');
+        $this->send($company, $instance, $phone, 'Paulo', 'gust-1');
+        $this->send($company, $instance, $phone, 'Gustavo', 'gust-2');
+
+        $conversation = TattooAiConversation::query()->firstOrFail();
+        $this->assertSame('Paulo', $conversation->collected_data['name']);
+        $this->assertSame('Gustavo', $conversation->collected_data['artist_preference']);
+        $this->assertStringContainsString('desenho', (string) TattooAiMessage::query()
+            ->where('provider_message_id', 'reply:gust-2')->value('body'));
     }
 
     public function test_artist_availability_question_does_not_become_client_name(): void
