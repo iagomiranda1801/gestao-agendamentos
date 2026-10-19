@@ -2,11 +2,12 @@ import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import { bunny } from 'laravel-vite-plugin/fonts';
 import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
     plugins: [
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.js', 'resources/js/scheduling-calendar.js', 'resources/css/scheduling-calendar.css', 'resources/css/public-booking.css', 'resources/css/signup.css', 'resources/css/filament/app/theme.css', 'resources/css/filament/salao/theme.css', 'resources/css/filament/tattoo/theme.css', 'resources/css/filament/admin/theme.css'],
+            input: ['resources/css/app.css', 'resources/js/app.js', 'resources/js/scheduling-calendar.js', 'resources/css/scheduling-calendar.css', 'resources/css/public-booking.css', 'resources/css/signup.css', 'resources/css/filament/app/theme.css', 'resources/css/filament/salao/theme.css', 'resources/css/filament/tattoo/theme.css', 'resources/css/filament/admin/theme.css', 'resources/js/landing/main.jsx', 'resources/css/landing.css'],
             refresh: true,
             fonts: [
                 bunny('Instrument Sans', {
@@ -15,6 +16,7 @@ export default defineConfig({
             ],
         }),
         tailwindcss(),
+        react(),
     ],
     server: {
         watch: {

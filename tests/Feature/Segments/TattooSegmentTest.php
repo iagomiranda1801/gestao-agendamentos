@@ -42,9 +42,13 @@ class TattooSegmentTest extends TestCase
             ->assertDontSee('salon-auth', false);
     }
 
-    public function test_tattoo_domain_root_redirects_to_tattoo_panel(): void
+    public function test_tattoo_domain_root_shows_landing(): void
     {
-        $this->get("http://{$this->tattooHost}/")->assertRedirect("http://{$this->tattooHost}/painel");
+        $this->get("http://{$this->tattooHost}/")
+            ->assertOk()
+            ->assertSee('O cliente manda a ideia no WhatsApp. O pedido chega pronto para orçar.', false);
+
+        $this->get("http://{$this->tattooHost}/painel/login")->assertOk();
     }
 
     public function test_admin_and_app_are_not_available_on_tattoo_domain(): void

@@ -20,7 +20,7 @@ foreach (Segment::hosts('salon') as $salonHost) {
 }
 
 Route::domain((string) config('segments.tattoo.domain'))->group(function (): void {
-    Route::redirect('/', '/painel');
+    Route::view('/', 'landing.tattoo')->name('tattoo.landing');
 });
 
 Route::redirect('/', '/admin');
