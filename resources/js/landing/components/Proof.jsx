@@ -10,7 +10,8 @@ const fields = [
 export function Proof() {
     return (
         <section className="section">
-            <h2>O pedido, como a equipe vê.</h2>
+            <p className="kicker">O pedido</p>
+            <h2>Como a equipe vê.</h2>
             <article className="order">
                 <div className="order-photo" aria-hidden="true" />
                 <dl>
@@ -22,7 +23,7 @@ export function Proof() {
                     ))}
                 </dl>
                 <p className="order-status">Foto recebida</p>
-                <button type="button">Fazer orçamento</button>
+                <a href="/painel/login">Fazer orçamento</a>
             </article>
         </section>
     );

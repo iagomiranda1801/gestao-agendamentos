@@ -7,6 +7,7 @@ const facts = [
 export function Problem() {
     return (
         <section className="section">
+            <p className="kicker">A casa</p>
             <h2>O WhatsApp não devia parar a sessão.</h2>
             <ul className="facts">
                 {facts.map(([title, text]) => (

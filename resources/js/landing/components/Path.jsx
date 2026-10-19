@@ -9,6 +9,7 @@ const steps = [
 export function Path() {
     return (
         <section className="section">
+            <p className="kicker">O serviço</p>
             <h2>Do primeiro oi ao pedido pronto.</h2>
             <ol className="steps">
                 {steps.map(([title, text], index) => (

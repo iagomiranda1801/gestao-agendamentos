@@ -14,11 +14,17 @@ export function Hero() {
     return (
         <header className="hero">
             <div className="hero-copy">
-                <p className="brand">Agendaqui Estúdio</p>
+                <p className="brand">TatooAI</p>
                 <h1>O cliente manda a ideia no WhatsApp. O pedido chega pronto para orçar.</h1>
                 <p className="lede">A assistente coleta nome, artista, desenho e referência. Sua equipe só define o valor e envia.</p>
-                <Cta>Quero ver no meu estúdio</Cta>
+                <Cta>Entrar no estúdio</Cta>
                 <p className="note">A conversa continua no WhatsApp do estúdio.</p>
+                <ul className="collected">
+                    <li>Nome</li>
+                    <li>Artista</li>
+                    <li>Desenho</li>
+                    <li>Foto</li>
+                </ul>
             </div>
             <div className="chat" aria-label="Conversa de exemplo">
                 <div className="chat-bar">

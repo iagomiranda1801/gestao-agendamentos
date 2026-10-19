@@ -46,7 +46,8 @@ class TattooSegmentTest extends TestCase
     {
         $this->get("http://{$this->tattooHost}/")
             ->assertOk()
-            ->assertSee('O cliente manda a ideia no WhatsApp. O pedido chega pronto para orçar.', false);
+            ->assertSee('O cliente manda a ideia no WhatsApp. O pedido chega pronto para orçar.', false)
+            ->assertSee('/painel/login', false);
 
         $this->get("http://{$this->tattooHost}/painel/login")->assertOk();
     }
