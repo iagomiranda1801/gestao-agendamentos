@@ -8,7 +8,7 @@ const steps = [
 
 export function Path() {
     return (
-        <section className="section">
+        <section className="section" id="servico">
             <p className="kicker">O serviço</p>
             <h2>Do primeiro oi ao pedido pronto.</h2>
             <ol className="steps">

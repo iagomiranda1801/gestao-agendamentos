@@ -6,7 +6,7 @@ const lines = [
 
 export function After() {
     return (
-        <section className="section">
+        <section className="section" id="depois">
             <p className="kicker">Depois</p>
             <h2>O orçamento segue na conversa.</h2>
             <ul className="after">

@@ -6,7 +6,7 @@ const facts = [
 
 export function Problem() {
     return (
-        <section className="section">
+        <section className="section" id="casa">
             <p className="kicker">A casa</p>
             <h2>O WhatsApp não devia parar a sessão.</h2>
             <ul className="facts">

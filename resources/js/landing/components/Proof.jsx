@@ -9,7 +9,7 @@ const fields = [
 
 export function Proof() {
     return (
-        <section className="section">
+        <section className="section" id="pedido">
             <p className="kicker">O pedido</p>
             <h2>Como a equipe vê.</h2>
             <article className="order">

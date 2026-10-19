@@ -1,6 +1,6 @@
 export function Price() {
     return (
-        <section className="section">
+        <section className="section" id="valor">
             <div className="price">
                 <p className="kicker">O valor</p>
                 <h2>Continua da equipe.</h2>
