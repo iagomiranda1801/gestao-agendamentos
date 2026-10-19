@@ -103,7 +103,7 @@ class TattooAIResilienceTest extends TestCase
         $this->fakeHttp([]);
 
         $this->assertSame($this->assistantAskName($company), $this->send($company, $instance, 'Oi', 't1'));
-        $this->assertSame('Tudo certo por aqui, valeu! Qual seu nome?', $this->send($company, $instance, 'bem e vc?', 't2'));
+        $this->assertSame('Tudo certo por aqui, valeu!', $this->send($company, $instance, 'bem e vc?', 't2'));
         $this->assertSame(0, $this->geminiCalls());
 
         $this->assertStringContainsString('preferência de artista', $this->send($company, $instance, 'Ana Souza', 't3'));
@@ -134,7 +134,7 @@ class TattooAIResilienceTest extends TestCase
 
         $this->assertSame($this->assistantAskName($company), $this->send($company, $instance, 'Oi', 'n1'));
         $this->assertSame(
-            'Anotei janeiro. Qual seu nome?',
+            'Anotei janeiro. Como você se chama?',
             $this->send($company, $instance, 'Pra mim fica melhor em janeiro, o dia que estiver disponível', 'n2'),
         );
         $this->assertSame(
