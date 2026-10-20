@@ -41,6 +41,27 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         return 'Tattoo AI';
     }
 
+    /**
+     * A primeira resposta da conversa sempre apresenta a assistente (uma
+     * única vez); as seguintes nunca se apresentam de novo.
+     */
+    protected function replyWithoutSilence(TattooAiConversation $conversation, TattooAiMessage $message): ?string
+    {
+        $first = ! $conversation->messages()->where('direction', 'out')
+            ->where('id', '>', $conversation->context_start_message_id ?? 0)->exists();
+        $reply = parent::replyWithoutSilence($conversation, $message);
+        if (! $first || $reply === null || trim($reply) === '' || str_contains($reply, 'assistente')) {
+            return $reply;
+        }
+        $conversation->refresh();
+        if ($conversation->human_takeover || $conversation->tattoo_request_id !== null) {
+            return $reply;
+        }
+
+        return $this->studioAssistantIntro($conversation, $this->addressName($conversation->collected_data ?: []))
+            .' '.$this->stripOpeningGreeting($reply);
+    }
+
     protected function process(TattooAiConversation $conversation, TattooAiMessage $message): ?string
     {
         $text = trim((string) $message->body);
@@ -51,6 +72,12 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             $conversation->update(['human_takeover' => true, 'status' => 'human_takeover']);
 
             return 'Sobre workshop a equipe do estúdio te responde. Já encaminhei e eles entram em contato por aqui.';
+        }
+        if ($this->asksIfRobot($normalized)) {
+            $data = $conversation->collected_data ?: [];
+            $follow = $request === null ? (empty($data['name']) ? 'Qual seu nome?' : $this->nextQuestion($data, $conversation)) : '';
+
+            return trim('Sou a assistente do estúdio, sim 🙂 O tatuador acompanha a conversa e entra pra fechar o orçamento com você. '.$follow);
         }
         if (preg_match('/\b(atendente|humano|pessoa da equipe)\b/u', $normalized)) {
             $conversation->update(['human_takeover' => true, 'status' => 'human_takeover']);
@@ -162,7 +189,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             if ($this->readyForConfirmation($collected) && preg_match('/^(sim|isso|correto|confirmo|pode enviar|esta certo)[!. ]*$/u', $normalized)) {
                 $this->createRequest($conversation, $collected);
 
-                return 'Perfeito, '.$this->displayFirstName($collected['name']).'! A equipe recebeu sua ideia e vai preparar o orçamento por aqui.';
+                return 'Fechou'.$this->addressName($collected, ', ').'! A equipe recebeu sua ideia e vai preparar o orçamento por aqui 🤙';
             }
             if (preg_match('/^(nao|nao e isso|corrigir|alterar)[!. ]*$/u', $normalized)) {
                 $conversation->update(['status' => 'collecting_information']);
@@ -170,6 +197,19 @@ class TattooAIConversationService extends WhatsAppAIConversationService
                 return 'Claro! O que você gostaria de ajustar?';
             }
             $conversation->update(['status' => 'collecting_information']);
+        }
+        if ($request === null && ($outcome = $this->resolvePendingNameConfirmation($conversation, $text)) !== null) {
+            $collected = $conversation->collected_data ?: [];
+            if ($outcome === 'rejected') {
+                return 'Foi mal! Como você se chama?';
+            }
+            $this->saveClient($conversation, (string) $collected['name']);
+            if ($outcome !== 'implicit') {
+                return $this->finishReply($conversation, 'Show, '.$this->displayFirstName((string) $collected['name']).'! '.$this->nextQuestion($collected, $conversation));
+            }
+        }
+        if ($request === null && ($answer = $this->answerNamePrompt($conversation, $collected, $text)) !== null) {
+            return $answer;
         }
         if ($request === null && ($quick = $this->quickReply($conversation, $collected, $text)) !== null) {
             return $quick;
@@ -218,6 +258,15 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             $this->logFallback($conversation, $message, 'invalid_details');
         }
         $details = array_intersect_key($validator->valid(), $rules);
+        if (empty($collected['name']) && $this->askedForName($this->lastOutbound($conversation))) {
+            // Resposta ao pedido do nome nunca vira ideia da tatuagem.
+            unset($details['description']);
+        }
+        foreach (['style', 'body_placement', 'size_description'] as $field) {
+            if (isset($details[$field])) {
+                $details[$field] = $this->cleanOpenAnswer((string) $details[$field]);
+            }
+        }
         if (isset($details['description'])) {
             $details['description'] = $this->cleanDescription($details['description']);
             if (! $this->hasUsableDescription($details['description'])) {
@@ -249,7 +298,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         }
         $asked = $this->normalizedText((string) $conversation->messages()->where('direction', 'out')
             ->where('id', '>', $conversation->context_start_message_id ?? 0)->latest('id')->value('body'));
-        if (empty($data['style']) && str_contains($asked, 'qual estilo') && preg_match('/\b(nao sei|nao tenho certeza|a definir|sem preferencia)\b/u', $normalized)) {
+        if (empty($data['style']) && str_contains($asked, 'estilo') && preg_match('/\b(nao sei|nao tenho certeza|a definir|sem preferencia)\b/u', $normalized)) {
             $data['style'] = 'A definir';
         }
         if (empty($data['reference_status']) && preg_match('/\b(foto|imagem|referencia|inspiracao)\b/u', $asked)) {
@@ -263,6 +312,10 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         }
         $data = $this->sanitizeCollectedName($conversation, $data, $text, $nameBefore);
         $data = $this->acceptOpenAnswer($conversation, $data, $text);
+        if (! empty($data['name']) && $data['name'] !== $nameBefore) {
+            $data['name_source'] = 'customer';
+            unset($data['_name_candidate'], $data['_name_candidate_source'], $data['_name_confirm_pending']);
+        }
         $summary = $data;
         unset($summary['description_confirmed']);
         $conversation->update(['collected_data' => $data,
@@ -272,8 +325,18 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         if (! empty($data['name']) && CustomerNameDetector::isPlausible((string) $data['name'])) {
             $this->saveClient($conversation, $data['name']);
         }
+        if (empty($data['name']) && $this->nameAskCount($conversation) >= 2) {
+            $data = $this->proceedWithoutName($conversation, $data);
+            if ($this->readyForConfirmation($data)) {
+                $conversation->update(['status' => 'awaiting_confirmation']);
+
+                return $this->requestSummary($data);
+            }
+
+            return $this->finishReply($conversation, 'Tranquilo, vamos seguindo! '.$this->nextQuestion($data, $conversation));
+        }
         if (empty($data['name'])) {
-            return $this->finishReply($conversation, $this->askForName($conversation, $data));
+            return $this->finishReply($conversation, $this->askForName($conversation, $data, $text));
         }
         if ($this->readyForConfirmation($data)) {
             $conversation->update(['status' => 'awaiting_confirmation']);
@@ -281,11 +344,13 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             return $this->requestSummary($data);
         }
         $reply = is_string($result['reply'] ?? null) ? trim($result['reply']) : '';
-        if ($this->mentionsUnverifiedFacts($reply)) {
+        // Só a primeira mensagem do bot cumprimenta; o texto livre do Gemini nunca abre com "Olá, Lucas! Tudo bem?".
+        $reply = $this->stripOpeningGreeting($reply);
+        if ($this->mentionsUnverifiedFacts($reply) || $this->reintroduces($reply)) {
             $reply = '';
         }
         if ($reply === '' && $withoutModel && $data['name'] !== $nameBefore) {
-            return $this->finishReply($conversation, 'Show, '.$this->displayFirstName($data['name']).'! '.$this->nextQuestion($data, $conversation));
+            return $this->finishReply($conversation, 'Show'.$this->addressName($data, ', ').'! '.$this->nextQuestion($data, $conversation));
         }
 
         return $this->finishReply($conversation, $reply !== '' && $this->replyAsksForMissingDetail($reply, $data, $conversation)
@@ -311,18 +376,19 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         Log::info('Tattoo AI quick reply.', ['company_id' => $conversation->company_id,
             'conversation_id' => $conversation->id, 'intent' => $intent]);
         $asked = $this->lastOutbound($conversation);
-        $name = ! empty($data['name']) ? $this->displayFirstName((string) $data['name']) : null;
-        if ($name === null) {
+        if (empty($data['name'])) {
             if ($this->askedForName($asked)) {
-                return $intent === 'greeting' ? 'Oi! Tudo bem por aqui.' : 'Tudo certo por aqui, valeu!';
+                return $intent === 'greeting' ? 'Opa! Tudo certo por aqui.' : 'Tudo certo por aqui, valeu!';
+            }
+            if (! $this->nameWasRequested($conversation)) {
+                return $this->firstMessage($conversation);
             }
 
-            return $intent === 'greeting'
-                ? $this->studioAssistantIntro($conversation).' Qual seu nome?'
-                : 'Tudo certo por aqui, valeu! Qual seu nome?';
+            return 'Tudo certo por aqui, valeu! Qual seu nome?';
         }
+        $name = $this->addressName($data);
         $opening = $intent === 'greeting'
-            ? 'Opa, '.$name.'! Tudo bem?'
+            ? ($name !== null ? 'Opa, '.$name.'! Tudo bem?' : 'Opa! Tudo bem?')
             : 'Tudo certo por aqui, valeu!';
         $question = $this->nextQuestion($data, $conversation);
         if ($this->repeatsQuestion($asked, $question) || $this->currentQuestionAlreadyAsked($asked, $data)) {
@@ -359,9 +425,6 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             if ($this->looksLikeDatePreference($text)) {
                 $details['date_preference'] = mb_substr($text, 0, 255);
             }
-            if ($name === null && $askedName && $this->hasUsableDescription($text)) {
-                $details['description'] = mb_substr($text, 0, 3000);
-            }
 
             return $details;
         }
@@ -369,10 +432,10 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         return match (true) {
             empty($data['artist_preference']) && ($preference = $this->artistPreferenceFromMessage($conversation, $asked, $text)) !== null => ['artist_preference' => $preference],
             ! $this->hasUsableDescription($data['description'] ?? null) && preg_match('/\b(ideia|desenho|tatuagem|tattoo)\b/u', $asked) && mb_strlen($text) >= 5 => ['description' => mb_substr($text, 0, 3000)],
-            empty($data['body_placement']) && preg_match('/\b(corpo|onde|local)\b/u', $asked) && mb_strlen($text) >= 2 => ['body_placement' => mb_substr($text, 0, 255)],
+            empty($data['body_placement']) && preg_match('/\b(corpo|onde|local)\b/u', $asked) && mb_strlen($text) >= 2 => ['body_placement' => mb_substr($this->cleanOpenAnswer($text), 0, 255)],
             empty($data['size_description']) && ! empty($data['description']) && ! empty($data['body_placement'])
-                && str_contains($asked, 'tamanho') && $text !== '' => ['size_description' => mb_substr($text, 0, 255)],
-            empty($data['style']) && preg_match('/\b(estilo|realismo|blackwork|fine line)\b/u', $asked) && $text !== '' => ['style' => mb_substr($text, 0, 255)],
+                && str_contains($asked, 'tamanho') && $text !== '' => ['size_description' => mb_substr($this->cleanOpenAnswer($text), 0, 255)],
+            empty($data['style']) && preg_match('/\b(estilo|realismo|blackwork|fine line)\b/u', $asked) && $text !== '' => ['style' => mb_substr($this->cleanOpenAnswer($text), 0, 255)],
             default => [],
         };
     }
@@ -393,10 +456,16 @@ class TattooAIConversationService extends WhatsAppAIConversationService
     /**
      * @param  array<string, mixed>  $data
      */
-    protected function askForName(TattooAiConversation $conversation, array $data): string
+    protected function askForName(TattooAiConversation $conversation, array $data, string $text = ''): string
     {
         $asked = $this->lastOutbound($conversation);
         $alreadyAsked = $this->nameWasRequested($conversation);
+        if (! $alreadyAsked) {
+            return $this->firstMessage($conversation);
+        }
+        if (($guess = $this->guessedName($conversation, $text)) !== null) {
+            return 'Só pra confirmar: seu nome é '.$guess.'?';
+        }
         if (! empty($data['date_preference']) && $alreadyAsked && ! str_contains($asked, 'anotei')) {
             $month = $this->datePreferenceMonth((string) $data['date_preference']);
 
@@ -404,14 +473,176 @@ class TattooAIConversationService extends WhatsAppAIConversationService
                 ? 'Anotei '.$month.'. Como você se chama?'
                 : 'Anotei sua preferência de data. Como você se chama?';
         }
-        if (! $alreadyAsked) {
-            return $this->studioAssistantIntro($conversation).' Qual seu nome?';
+
+        return 'Não peguei seu nome. Como você se chama?';
+    }
+
+    /**
+     * Primeira mensagem do bot: apresenta a assistente uma única vez e já
+     * confirma o nome sugerido pelo WhatsApp, quando houver.
+     */
+    protected function firstMessage(TattooAiConversation $conversation): string
+    {
+        $candidate = $this->nameCandidateFirstName($conversation);
+        $intro = $this->studioAssistantIntro($conversation, $candidate);
+        $confirm = $candidate !== null ? $this->nameConfirmationQuestion($conversation) : null;
+
+        return $intro.' '.($confirm ?? 'Qual seu nome?');
+    }
+
+    /**
+     * Resposta direta ao pedido do nome. Nome solto e plausível é o nome do
+     * cliente, mesmo igual ao de um tatuador; só pergunta quando a dúvida é
+     * real (o cliente digitou o nome completo de um profissional).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function answerNamePrompt(TattooAiConversation $conversation, array $data, string $text): ?string
+    {
+        if (! empty($data['name']) || $text === '') {
+            return null;
         }
-        if (! str_contains($asked, 'nao peguei seu nome')) {
-            return 'Não peguei seu nome. Como você se chama?';
+        $pending = $data['_name_or_artist'] ?? null;
+        if (filled($pending)) {
+            unset($data['_name_or_artist']);
+            $conversation->update(['collected_data' => $data]);
+            $normalized = $this->normalizedText($text);
+            if (preg_match('/\b(sou eu|eu mesm[oa]|meu nome|e meu nome|e o meu)\b|^(?:eu|sim|isso|sou|e eu)[!. ]*$/u', $normalized)) {
+                return $this->acceptCustomerName($conversation, $data, (string) $pending);
+            }
+            if (preg_match('/\b(tatuador|tatuadora|artista|ele|ela)\b/u', $normalized)) {
+                $artist = $this->matchingStudioProfessional((string) $pending, $conversation->company_id) ?? (string) $pending;
+                $data['artist_preference'] = $artist;
+                $conversation->update(['collected_data' => $data]);
+
+                return 'Fechou, anotei o '.$this->firstName($artist).' como tatuador. E qual seu nome?';
+            }
+        }
+        if (! $this->nameWasRequested($conversation) || $this->looksLikeThirdPartySchedule($text)) {
+            return null;
+        }
+        $name = CustomerNameDetector::fromMessage($text);
+        if ($name === null) {
+            return null;
+        }
+        $artist = $this->matchingStudioProfessional($name, $conversation->company_id);
+        if ($artist !== null && ! $this->isExplicitSelfName($text) && str_contains(trim($artist), ' ')
+            && $this->normalizedText($artist) === $this->normalizedText($name)) {
+            $data['_name_or_artist'] = $name;
+            $conversation->update(['collected_data' => $data]);
+
+            return $this->displayFirstName($name).' é você ou o tatuador?';
         }
 
-        return 'Pra eu seguir, me diz só o seu nome.';
+        return $this->acceptCustomerName($conversation, $data, $name);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function acceptCustomerName(TattooAiConversation $conversation, array $data, string $name): string
+    {
+        $data['name'] = $name;
+        $data['name_source'] = 'customer';
+        unset($data['_name_candidate'], $data['_name_candidate_source'], $data['_name_confirm_pending'], $data['_name_or_artist']);
+        $conversation->update(['collected_data' => $data]);
+        $this->saveClient($conversation, $name, 'customer');
+
+        return $this->finishReply($conversation, 'Show, '.$this->displayFirstName($name).'! '.$this->nextQuestion($data, $conversation));
+    }
+
+    /**
+     * Na segunda tentativa, uma palavra que parece nome ("lucas aqui") é
+     * confirmada em vez de pedir o nome de novo.
+     */
+    protected function guessedName(TattooAiConversation $conversation, string $text): ?string
+    {
+        if ($text === '' || $this->nameAskCount($conversation) !== 1 || count(preg_split('/\s+/u', trim($text)) ?: []) > 2) {
+            return null;
+        }
+        $first = (string) preg_replace('/[^\p{L}\'\-]/u', '', explode(' ', trim($text))[0] ?? '');
+        if (mb_strlen($first) < 3 || ! CustomerNameDetector::isPlausible($first) || $this->isGreeting($this->normalizedText($first))) {
+            return null;
+        }
+        $guess = mb_convert_case(mb_strtolower($first), MB_CASE_TITLE, 'UTF-8');
+        $conversation->update(['collected_data' => array_merge($conversation->collected_data ?: [],
+            ['_name_candidate' => $guess, '_name_candidate_source' => 'customer', '_name_confirm_pending' => true])]);
+
+        return $guess;
+    }
+
+    /** Quantas vezes o bot já pediu o nome nesta conversa. */
+    protected function nameAskCount(TattooAiConversation $conversation): int
+    {
+        return $conversation->messages()->where('direction', 'out')
+            ->where('id', '>', $conversation->context_start_message_id ?? 0)
+            ->pluck('body')
+            ->filter(fn ($body) => $this->askedForName($this->normalizedText((string) $body)))
+            ->count();
+    }
+
+    /**
+     * Depois de duas tentativas, segue sem travar: usa o nome sugerido pelo
+     * WhatsApp ou um nome provisório, e deixa nota para a equipe.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function proceedWithoutName(TattooAiConversation $conversation, array $data): array
+    {
+        if (filled($data['_name_candidate'] ?? null) && ($data['_name_candidate_source'] ?? null) !== 'customer') {
+            $data['name'] = (string) $data['_name_candidate'];
+            $data['name_source'] = (string) $data['_name_candidate_source'];
+        } else {
+            $data['name'] = 'Cliente WhatsApp '.mb_substr((string) $conversation->phone_normalized, -4);
+            $data['name_source'] = 'placeholder';
+        }
+        unset($data['_name_candidate'], $data['_name_candidate_source'], $data['_name_confirm_pending']);
+        $data['notes'] = $this->appendNote($data['notes'] ?? null, 'Cliente não informou o nome na conversa; confirmar com ele.');
+        $conversation->update(['collected_data' => $data]);
+        $this->saveClient($conversation, (string) $data['name'], (string) $data['name_source']);
+        Log::info('Tattoo AI continued without customer name.', ['company_id' => $conversation->company_id,
+            'conversation_id' => $conversation->id, 'name_source' => $data['name_source']]);
+
+        return $data;
+    }
+
+    /**
+     * Primeiro nome para chamar o cliente; null quando o nome é provisório.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function addressName(array $data, ?string $prefix = null): ?string
+    {
+        if (empty($data['name']) || ($data['name_source'] ?? null) === 'placeholder' || $this->isPlaceholderName((string) $data['name'])) {
+            return $prefix !== null ? '' : null;
+        }
+        $name = $this->displayFirstName((string) $data['name']);
+
+        return $prefix !== null ? $prefix.$name : $name;
+    }
+
+    protected function asksIfRobot(string $normalized): bool
+    {
+        return (bool) preg_match('/\b(?:robo|bot|chatbot|inteligencia artificial)\b|\b(?:e|eh|vc e|voce e) (?:uma? )?(?:ia|maquina|pessoa|pessoa de verdade|humano|humana)\s*\?|\bfalando com (?:uma )?(?:pessoa|maquina|ia)\b.*\?/u', $normalized);
+    }
+
+    /** Texto livre do modelo que tenta se apresentar de novo não é enviado. */
+    protected function reintroduces(string $reply): bool
+    {
+        return (bool) preg_match('/\b(sou a assistente|sou o assistente|aqui e a assistente|me chamo|sou uma ia|sou um robo)\b/u', $this->normalizedText($reply));
+    }
+
+    /**
+     * Limpa prefixos de respostas abertas: "o estilo é Lettering" vira "Lettering".
+     */
+    protected function cleanOpenAnswer(string $text): string
+    {
+        $clean = trim((string) preg_replace('/^(?:(?:o|a|meu|minha)\s+)?(?:estilo|local|lugar|tamanho|parte)\s+(?:é|e|eh|seria|vai ser|será|sera|fica|ficaria)\s*:?\s*/iu', '', trim($text)));
+        $clean = trim((string) preg_replace('/^(?:(?:eu\s+)?acho que\s+)?(?:quero|queria|seria|vai ser|será|sera|é|eh|pode ser|prefiro)\s+/iu', '', $clean));
+        $clean = trim((string) preg_replace('/[\s.!]+$/u', '', $clean));
+
+        return $clean !== '' ? $clean : trim($text);
     }
 
     /**
@@ -577,9 +808,9 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         return mb_substr(trim($existing !== '' ? $existing."\n".$note : $note), 0, 3000);
     }
 
-    protected function studioAssistantIntro(TattooAiConversation $conversation): string
+    protected function studioAssistantIntro(TattooAiConversation $conversation, ?string $name = null): string
     {
-        return 'Oi! Sou a assistente do estúdio *'.$conversation->company->name.'*. Vou te atender daqui até o tatuador entrar na conversa.';
+        return 'Opa'.($name !== null ? ', '.$name : '').', tudo bem? Aqui é a assistente do *'.$conversation->company->name.'*, o tatuador acompanha a conversa por aqui 🤙';
     }
 
     protected function isWorkshopTopic(string $normalized): bool
@@ -657,11 +888,12 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         $company = $conversation->company;
         $custom = $company->schedulingSetting?->tattoo_ai_prompt;
 
-        return "Você é a assistente do estúdio de tatuagem {$company->name} no WhatsApp. Atende o cliente até um tatuador da equipe entrar na conversa. "
-            .'Escreva em português brasileiro: próxima, clara e interessada na ideia, com frases curtas e uma pergunta por vez. '
+        return "Você conversa no WhatsApp pelo estúdio de tatuagem {$company->name}, como alguém do estúdio, até o tatuador assumir a conversa. "
+            .'A primeira mensagem do sistema já apresentou você como assistente do estúdio: nunca se apresente de novo e nunca comece a resposta com cumprimento ("Olá", "Oi", "Opa, fulano", "Tudo bem?"). Vá direto ao assunto. '
+            .'Escreva em português brasileiro, informal, como alguém do estúdio: frases curtas, uma pergunta por vez, interessada na ideia. '
             .'Use "você"; pode usar expressões como "show", "massa", "top" e "fechou", e no máximo um emoji de vez em quando. Comente a ideia do cliente com interesse genuíno quando fizer sentido. '
             .'Evite tom de central de atendimento: não use "prezado", "informe", "seu atendimento", "encaminhar", "aguarde" nem listas. '
-            .'Se o cliente perguntar se é robô, diga com honestidade que é a assistente do estúdio e que a equipe acompanha a conversa. '
+            .'Se o cliente perguntar se é robô ou pessoa, diga com sinceridade que é a assistente do estúdio e que o tatuador entra na conversa pra fechar o orçamento. '
             .'Retorne JSON com action (ask, save_details, request_approval ou handoff), details e reply. '
             .'Peça o nome logo no início. Só preencha details.name quando o cliente informar o próprio nome explicitamente; nunca deduza o nome de uma ideia de tatuagem. '
             .'Pergunte se o cliente tem preferência de artista e qual seria, sem citar os tatuadores do estúdio. Preencha details.artist_preference só com o nome que o cliente falar ou "Sem preferência". Nunca confirme horário, disponibilidade ou que o tatuador aceitou o pedido; a equipe faz a atribuição. '
@@ -679,11 +911,11 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         return match (true) {
             empty($data['name']) => 'Qual seu nome?',
             empty($data['artist_preference']) => $this->artistPreferenceQuestion($conversation !== null ? $this->lastOutbound($conversation) : ''),
-            ! $this->descriptionReady($data) => 'Que desenho ou elementos você quer na tattoo? Pode descrever do seu jeito.',
+            ! $this->descriptionReady($data) => 'Me conta como você imagina a tattoo?',
             empty($data['body_placement']) => 'Massa! E vai ser em qual parte do corpo?',
             empty($data['size_description']) => 'E mais ou menos de que tamanho? Pode ser em cm mesmo.',
-            empty($data['style']) => 'Qual estilo você imagina para a tatuagem? Pode ser realismo, blackwork, fine line ou outro. Se ainda não souber, tudo bem.',
-            empty($data['reference_status']) => 'Você tem alguma imagem de referência ou inspiração para mandar? Se não tiver, pode me dizer *sem foto*.',
+            empty($data['style']) => 'Já tem um estilo em mente? Tipo fine line, blackwork, lettering… se não souber, tranquilo.',
+            empty($data['reference_status']) => 'Tem alguma foto de referência? Se tiver, manda aqui. Se não tiver, só me fala *sem foto*.',
             default => 'Quer acrescentar mais algum detalhe?',
         };
     }
@@ -745,18 +977,19 @@ class TattooAIConversationService extends WhatsAppAIConversationService
 
             return $data;
         }
-        if (! $this->descriptionReady($data) && $this->askedForDrawing($asked) && mb_strlen(trim($text)) >= 5) {
+        if (! $this->descriptionReady($data) && $this->askedForDrawing($asked) && ! $this->askedForName($asked)
+            && mb_strlen(trim($text)) >= 5 && ! $this->isRequestPhrase($this->normalizedText($text))) {
             $data['description'] = mb_substr(trim($text), 0, 3000);
             $data['description_confirmed'] = true;
         }
         if (empty($data['body_placement']) && preg_match('/\b(corpo|onde|local)\b/u', $asked) && mb_strlen(trim($text)) >= 2) {
-            $data['body_placement'] = mb_substr(trim($text), 0, 255);
+            $data['body_placement'] = mb_substr($this->cleanOpenAnswer($text), 0, 255);
         }
         if (empty($data['size_description']) && str_contains($asked, 'tamanho') && trim($text) !== '') {
-            $data['size_description'] = mb_substr(trim($text), 0, 255);
+            $data['size_description'] = mb_substr($this->cleanOpenAnswer($text), 0, 255);
         }
         if (empty($data['style']) && preg_match('/\b(estilo|realismo|blackwork|fine line)\b/u', $asked) && trim($text) !== '') {
-            $data['style'] = mb_substr(trim($text), 0, 255);
+            $data['style'] = mb_substr($this->cleanOpenAnswer($text), 0, 255);
         }
 
         return $data;
@@ -775,11 +1008,11 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             'como voce se chama',
             'qual seu nome',
             'preferencia de artista',
-            'que desenho ou elementos',
+            'como voce imagina a tattoo',
             'qual parte do corpo',
             'de que tamanho',
-            'qual estilo',
-            'imagem de referencia',
+            'estilo em mente',
+            'foto de referencia',
         ] as $needle) {
             if (str_contains($replyNorm, $needle)) {
                 return str_contains($asked, $needle);
@@ -798,12 +1031,13 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         $replyNorm = $this->normalizedText($reply);
         $alternate = match (true) {
             str_contains($replyNorm, 'qual seu nome') || str_contains($replyNorm, 'como voce se chama') => 'Não peguei seu nome. Como você se chama?',
-            str_contains($replyNorm, 'nao peguei seu nome') => 'Pra eu seguir, me diz só o seu nome.',
+            str_contains($replyNorm, 'nao peguei seu nome') => 'Me fala só seu primeiro nome?',
             str_contains($replyNorm, 'preferencia de artista') => $this->artistPreferenceQuestion($asked),
-            str_contains($replyNorm, 'que desenho ou elementos') => 'Me descreve o desenho com outras palavras.',
+            str_contains($replyNorm, 'como voce imagina a tattoo') => 'Me descreve o desenho com outras palavras?',
             str_contains($replyNorm, 'qual parte do corpo') => 'Em qual parte do corpo fica?',
             str_contains($replyNorm, 'de que tamanho') => 'Qual o tamanho, em cm?',
-            str_contains($replyNorm, 'qual estilo') => 'Se ainda não souber o estilo, pode dizer que está a definir.',
+            str_contains($replyNorm, 'estilo em mente') => 'Se ainda não souber o estilo, pode dizer que tá a definir.',
+            str_contains($replyNorm, 'foto de referencia') => 'Tem alguma foto pra mandar? Se não tiver, só falar *sem foto*.',
             default => 'Pode me responder com outras palavras?',
         };
 
@@ -873,8 +1107,32 @@ class TattooAIConversationService extends WhatsAppAIConversationService
     protected function hasUsableDescription(?string $description): bool
     {
         $normalized = $this->normalizedText($this->cleanDescription($description ?? ''));
+        if ($this->isRequestPhrase($normalized)) {
+            return false;
+        }
 
         return mb_strlen($normalized) >= 5 && ! preg_match('/^(?:(?:imagino?|imagina|quero|queria|tenho|penso em)\s+)?(?:varias|algumas|muitas) ideias?(?:\s+(?:de tatuagem|para tatuagem))?[.!?]*$|^(?:quero|queria|fazer|ter|tenho)?\s*(?:uma?\s+)?(?:tatuagem|tattoo|ideia)(?:\s+(?:legal|bonita|diferente))?[.!?]*$|^(?:nao sei|ainda nao sei|sem ideia)(?:\s+ainda)?[.!?]*$/u', $normalized);
+    }
+
+    /**
+     * Frase de pedido sem conteúdo de desenho: "queria fazer um outro orçamento
+     * de tatto", "quanto custa uma tattoo?", "tem horário?".
+     */
+    protected function isRequestPhrase(string $normalized): bool
+    {
+        $words = preg_split('/[^a-z0-9]+/', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if ($words === []) {
+            return false;
+        }
+        $filler = ['oi', 'ola', 'opa', 'bom', 'boa', 'dia', 'tarde', 'noite', 'eu', 'queria', 'quero', 'gostaria', 'gostava',
+            'preciso', 'vim', 'pra', 'para', 'de', 'da', 'do', 'um', 'uma', 'outro', 'outra', 'novo', 'nova', 'mais',
+            'fazer', 'faz', 'ver', 'saber', 'pedir', 'solicitar', 'orcamento', 'orcamentos', 'orcar', 'valor', 'valores',
+            'preco', 'precos', 'quanto', 'custa', 'sai', 'fica', 'tattoo', 'tattoos', 'tatto', 'tatoo', 'tatu',
+            'tatuagem', 'tatuagens', 'tatuar', 'tem', 'horario', 'horarios', 'agenda', 'vaga', 'vagas', 'disponivel',
+            'ai', 'voces', 'vcs', 'com', 'o', 'a', 'e', 'por', 'favor', 'pf', 'pfv', 'info', 'informacao', 'informacoes',
+            'sobre', 'uns', 'umas', 'duas', 'dois', 'como', 'funciona'];
+
+        return array_diff($words, $filler) === [];
     }
 
     protected function requestSummary(array $data): string

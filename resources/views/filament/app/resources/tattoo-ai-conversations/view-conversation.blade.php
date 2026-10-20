@@ -19,9 +19,9 @@
     <div class="tattoo-chat-layout">
         <section class="tattoo-chat-card" aria-label="Conversa pelo WhatsApp">
             <header class="tattoo-chat-header">
-                <div class="tattoo-chat-avatar" aria-hidden="true">{{ mb_strtoupper(mb_substr($conversation->client?->name ?: 'C', 0, 1)) }}</div>
+                <div class="tattoo-chat-avatar" aria-hidden="true">{{ mb_strtoupper(mb_substr($this->displayClientName() ?: 'C', 0, 1)) }}</div>
                 <div class="tattoo-chat-heading">
-                    <strong>{{ $conversation->client?->name ?: 'Cliente WhatsApp' }}</strong>
+                    <strong>{{ $this->displayClientName() ?: 'Cliente WhatsApp' }}</strong>
                     <span>{{ $conversation->phone_normalized }}</span>
                 </div>
                 <span class="tattoo-chat-mode {{ $conversation->human_takeover ? 'is-human' : ($externallyPaused ? 'is-paused' : 'is-ai') }}">

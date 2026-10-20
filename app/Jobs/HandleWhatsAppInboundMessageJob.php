@@ -34,6 +34,7 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
         public string $text,
         public ?string $messageId = null,
         public ?string $imageMime = null,
+        public ?string $pushName = null,
     ) {}
 
     public function handle(
@@ -68,7 +69,7 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
             }
             $this->runAiConversation($company, fn () => app(TattooAIConversationService::class)->handle($company, $instance, $this->remoteJid,
                 $this->phone, $this->text, $this->messageId, $this->imageMime,
-                app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone)));
+                app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone), $this->pushName));
 
             return;
         }
@@ -93,7 +94,7 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
             }
             $this->runAiConversation($company, fn () => app(BeautyAIConversationService::class)->handle($company, $instance, $this->remoteJid,
                 $this->phone, $this->text, $this->messageId, $this->imageMime,
-                app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone)));
+                app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone), $this->pushName));
 
             return;
         }

@@ -19,9 +19,9 @@ use App\Services\Tattoo\TattooAISchedulingService;
 use App\Services\Tattoo\TattooReceiptService;
 use App\Services\WhatsApp\WhatsAppHumanTakeover;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Tests\Concerns\CreatesSchedulingFixtures;
@@ -54,7 +54,7 @@ class TattooAIFlowTest extends TestCase
 
     private function assistantAskName($company): string
     {
-        return 'Oi! Sou a assistente do estúdio *'.$company->name.'*. Vou te atender daqui até o tatuador entrar na conversa. Qual seu nome?';
+        return 'Opa, tudo bem? Aqui é a assistente do *'.$company->name.'*, o tatuador acompanha a conversa por aqui 🤙 Qual seu nome?';
     }
 
     public function test_multiturn_collection_creates_one_unpriced_request_and_deduplicates_message(): void
@@ -159,12 +159,12 @@ class TattooAIFlowTest extends TestCase
         ]);
 
         $this->send($company, $instance, $phone, '', 'vague-image', 'image/png');
-        $this->assertSame('Recebi a imagem, obrigado! Que desenho ou elementos você quer na tattoo? Pode descrever do seu jeito.',
-            TattooAiMessage::query()->where('provider_message_id', 'reply:vague-image')->value('body'));
+        $this->assertStringEndsWith('Recebi a imagem, obrigado! Me conta como você imagina a tattoo?',
+            (string) TattooAiMessage::query()->where('provider_message_id', 'reply:vague-image')->value('body'));
 
         $this->send($company, $instance, $phone, 'Imagina várias ideias', 'still-vague');
         $stillVague = (string) TattooAiMessage::query()->where('provider_message_id', 'reply:still-vague')->value('body');
-        $this->assertStringNotContainsString('Que desenho ou elementos', $stillVague);
+        $this->assertStringNotContainsString('como você imagina a tattoo', $stillVague);
         $this->assertStringContainsString('Deixa eu confirmar', $stillVague);
         $this->assertDatabaseCount('tattoo_requests', 0);
 
@@ -238,7 +238,7 @@ class TattooAIFlowTest extends TestCase
         $conversation = TattooAiConversation::query()->firstOrFail();
         $this->assertSame('Ana', $conversation->collected_data['name']);
         $this->assertSame('Gustavo', $conversation->collected_data['artist_preference']);
-        $this->assertStringContainsString('desenho', (string) TattooAiMessage::query()
+        $this->assertStringContainsString('imagina a tattoo', (string) TattooAiMessage::query()
             ->where('provider_message_id', 'reply:pref-2')->value('body'));
     }
 
@@ -267,7 +267,8 @@ class TattooAIFlowTest extends TestCase
 
         $conversation = TattooAiConversation::query()->firstOrFail();
         $this->assertArrayNotHasKey('name', $conversation->collected_data ?? []);
-        $this->assertSame('Pensei em algo assim', $conversation->collected_data['description'] ?? null);
+        // Resposta ao pedido do nome nunca vira ideia da tatuagem.
+        $this->assertArrayNotHasKey('description', $conversation->collected_data ?? []);
         $this->assertDatabaseMissing('clients', ['company_id' => $company->id, 'name' => 'Pensei em algo assim']);
         $reply = (string) TattooAiMessage::query()->where('provider_message_id', 'reply:idea-1')->value('body');
         $this->assertSame('Não peguei seu nome. Como você se chama?', $reply);
@@ -327,7 +328,7 @@ class TattooAIFlowTest extends TestCase
         $this->assertSame('Sem preferência', $conversation->collected_data['artist_preference']);
         $this->assertStringContainsString('o vizinho', (string) ($conversation->collected_data['notes'] ?? ''));
         $third = (string) TattooAiMessage::query()->where('provider_message_id', 'reply:unk-3')->value('body');
-        $this->assertStringContainsString('desenho', $third);
+        $this->assertStringContainsString('imagina a tattoo', $third);
         $this->assertStringNotContainsString('Não fechei a preferência', $third);
     }
 
@@ -359,7 +360,7 @@ class TattooAIFlowTest extends TestCase
         $conversation = TattooAiConversation::query()->firstOrFail();
         $this->assertSame('Paulo', $conversation->collected_data['name']);
         $this->assertSame('Gustavo', $conversation->collected_data['artist_preference']);
-        $this->assertStringContainsString('desenho', (string) TattooAiMessage::query()
+        $this->assertStringContainsString('imagina a tattoo', (string) TattooAiMessage::query()
             ->where('provider_message_id', 'reply:gust-2')->value('body'));
     }
 
@@ -427,8 +428,9 @@ class TattooAIFlowTest extends TestCase
 
         $conversation = TattooAiConversation::query()->firstOrFail();
         $this->assertArrayNotHasKey('name', $conversation->collected_data ?? []);
-        $this->assertSame($this->assistantAskName($company), TattooAiMessage::query()
-            ->where('provider_message_id', 'reply:prefill-0')->value('body'));
+        // Nome cadastrado igual ao de um tatuador é confirmado, não assumido.
+        $this->assertSame('Opa, Gustavo, tudo bem? Aqui é a assistente do *'.$company->name.'*, o tatuador acompanha a conversa por aqui 🤙 É Gustavo mesmo?',
+            TattooAiMessage::query()->where('provider_message_id', 'reply:prefill-0')->value('body'));
     }
 
     public function test_scripted_flow_saves_description_when_gemini_asks_again_without_details(): void

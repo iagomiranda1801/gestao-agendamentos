@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\CompanyWhatsAppInstance;
 use App\Models\TattooAiConversation;
 use App\Models\TattooAiMessage;
+use App\Models\WhatsAppContact;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\Outbound\WhatsAppOutboundGate;
 use App\Services\WhatsApp\WhatsAppHumanTakeover;
@@ -57,18 +58,19 @@ abstract class WhatsAppAIConversationService
     }
 
     public function handle(Company $company, CompanyWhatsAppInstance $instance, string $jid, string $phone,
-        string $text, ?string $messageId, ?string $mediaMime, bool $paused = false): void
+        string $text, ?string $messageId, ?string $mediaMime, bool $paused = false, ?string $pushName = null): void
     {
         $phone = PhoneNormalizer::normalize($phone);
         if (! $phone || ! $messageId) {
             return;
         }
-        $out = Cache::lock("wa:ai:{$company->id}:{$phone}", 150)->block(10, function () use ($company, $instance, $jid, $phone, $text, $messageId, $mediaMime, $paused): ?TattooAiMessage {
+        $out = Cache::lock("wa:ai:{$company->id}:{$phone}", 150)->block(10, function () use ($company, $instance, $jid, $phone, $text, $messageId, $mediaMime, $paused, $pushName): ?TattooAiMessage {
             $conversation = TattooAiConversation::query()->firstOrCreate(
                 ['company_whatsapp_instance_id' => $instance->id, 'phone_normalized' => $phone],
                 ['company_id' => $company->id, 'remote_jid' => $jid, 'status' => 'collecting_information'],
             );
             $this->linkKnownClient($conversation);
+            $this->rememberWhatsAppName($conversation, $pushName);
             $incoming = TattooAiMessage::query()->firstOrCreate(
                 ['company_id' => $company->id, 'provider_message_id' => $messageId],
                 ['tattoo_ai_conversation_id' => $conversation->id, 'direction' => 'in',
@@ -397,16 +399,23 @@ abstract class WhatsAppAIConversationService
         }
 
         $updates = ['client_id' => $client->id];
-        if (! $this->isPlaceholderName($client->name) && $this->canPrefillCollectedName($conversation, $client->name)) {
-            $updates['collected_data'] = array_merge($conversation->collected_data ?: [], ['name' => $client->name]);
+        $data = $conversation->collected_data ?: [];
+        if (! $this->isPlaceholderName($client->name) && CustomerNameDetector::isValidStoredName($client->name)) {
+            if ($this->canPrefillCollectedName($conversation, $client->name)) {
+                $updates['collected_data'] = array_merge($data, ['name' => $client->name, 'name_source' => 'client']);
+            } elseif (blank($data['_name_candidate'] ?? null) && empty($data['_name_candidate_rejected'])) {
+                // Nome cadastrado que gera dúvida (ex.: igual ao de um profissional) é confirmado, não assumido.
+                $updates['collected_data'] = $this->withNameCandidate($data, $client->name, 'client');
+            }
         }
         if ((int) $conversation->client_id !== (int) $client->id || isset($updates['collected_data'])) {
             $conversation->update($updates);
         }
     }
 
-    protected function saveClient(TattooAiConversation $conversation, string $name): Client
+    protected function saveClient(TattooAiConversation $conversation, string $name, ?string $source = null): Client
     {
+        $source ??= $conversation->collected_data['name_source'] ?? 'customer';
         $client = Client::query()->where('company_id', $conversation->company_id)
             ->whereIn('phone_normalized', PhoneNormalizer::candidates($conversation->phone_normalized))->first();
         if (! $client) {
@@ -414,14 +423,33 @@ abstract class WhatsAppAIConversationService
                 'is_active' => true, 'source' => 'whatsapp']);
             $client->company_id = $conversation->company_id;
             $client->save();
-        } elseif ($this->isPlaceholderName($client->name)) {
+        } elseif ($this->shouldReplaceClientName($client, $name)) {
+            $previous = $client->name;
             $client->update(['name' => $name]);
+            Log::info($this->logLabel().' client name corrected.', ['company_id' => $conversation->company_id,
+                'conversation_id' => $conversation->id, 'client_id' => $client->id,
+                'previous_name' => mb_substr((string) $previous, 0, 120), 'name_source' => $source]);
         }
         if ((int) $conversation->client_id !== (int) $client->id) {
             $conversation->update(['client_id' => $client->id]);
         }
 
         return $client;
+    }
+
+    /**
+     * Só troca o nome do cadastro quando ele é provisório ("Cliente WhatsApp 1234")
+     * ou é uma frase gravada pelo próprio WhatsApp (ex.: "queria fazer um
+     * orçamento"). Nome válido ou cadastrado pela equipe nunca é sobrescrito.
+     */
+    protected function shouldReplaceClientName(Client $client, string $name): bool
+    {
+        if (! CustomerNameDetector::isValidStoredName($name) || $this->isPlaceholderName($name)) {
+            return false;
+        }
+
+        return $this->isPlaceholderName((string) $client->name)
+            || ($client->source === 'whatsapp' && ! CustomerNameDetector::isValidStoredName($client->name));
     }
 
     protected function isPlaceholderName(string $name): bool
@@ -433,5 +461,166 @@ abstract class WhatsAppAIConversationService
     protected function canPrefillCollectedName(TattooAiConversation $conversation, string $name): bool
     {
         return true;
+    }
+
+    /**
+     * Guarda um nome sugerido pelo WhatsApp para a IA confirmar com o cliente.
+     * Prioridade: nome da agenda do celular da empresa > nome do perfil
+     * (pushName). Cadastro válido já entra antes, em linkKnownClient().
+     */
+    protected function rememberWhatsAppName(TattooAiConversation $conversation, ?string $pushName): void
+    {
+        $data = $conversation->collected_data ?: [];
+        if (filled($data['name'] ?? null) || filled($data['_name_candidate'] ?? null) || ! empty($data['_name_candidate_rejected'])) {
+            return;
+        }
+        $push = $this->cleanWhatsAppName($pushName);
+        try {
+            $book = $this->cleanWhatsAppName($this->contactBookName($conversation));
+        } catch (Throwable $exception) {
+            // A agenda é opcional: qualquer falha segue só com o pushName.
+            Log::info($this->logLabel().' contact book lookup skipped.', ['company_id' => $conversation->company_id,
+                'conversation_id' => $conversation->id, 'error_type' => $exception::class]);
+            $book = null;
+        }
+        if ($book !== null && $push !== null && $this->normalizedText($book) === $this->normalizedText($push)) {
+            // A sincronização grava o pushName quando não há nome na agenda: não dá pra afirmar que veio da agenda.
+            $book = null;
+        }
+        [$candidate, $source] = match (true) {
+            $book !== null => [$book, 'contact_book'],
+            $push !== null => [$push, 'push_name'],
+            default => [null, null],
+        };
+        if ($candidate === null) {
+            return;
+        }
+        $conversation->update(['collected_data' => $this->withNameCandidate($data, $candidate, $source)]);
+    }
+
+    /**
+     * Nome salvo no celular da empresa, vindo dos contatos já sincronizados
+     * (findContacts). Consulta local e em cache: nunca chama a Evolution aqui.
+     */
+    protected function contactBookName(TattooAiConversation $conversation): ?string
+    {
+        $key = "wa:ai:contact-name:{$conversation->company_whatsapp_instance_id}:{$conversation->phone_normalized}";
+        $name = Cache::remember($key, now()->addMinutes(30), function () use ($conversation): string {
+            $contact = WhatsAppContact::query()
+                ->where('company_id', $conversation->company_id)
+                ->where('company_whatsapp_instance_id', $conversation->company_whatsapp_instance_id)
+                ->whereIn('phone_normalized', PhoneNormalizer::candidates($conversation->phone_normalized))
+                ->first();
+
+            return (string) ($contact?->name ?? '');
+        });
+
+        return $name !== '' && PhoneNormalizer::normalize($name) !== PhoneNormalizer::normalize($conversation->phone_normalized)
+            ? $name : null;
+    }
+
+    protected function cleanWhatsAppName(?string $name): ?string
+    {
+        $name = Str::squish((string) $name);
+        if ($name === '' || $this->isPlaceholderName($name) || ! CustomerNameDetector::isPlausible($name)) {
+            return null;
+        }
+
+        return $name === mb_strtolower($name) || $name === mb_strtoupper($name)
+            ? mb_convert_case(mb_strtolower($name), MB_CASE_TITLE, 'UTF-8') : $name;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function withNameCandidate(array $data, string $name, string $source): array
+    {
+        return array_merge($data, ['_name_candidate' => $name, '_name_candidate_source' => $source]);
+    }
+
+    /**
+     * Em vez de pedir o nome, pergunta se o nome sugerido está certo
+     * ("É Lucas mesmo?"). Null quando não há nome sugerido.
+     */
+    protected function nameConfirmationQuestion(TattooAiConversation $conversation): ?string
+    {
+        $data = $conversation->collected_data ?: [];
+        if (filled($data['name'] ?? null) || blank($data['_name_candidate'] ?? null)) {
+            return null;
+        }
+        $data['_name_confirm_pending'] = true;
+        $conversation->update(['collected_data' => $data]);
+
+        return 'É '.$this->displayFirstName((string) $data['_name_candidate']).' mesmo?';
+    }
+
+    protected function nameCandidateFirstName(TattooAiConversation $conversation): ?string
+    {
+        $candidate = $conversation->collected_data['_name_candidate'] ?? null;
+
+        return filled($candidate) && blank($conversation->collected_data['name'] ?? null)
+            ? $this->displayFirstName((string) $candidate) : null;
+    }
+
+    /**
+     * Resposta do cliente à confirmação do nome. A correção do cliente sempre
+     * prevalece; se ele ignorar a pergunta e seguir a conversa, o nome sugerido
+     * é aceito e a mensagem segue o fluxo normal.
+     *
+     * @return 'confirmed'|'corrected'|'rejected'|'implicit'|null
+     */
+    protected function resolvePendingNameConfirmation(TattooAiConversation $conversation, string $text): ?string
+    {
+        $data = $conversation->collected_data ?: [];
+        if (empty($data['_name_confirm_pending']) || filled($data['name'] ?? null) || blank($data['_name_candidate'] ?? null)) {
+            return null;
+        }
+        $candidate = (string) $data['_name_candidate'];
+        $source = (string) ($data['_name_candidate_source'] ?? 'push_name');
+        unset($data['_name_confirm_pending']);
+        $normalized = $this->normalizedText($text);
+        $denied = (bool) preg_match('/^(?:nao|n|nops?|negativo|errado|errou)\b|\b(?:na verdade|nao sou|nao e (?:esse|meu nome))\b/u', $normalized);
+        $stripped = trim((string) preg_replace('/^(?:n[aã]o|n|nops?|negativo|errado)\b[\s,!.]*|^(?:na verdade)[\s,]*/iu', '', trim($text)));
+        $stripped = trim((string) preg_replace('/^(?:[eé]h?)\s+/iu', '', $stripped));
+        $named = $stripped !== '' ? CustomerNameDetector::fromMessage($stripped) : null;
+
+        $outcome = match (true) {
+            ! $denied && (bool) preg_match('/^(?:sim|s|ss|isso|isso mesmo|isso ai|exato|exatamente|correto|certo|certinho|pode ser|pode|sou eu|sou|eu mesm[oa]|e sim|e isso|e|uhum|aham|claro|com certeza|yes|positivo|confirmo)(?:[\s,!.]+(?:sim|mesmo|isso|pode|sou))*[\s!.]*$/u', $normalized) => 'confirmed',
+            $named !== null && $this->normalizedText($named) !== $this->normalizedText($candidate)
+                && ($denied || ! $this->isGreeting($normalized)) => 'corrected',
+            $denied => 'rejected',
+            $named !== null => 'confirmed',
+            default => 'implicit',
+        };
+        if ($outcome === 'rejected') {
+            unset($data['_name_candidate'], $data['_name_candidate_source']);
+            $data['_name_candidate_rejected'] = true;
+        } else {
+            $data['name'] = $outcome === 'corrected' ? $named : $candidate;
+            $data['name_source'] = $outcome === 'corrected' ? 'customer' : $source;
+            unset($data['_name_candidate'], $data['_name_candidate_source']);
+        }
+        $conversation->update(['collected_data' => $data]);
+        Log::info($this->logLabel().' name confirmation.', ['company_id' => $conversation->company_id,
+            'conversation_id' => $conversation->id, 'outcome' => $outcome, 'name_source' => $data['name_source'] ?? null]);
+
+        return $outcome;
+    }
+
+    /**
+     * Remove a saudação do começo de um texto livre do modelo ("Olá Lucas!
+     * Tudo bem? ..."): depois da primeira mensagem, ninguém cumprimenta de novo.
+     */
+    protected function stripOpeningGreeting(string $reply): string
+    {
+        $pattern = '/^\s*(?:(?i:oi+e?|ol[aá]+|opa|e a[ií]|eae|eai|salve|hey|bom dia|boa tarde|boa noite|prazer)(?:[\s,]+\p{Lu}[\p{L}\'\-]*)?\s*[!,.]*\s*)?'
+            .'(?:(?i:tudo (?:bem|bom|certo|tranquilo|joia|[oó]timo)|td bem|como vai)(?:\s+(?i:com|e)\s+(?i:voc[eê]|vc))?\s*\?+[\s!.]*)?/u';
+        $clean = trim((string) preg_replace($pattern, '', $reply, 1));
+        if ($clean === trim($reply) || $clean === '') {
+            return $clean;
+        }
+
+        return mb_strtoupper(mb_substr($clean, 0, 1)).mb_substr($clean, 1);
     }
 }

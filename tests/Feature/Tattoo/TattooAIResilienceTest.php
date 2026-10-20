@@ -88,7 +88,7 @@ class TattooAIResilienceTest extends TestCase
 
     private function assistantAskName(Company $company): string
     {
-        return 'Oi! Sou a assistente do estúdio *'.$company->name.'*. Vou te atender daqui até o tatuador entrar na conversa. Qual seu nome?';
+        return 'Opa, tudo bem? Aqui é a assistente do *'.$company->name.'*, o tatuador acompanha a conversa por aqui 🤙 Qual seu nome?';
     }
 
     private function geminiCalls(): int
@@ -108,11 +108,11 @@ class TattooAIResilienceTest extends TestCase
 
         $this->assertStringContainsString('preferência de artista', $this->send($company, $instance, 'Ana Souza', 't3'));
         $this->assertDatabaseHas('clients', ['company_id' => $company->id, 'name' => 'Ana Souza', 'phone_normalized' => $this->phone]);
-        $this->assertSame('Que desenho ou elementos você quer na tattoo? Pode descrever do seu jeito.', $this->send($company, $instance, 'sem preferência', 't3b'));
+        $this->assertSame('Me conta como você imagina a tattoo?', $this->send($company, $instance, 'sem preferência', 't3b'));
         $this->assertSame('Massa! E vai ser em qual parte do corpo?', $this->send($company, $instance, 'Uma rosa fineline com folhas', 't4'));
         $this->assertSame('E mais ou menos de que tamanho? Pode ser em cm mesmo.', $this->send($company, $instance, 'Antebraço', 't5'));
-        $this->assertStringContainsString('Qual estilo', $this->send($company, $instance, '15 cm', 't6'));
-        $this->assertStringContainsString('referência ou inspiração', $this->send($company, $instance, 'fine line', 't7'));
+        $this->assertStringContainsString('estilo em mente', $this->send($company, $instance, '15 cm', 't6'));
+        $this->assertStringContainsString('foto de referência', $this->send($company, $instance, 'fine line', 't7'));
         $this->assertStringContainsString('Deixa eu confirmar', $this->send($company, $instance, 'sem foto', 't8'));
         $this->assertStringContainsString('A equipe recebeu sua ideia', $this->send($company, $instance, 'sim', 't9'));
 
@@ -122,9 +122,10 @@ class TattooAIResilienceTest extends TestCase
         $this->assertSame('15 cm', $request->size_description);
         $this->assertSame('awaiting_review', $request->status);
         $this->assertDatabaseCount('tattoo_quotes', 0);
-        $this->assertSame(7, $this->geminiCalls());
+        // A resposta ao pedido do nome é resolvida sem o Gemini (economiza cota).
+        $this->assertSame(6, $this->geminiCalls());
         Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context = []) => $message === 'Tattoo AI fallback reply.'
-            && $context['reason'] === 'model_unavailable' && $context['http_status'] === 429)->times(7);
+            && $context['reason'] === 'model_unavailable' && $context['http_status'] === 429)->times(6);
     }
 
     public function test_off_script_date_and_small_talk_name_do_not_repeat_the_opening(): void
@@ -166,10 +167,10 @@ class TattooAIResilienceTest extends TestCase
         ]);
 
         $this->assertStringContainsString('preferência de artista', $this->send($company, $instance, 'Quero fazer uma tattoo', 'w1'));
-        $this->assertSame('Que desenho ou elementos você quer na tattoo? Pode descrever do seu jeito.', $this->send($company, $instance, 'sem preferência', 'w1b'));
+        $this->assertSame('Me conta como você imagina a tattoo?', $this->send($company, $instance, 'sem preferência', 'w1b'));
         $this->assertSame('Massa! E vai ser em qual parte do corpo?', $this->send($company, $instance, 'Um leão realista', 'w2'));
         $this->assertSame('E mais ou menos de que tamanho? Pode ser em cm mesmo.', $this->send($company, $instance, 'Nas costas', 'w3'));
-        $this->assertStringContainsString('referência ou inspiração', $this->send($company, $instance, 'uns 20', 'w4'));
+        $this->assertStringContainsString('foto de referência', $this->send($company, $instance, 'uns 20', 'w4'));
         $this->assertStringContainsString('Deixa eu confirmar', $this->send($company, $instance, 'sem foto', 'w5'));
         $this->assertStringContainsString('A equipe recebeu sua ideia', $this->send($company, $instance, 'sim', 'w6'));
 

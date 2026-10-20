@@ -79,7 +79,7 @@ class WhatsAppAIReplyDelayTest extends TestCase
 
     private function assistantAskName(Company $company): string
     {
-        return 'Oi! Sou a assistente do estúdio *'.$company->name.'*. Vou te atender daqui até o tatuador entrar na conversa. Qual seu nome?';
+        return 'Opa, tudo bem? Aqui é a assistente do *'.$company->name.'*, o tatuador acompanha a conversa por aqui 🤙 Qual seu nome?';
     }
 
     public function test_reply_is_queued_with_human_delay_within_bounds_and_shows_typing(): void
@@ -197,7 +197,8 @@ class WhatsAppAIReplyDelayTest extends TestCase
         (new SendWhatsAppAIReplyJob($second->service, $second->messageId, $second->typingMs))->handle();
         $this->assertSame('sent', $this->replyStatus('o1'));
         $this->assertSame('sent', $this->replyStatus('o2'));
-        $this->assertSame([$this->assistantAskName($company), 'Tudo certo por aqui, valeu! Qual seu nome?'],
+        // O nome já foi pedido na mensagem anterior: o papo rápido não repete a pergunta.
+        $this->assertSame([$this->assistantAskName($company), 'Tudo certo por aqui, valeu!'],
             $this->sentTexts()->map(fn (Request $request) => $request['text'])->values()->all());
     }
 
@@ -206,9 +207,10 @@ class WhatsAppAIReplyDelayTest extends TestCase
         [$company, $instance] = $this->setupStudio();
         Queue::fake();
 
-        $this->receive($company, $instance, 'Oi', 'd1');
+        // Duas perguntas iguais em seguida geram a mesma resposta pronta.
+        $this->receive($company, $instance, 'vc é robô?', 'd1');
         $this->travel(1)->seconds();
-        $this->receive($company, $instance, 'Olá', 'd2');
+        $this->receive($company, $instance, 'é robô?', 'd2');
         $this->travel(6)->seconds();
         $this->jobFor('d1')->handle();
         $this->jobFor('d2')->handle();
@@ -219,7 +221,7 @@ class WhatsAppAIReplyDelayTest extends TestCase
 
         // Já respondido antes da nova mensagem chegar: a mesma pergunta pode sair de novo.
         $this->travel(1)->minutes();
-        $this->receive($company, $instance, 'oi?', 'd3');
+        $this->receive($company, $instance, 'é um bot?', 'd3');
         $this->jobFor('d3')->handle();
         $this->assertSame('sent', $this->replyStatus('d3'));
         $this->assertCount(2, $this->sentTexts());

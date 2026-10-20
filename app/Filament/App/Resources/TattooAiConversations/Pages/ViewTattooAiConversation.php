@@ -11,6 +11,7 @@ use App\Services\Tattoo\TattooAIConversationRestartService;
 use App\Services\Tattoo\TattooConversationTakeoverService;
 use App\Services\Tattoo\TattooManualReplyService;
 use App\Services\WhatsApp\WhatsAppHumanTakeover;
+use App\Support\CustomerNameDetector;
 use App\Support\PhoneNormalizer;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
@@ -33,7 +34,26 @@ class ViewTattooAiConversation extends ViewRecord
     {
         $conversation = $this->getRecord();
 
-        return 'Conversa com '.($conversation->client?->name ?: $conversation->phone_normalized);
+        return 'Conversa com '.($this->displayClientName() ?: $conversation->phone_normalized);
+    }
+
+    /**
+     * Nome do cadastro quando ele é válido; se o cadastro guardou uma frase
+     * (ex.: "queria fazer um orçamento"), mostra o nome coletado na conversa.
+     */
+    public function displayClientName(): ?string
+    {
+        $conversation = $this->getRecord();
+        $client = trim((string) $conversation->client?->name);
+        if ($client !== '' && CustomerNameDetector::isValidStoredName($client) && ! $this->isPlaceholderName($client)) {
+            return $client;
+        }
+        $collected = trim((string) ($conversation->collected_data['name'] ?? ''));
+        if ($collected !== '' && CustomerNameDetector::isValidStoredName($collected) && ! $this->isPlaceholderName($collected)) {
+            return $collected;
+        }
+
+        return $client !== '' ? $client : null;
     }
 
     public function getChatMessages(): Collection
@@ -144,7 +164,7 @@ class ViewTattooAiConversation extends ViewRecord
     public function suggestedClientName(): string
     {
         $conversation = $this->getRecord();
-        $name = $conversation->client?->name ?: ($conversation->collected_data['name'] ?? null);
+        $name = $this->displayClientName();
         if (filled($name) && ! $this->isPlaceholderName((string) $name)) {
             return trim((string) $name);
         }

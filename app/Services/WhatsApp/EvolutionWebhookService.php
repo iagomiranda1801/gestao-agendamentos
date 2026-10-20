@@ -76,6 +76,7 @@ class EvolutionWebhookService
             text: $text,
             messageId: (string) ($event->message_id ?? ''),
             imageMime: $this->imageMime($payload),
+            pushName: $this->pushName($payload),
         );
     }
 
@@ -212,6 +213,18 @@ class EvolutionWebhookService
             'phone' => $phone,
             'minutes' => $takeover->minutes(),
         ]);
+    }
+
+    /**
+     * Nome público do perfil de quem mandou a mensagem (messages.upsert).
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function pushName(array $payload): ?string
+    {
+        $name = Arr::get($payload, 'data.pushName') ?? Arr::get($payload, 'data.0.pushName') ?? Arr::get($payload, 'pushName');
+
+        return is_string($name) && trim($name) !== '' ? mb_substr(trim($name), 0, 120) : null;
     }
 
     protected function extractPhone(string $remoteJid): string

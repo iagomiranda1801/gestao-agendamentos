@@ -73,6 +73,21 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
             return $this->handoff($conversation);
         }
 
+        if (($outcome = $this->resolvePendingNameConfirmation($conversation, $text)) !== null) {
+            $data = $conversation->collected_data ?: [];
+            if ($outcome === 'rejected') {
+                $data['asked_name'] = true;
+                $conversation->update(['collected_data' => $data]);
+
+                return 'Sem problema! Como você se chama?';
+            }
+            $this->saveClient($conversation, (string) $data['name']);
+            if ($outcome !== 'implicit') {
+                return $this->prefixed($conversation, 'Prazer, '.$this->displayFirstName((string) $data['name']).'! ',
+                    $this->nextStep($conversation, $data, $services));
+            }
+        }
+
         if ($conversation->status === 'awaiting_confirmation' && ! empty($data['selected_slot'])
             && preg_match('/^(sim|s|pode|pode sim|pode confirmar|confirma|confirmar|confirmado|isso|isso mesmo|fechado|fechou|ok|okay|beleza|bora|perfeito|certo|claro|quero|show)[!. ]*$/u', $normalized)) {
             return $this->book($conversation, $data, $services);
@@ -140,7 +155,10 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
         $data = $this->applyDetails($conversation, $data, $details, $text, $services);
         $conversation->update(['collected_data' => $data]);
         if (! empty($data['name']) && $data['name'] !== $nameBefore) {
-            $this->saveClient($conversation, $data['name']);
+            $data['name_source'] = 'customer';
+            unset($data['_name_candidate'], $data['_name_candidate_source'], $data['_name_confirm_pending']);
+            $conversation->update(['collected_data' => $data]);
+            $this->saveClient($conversation, $data['name'], 'customer');
         }
         $greeting = ! empty($data['name']) && $data['name'] !== $nameBefore ? 'Prazer, '.$this->displayFirstName($data['name']).'! ' : '';
 
@@ -207,6 +225,9 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
         if ($intent === 'services') {
             $list = "Claro! Aqui a gente faz:\n\n".$this->numberedList($services->pluck('name')->take(12)->all());
             if ($name === null) {
+                if (($confirm = $this->nameConfirmationQuestion($conversation)) !== null) {
+                    return $list."\n\nQual deles te interessa?\n\nAh, e só pra confirmar: ".lcfirst($confirm);
+                }
                 $data['asked_name'] = true;
                 $conversation->update(['collected_data' => $data]);
 
@@ -220,6 +241,10 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
             ? ($name !== null ? 'Oi, '.$name.'! Tudo bem? 😊' : 'Oi, tudo bem? 😊')
             : 'Tudo ótimo por aqui, obrigada! 😊';
         if ($name === null) {
+            $candidate = $this->nameCandidateFirstName($conversation);
+            if ($candidate !== null && ($confirm = $this->nameConfirmationQuestion($conversation)) !== null) {
+                return ($intent === 'greeting' ? 'Oi, '.$candidate.'! Tudo bem? 😊' : $opening)."\n\n".$confirm;
+            }
             $data['asked_name'] = true;
             $conversation->update(['collected_data' => $data]);
 
@@ -379,6 +404,13 @@ class BeautyAIConversationService extends WhatsAppAIConversationService
 
         if (empty($data['name'])) {
             $alreadyAsked = ! empty($data['asked_name']);
+            $candidate = $this->nameCandidateFirstName($conversation);
+            if (! $alreadyAsked && $candidate !== null && ($confirm = $this->nameConfirmationQuestion($conversation)) !== null) {
+                $service = $this->currentService($data, $services);
+
+                return ($service !== null ? 'Oi, '.$candidate.', tudo bem? Consigo sim te ajudar com '.$service->name.'!' : 'Oi, '.$candidate.', tudo bem? 😊')
+                    ."\n\n".$confirm;
+            }
             $data['asked_name'] = true;
             $conversation->update(['collected_data' => $data]);
             $service = $this->currentService($data, $services);

@@ -10,6 +10,7 @@ use App\Filament\App\Resources\TattooRequests\TattooRequestResource;
 use App\Models\Company;
 use App\Models\Professional;
 use App\Models\TattooAiConversation;
+use App\Support\CustomerNameDetector;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Resources\Resource;
@@ -98,7 +99,11 @@ class TattooAiConversationResource extends Resource
     {
         return $table->columns([
             TextColumn::make('last_interaction_at')->label('Última interação')->dateTime('d/m/Y H:i')->sortable(),
-            TextColumn::make('client.name')->label('Cliente')->placeholder('A identificar'),
+            TextColumn::make('client.name')->label('Cliente')->placeholder('A identificar')
+                // Cadastro com frase no lugar do nome mostra o nome coletado na conversa.
+                ->formatStateUsing(fn (?string $state, TattooAiConversation $record): ?string => filled($state) && ! CustomerNameDetector::isValidStoredName($state)
+                    && CustomerNameDetector::isValidStoredName($record->collected_data['name'] ?? null)
+                    ? (string) $record->collected_data['name'] : $state),
             TextColumn::make('phone_normalized')->label('Telefone')->searchable(),
             TextColumn::make('status')->label('Status')->badge()
                 ->formatStateUsing(fn (?string $state): string => TattooAiConversation::statusLabel($state)),
