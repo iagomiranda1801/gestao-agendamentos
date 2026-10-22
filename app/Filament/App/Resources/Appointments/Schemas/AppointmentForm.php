@@ -110,6 +110,11 @@ class AppointmentForm
                                 $get('service_id'),
                                 $state,
                             )),
+                        Toggle::make('is_tattoo')
+                            ->label('É tatuagem')
+                            ->default(false)
+                            ->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio())
+                            ->disabled($readOnly),
                         TextInput::make('duration_minutes_snapshot')
                             ->label('Duração prevista')
                             ->numeric()

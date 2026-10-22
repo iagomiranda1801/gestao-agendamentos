@@ -33,12 +33,21 @@ class TattooAIConversationService extends WhatsAppAIConversationService
 
     protected function handoffPrefixes(): array
     {
-        return ['Beleza, vou chamar o pessoal', 'Fechou, já chamei o pessoal', 'Sobre workshop'];
+        return ['Beleza, vou chamar o pessoal', 'Fechou, já chamei o pessoal', 'Sobre workshop', TattooStudioMenu::HANDOFF];
     }
 
     protected function logLabel(): string
     {
         return 'Tattoo AI';
+    }
+
+    protected function afterReplySent(TattooAiConversation $conversation, TattooAiMessage $message): void
+    {
+        if ((bool) $conversation->company->schedulingSetting?->tattoo_custom_flow_enabled
+            && $conversation->menu_choice === 1 && ! $conversation->human_takeover
+            && $conversation->tattoo_request_id === null && str_contains((string) $message->body, '?')) {
+            $conversation->update(['last_bot_question_at' => now()]);
+        }
     }
 
     /**
@@ -68,6 +77,27 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         $request = $conversation->request;
         $quote = $request?->quotes()->latest('version')->first();
         $normalized = Str::lower(Str::ascii($text));
+        if ((bool) $conversation->company->schedulingSetting?->tattoo_custom_flow_enabled && $conversation->menu_choice === null) {
+            $existingReply = $conversation->messages()->where('direction', 'out')->where('id', '<', $message->id)->exists();
+            if ($request || $existingReply && ($conversation->status !== 'awaiting_menu')) {
+                $conversation->update(['menu_choice' => 1]);
+            } elseif ($conversation->status !== 'awaiting_menu') {
+                $conversation->update(['status' => 'awaiting_menu']);
+
+                return TattooStudioMenu::TEXT;
+            } elseif (in_array($normalized, ['1', '2', '3', '4'], true)) {
+                $conversation->update(['menu_choice' => (int) $normalized,
+                    'status' => $normalized === '1' ? 'collecting_information' : 'human_takeover',
+                    'human_takeover' => $normalized !== '1']);
+                if ($normalized !== '1') {
+                    return TattooStudioMenu::HANDOFF;
+                }
+
+                return $this->nextQuestion($conversation->collected_data ?: [], $conversation);
+            } else {
+                return TattooStudioMenu::TEXT;
+            }
+        }
         if ($this->isWorkshopTopic($normalized)) {
             $conversation->update(['human_takeover' => true, 'status' => 'human_takeover']);
 

@@ -10,6 +10,7 @@ class TattooAiConversation extends Model
 {
     public const STATUS_LABELS = [
         'collecting_information' => 'Coletando informações',
+        'awaiting_menu' => 'Aguardando escolha do menu',
         'waiting_professional_quote' => 'Aguardando orçamento',
         'waiting_payment_receipt' => 'Aguardando comprovante',
         'receipt_received' => 'Comprovante em análise',
@@ -31,7 +32,8 @@ class TattooAiConversation extends Model
     protected function casts(): array
     {
         return ['human_takeover' => 'boolean', 'collected_data' => 'array', 'last_interaction_at' => 'datetime',
-            'context_start_message_id' => 'integer'];
+            'context_start_message_id' => 'integer', 'menu_choice' => 'integer',
+            'last_bot_question_at' => 'datetime', 'quote_followup_sent_at' => 'datetime'];
     }
 
     public function company(): BelongsTo

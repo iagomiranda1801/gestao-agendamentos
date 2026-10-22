@@ -74,6 +74,7 @@ class TattooWhatsAppBotService
         }
 
         $normalized = Str::lower(Str::ascii($text));
+        $customFlow = (bool) $company->schedulingSetting?->tattoo_custom_flow_enabled;
         $wantsHuman = (bool) preg_match('/^(quero |gostaria de |preciso )?(atendente|humano|falar com (um |uma |a )?(atendente|pessoa|equipe))[!. ]*$/u', $normalized);
         $wantsBooking = (bool) preg_match('/\b(agendar|agendamento|marcar horario)\b/u', $normalized);
         $bookingCommand = (bool) preg_match('/^(quero |gostaria de |preciso )?(agendar|agendamento|marcar)( um)?( horario)?[!. ]*$/u', $normalized);
@@ -86,6 +87,9 @@ class TattooWhatsAppBotService
             $priorConversation = WhatsAppBotConversation::query()
                 ->where('company_id', $company->id)->where('phone_normalized', $phone)
                 ->latest('id')->first();
+            if ($customFlow && $priorConversation?->finished_reason === 'handoff' && $normalized !== 'menu') {
+                return null;
+            }
             if ($priorConversation !== null && ! $isGreeting && ! $wantsQuote && ! $wantsBooking && ! $wantsHuman && $normalized !== 'menu') {
                 return null;
             }
@@ -98,10 +102,14 @@ class TattooWhatsAppBotService
                 'company_whatsapp_instance_id' => $instance->id,
                 'phone_normalized' => $phone,
                 'remote_jid' => $remoteJid,
-                'state' => State::TattooName,
+                'state' => $customFlow ? State::Greeting : State::TattooName,
                 'data' => [],
             ]);
             $conversation->save();
+
+            if ($customFlow) {
+                return $this->reply($conversation, $messageId, TattooStudioMenu::TEXT);
+            }
 
             if ($wantsHuman) {
                 $conversation->finished_at = now();
@@ -126,10 +134,33 @@ class TattooWhatsAppBotService
             return $this->reply($conversation, $messageId, "Oi! Você está falando com *{$company->name}*. Vou reunir sua ideia para o tatuador preparar um orçamento. Como posso te chamar?");
         }
 
+        if ($customFlow && $conversation->menu_choice === null && $conversation->state === State::Greeting) {
+            if (! in_array($normalized, ['1', '2', '3', '4'], true)) {
+                return $this->reply($conversation, $messageId, TattooStudioMenu::TEXT);
+            }
+            $conversation->menu_choice = (int) $normalized;
+            if ($normalized !== '1') {
+                $conversation->finished_at = now();
+                $conversation->finished_reason = 'handoff';
+
+                return $this->reply($conversation, $messageId, TattooStudioMenu::HANDOFF);
+            }
+            $conversation->state = State::TattooName;
+
+            return $this->reply($conversation, $messageId, 'Claro. Como posso te chamar?');
+        }
+
         if ($normalized === 'menu') {
             $this->cancelDraft($conversation);
-            $conversation->state = State::TattooName;
+            $conversation->state = $customFlow ? State::Greeting : State::TattooName;
             $conversation->data = [];
+            if ($customFlow) {
+                $conversation->menu_choice = null;
+                $conversation->last_bot_question_at = null;
+                $conversation->quote_followup_sent_at = null;
+
+                return $this->reply($conversation, $messageId, TattooStudioMenu::TEXT);
+            }
 
             return $this->reply($conversation, $messageId, 'Vamos começar de novo. Como posso te chamar?');
         }
@@ -364,7 +395,7 @@ class TattooWhatsAppBotService
     {
         $conversation->last_incoming_message_id = $messageId ?: $conversation->last_incoming_message_id;
         $conversation->last_activity_at = now();
-        $conversation->expires_at = now()->addMinutes(30);
+        $conversation->expires_at = now()->addMinutes($conversation->menu_choice === 1 ? 7 * 24 * 60 : 30);
         $conversation->save();
 
         return $reply;

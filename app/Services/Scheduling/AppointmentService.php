@@ -65,6 +65,7 @@ class AppointmentService
                 $snapshots['duration_minutes_snapshot'],
                 $snapshots['buffer_before_minutes_snapshot'],
                 $snapshots['buffer_after_minutes_snapshot'],
+                isTattoo: (bool) ($data['is_tattoo'] ?? false),
             )->assertAvailable();
 
             $appointment = new Appointment([
@@ -72,6 +73,7 @@ class AppointmentService
                 'origin' => AppointmentOrigin::Internal,
                 'send_whatsapp_confirmation' => (bool) ($data['send_whatsapp_confirmation'] ?? true),
                 'service_selection_mode' => $isOpenService ? 'to_be_defined' : 'defined',
+                'is_tattoo' => (bool) ($data['is_tattoo'] ?? false),
                 'start_at' => $startUtc,
                 'end_at' => $endUtc,
                 'service_name_snapshot' => $snapshots['service_name_snapshot'],
@@ -155,6 +157,7 @@ class AppointmentService
                 : $this->resolveSnapshots($company, $professional, $service);
             $startUtc = CompanyDateTime::localToUtc($company, $localStart);
             $endUtc = $startUtc->addMinutes($snapshots['duration_minutes_snapshot']);
+            $isTattoo = $appointment->tattooRequest()->exists() || (bool) ($data['is_tattoo'] ?? $appointment->is_tattoo);
 
             $this->availabilityService->assertAvailable(
                 $company,
@@ -165,6 +168,7 @@ class AppointmentService
                 $snapshots['buffer_before_minutes_snapshot'],
                 $snapshots['buffer_after_minutes_snapshot'],
                 $appointment,
+                $isTattoo,
             )->assertAvailable();
 
             $appointment->fill([
@@ -172,6 +176,7 @@ class AppointmentService
                 'professional_id' => $professional->getKey(),
                 'service_id' => $service?->getKey(),
                 'service_selection_mode' => $isOpenService ? 'to_be_defined' : 'defined',
+                'is_tattoo' => $isTattoo,
                 'start_at' => $startUtc,
                 'end_at' => $endUtc,
                 'service_name_snapshot' => $snapshots['service_name_snapshot'],
@@ -250,6 +255,7 @@ class AppointmentService
                 $appointment->buffer_before_minutes_snapshot,
                 $appointment->buffer_after_minutes_snapshot,
                 $appointment,
+                (bool) $appointment->is_tattoo,
             )->assertAvailable();
 
             $appointment->update([

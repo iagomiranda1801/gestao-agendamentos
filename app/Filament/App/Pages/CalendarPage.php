@@ -250,7 +250,7 @@ class CalendarPage extends Page
             'slotMaxTime' => substr((string) $settings->calendar_end_time, 0, 8),
             'firstDay' => $settings->week_starts_on,
             'canManage' => $this->canManageCalendar(),
-            'slotDuration' => sprintf('00:%02d:00', $settings->slot_interval_minutes),
+            'slotDuration' => CompanySchedulingSettingService::slotDurationForCalendar((int) $settings->slot_interval_minutes),
         ];
     }
 

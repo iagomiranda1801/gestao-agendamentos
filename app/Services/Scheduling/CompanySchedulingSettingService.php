@@ -11,6 +11,33 @@ use Illuminate\Validation\ValidationException;
 
 class CompanySchedulingSettingService
 {
+    /**
+     * @return array<int, string>
+     */
+    public static function slotIntervalOptions(): array
+    {
+        return [
+            5 => '5 minutos',
+            10 => '10 minutos',
+            15 => '15 minutos',
+            20 => '20 minutos',
+            30 => '30 minutos',
+            60 => '60 minutos',
+            120 => '2 horas',
+            180 => '3 horas',
+            240 => '4 horas',
+            360 => '6 horas',
+            480 => '8 horas',
+            720 => '12 horas',
+            1440 => '1 dia',
+        ];
+    }
+
+    public static function slotDurationForCalendar(int $minutes): string
+    {
+        return sprintf('%02d:%02d:00', intdiv($minutes, 60), $minutes % 60);
+    }
+
     public function getOrCreate(Company $company): CompanySchedulingSetting
     {
         $setting = CompanySchedulingSetting::query()
@@ -122,10 +149,8 @@ class CompanySchedulingSettingService
         if (blank($payload['ai_provider'] ?? null) && filled($payload['ai_api_key'] ?? null)) {
             throw ValidationException::withMessages(['ai_provider' => 'Selecione o provedor da chave de IA.']);
         }
-        $allowedIntervals = [5, 10, 15, 20, 30, 60];
-
         if (isset($payload['slot_interval_minutes'])
-            && ! in_array((int) $payload['slot_interval_minutes'], $allowedIntervals, true)) {
+            && ! array_key_exists((int) $payload['slot_interval_minutes'], self::slotIntervalOptions())) {
             throw ValidationException::withMessages([
                 'slot_interval_minutes' => 'Intervalo de horários inválido.',
             ]);

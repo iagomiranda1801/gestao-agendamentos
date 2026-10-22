@@ -33,6 +33,7 @@ class AvailabilityService
         int $bufferBefore,
         int $bufferAfter,
         ?Appointment $ignore = null,
+        bool $isTattoo = false,
     ): AvailabilityResult {
         if (! $company->is_active) {
             return AvailabilityResult::fail('A empresa está inativa.');
@@ -52,7 +53,7 @@ class AvailabilityService
         }
 
         if ($service === null) {
-            return $this->assertScheduleAvailability($company, $professional, $localStart, $durationMinutes, $bufferBefore, $bufferAfter, $ignore);
+            return $this->assertScheduleAvailability($company, $professional, $localStart, $durationMinutes, $bufferBefore, $bufferAfter, $ignore, $isTattoo);
         }
 
         $linked = $professional->services()
@@ -64,7 +65,7 @@ class AvailabilityService
             return AvailabilityResult::fail('Profissional não está associado a este serviço.');
         }
 
-        return $this->assertScheduleAvailability($company, $professional, $localStart, $durationMinutes, $bufferBefore, $bufferAfter, $ignore);
+        return $this->assertScheduleAvailability($company, $professional, $localStart, $durationMinutes, $bufferBefore, $bufferAfter, $ignore, $isTattoo);
     }
 
     protected function assertScheduleAvailability(
@@ -75,6 +76,7 @@ class AvailabilityService
         int $bufferBefore,
         int $bufferAfter,
         ?Appointment $ignore,
+        bool $isTattoo,
     ): AvailabilityResult {
         if ($localStart->lt(CompanyDateTime::nowLocal($company))) {
             return AvailabilityResult::fail('Não é possível agendar no passado.');
@@ -97,6 +99,19 @@ class AvailabilityService
 
         if (! $this->isWithinWorkingHours($company, $professional, $localStart, $localEnd)) {
             return AvailabilityResult::fail('Horário fora da jornada do profissional.');
+        }
+
+        if ($isTattoo && (bool) $settings->tattoo_custom_flow_enabled) {
+            $dayStart = CompanyDateTime::localToUtc($company, $localStart->startOfDay());
+            $dayEnd = CompanyDateTime::localToUtc($company, $localStart->addDay()->startOfDay());
+            $occupied = Appointment::query()->where('company_id', $company->getKey())
+                ->where('professional_id', $professional->getKey())->where('is_tattoo', true)
+                ->whereIn('status', ['pending', 'confirmed', 'in_progress', 'completed'])
+                ->where('start_at', '>=', $dayStart)->where('start_at', '<', $dayEnd)
+                ->when($ignore, fn ($query) => $query->where('id', '!=', $ignore->getKey()))->exists();
+            if ($occupied) {
+                return AvailabilityResult::fail('Este tatuador já tem uma tatuagem neste dia.');
+            }
         }
 
         if ($this->crossesBreak($company, $professional, $localStart, $localEnd, $bufferBefore, $bufferAfter)) {

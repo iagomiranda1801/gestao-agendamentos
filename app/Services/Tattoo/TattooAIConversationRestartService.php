@@ -39,6 +39,9 @@ class TattooAIConversationRestartService
                 'summary' => null,
                 'last_interaction_at' => null,
                 'context_start_message_id' => $lastMessageId,
+                'menu_choice' => 1,
+                'last_bot_question_at' => null,
+                'quote_followup_sent_at' => null,
             ]);
 
             return $files->all();

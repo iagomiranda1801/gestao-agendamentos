@@ -7,11 +7,13 @@ use App\Enums\WhatsAppOutboundKind;
 use App\Jobs\Concerns\DefersViaWhatsAppOutboundGate;
 use App\Models\Company;
 use App\Models\CompanyWhatsAppInstance;
+use App\Models\WhatsAppBotConversation;
 use App\Services\Beauty\BeautyAIConversationService;
 use App\Services\Company\CompanyModuleService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\Tattoo\TattooAIConversationService;
 use App\Services\Tattoo\TattooWhatsAppBotService;
+use App\Support\PhoneNormalizer;
 use App\Services\WhatsApp\Bot\WhatsAppBookingBotService;
 use App\Services\WhatsApp\Bot\WhatsAppOrderLinkBotService;
 use App\Services\WhatsApp\EvolutionApiClient;
@@ -238,6 +240,14 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
         try {
             $client->sendText($this->instanceName, $this->phone, $reply);
             $this->rememberOutboundSuccess($company);
+            if ($company->isTattooStudio() && (bool) $company->schedulingSetting?->tattoo_custom_flow_enabled
+                && str_contains($reply, '?')) {
+                WhatsAppBotConversation::query()->where('company_id', $company->getKey())
+                    ->where('phone_normalized', PhoneNormalizer::normalize($this->phone))
+                    ->where('last_incoming_message_id', $this->messageId)
+                    ->where('menu_choice', 1)->whereNull('finished_at')
+                    ->update(['last_bot_question_at' => now()]);
+            }
         } catch (Throwable $exception) {
             Log::warning('WhatsApp bot reply failed.', [
                 'company_id' => $company->getKey(),

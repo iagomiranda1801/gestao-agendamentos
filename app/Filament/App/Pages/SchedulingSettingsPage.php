@@ -108,6 +108,7 @@ class SchedulingSettingsPage extends Page
             'whatsapp_notifications_enabled' => $setting->whatsapp_notifications_enabled,
             'whatsapp_bot_enabled' => $setting->whatsapp_bot_enabled,
             'tattoo_ai_enabled' => $setting->tattoo_ai_enabled,
+            'tattoo_custom_flow_enabled' => $setting->tattoo_custom_flow_enabled,
             'tattoo_ai_prompt' => $setting->tattoo_ai_prompt,
             'ai_provider' => $setting->ai_provider,
             'ai_model' => $setting->ai_model,
@@ -216,14 +217,7 @@ class SchedulingSettingsPage extends Page
                     ->schema([
                         Select::make('slot_interval_minutes')
                             ->label('Intervalo dos horários')
-                            ->options([
-                                5 => '5 minutos',
-                                10 => '10 minutos',
-                                15 => '15 minutos',
-                                20 => '20 minutos',
-                                30 => '30 minutos',
-                                60 => '60 minutos',
-                            ])
+                            ->options(CompanySchedulingSettingService::slotIntervalOptions())
                             ->required()
                             ->native(false),
                         TimePicker::make('calendar_start_time')
@@ -419,6 +413,10 @@ class SchedulingSettingsPage extends Page
                             ->columnSpanFull(),
                         Toggle::make('tattoo_ai_enabled')->label('Atendimento com IA')
                             ->helperText('Substitui o questionário do bot de tatuagem. Usa a chave de IA da empresa configurada abaixo.')
+                            ->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
+                        Toggle::make('tattoo_custom_flow_enabled')
+                            ->label('Menu e regras especiais de tatuagem')
+                            ->helperText('Ativa o menu de quatro opções, uma tatuagem por tatuador ao dia e o retorno após quatro dias sem resposta.')
                             ->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
                         Textarea::make('tattoo_ai_prompt')->label('Orientações adicionais para a IA')
                             ->maxLength(3000)->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),

@@ -36,6 +36,23 @@ class SchedulingSettingsTest extends TestCase
         ]);
     }
 
+    public function test_long_slot_intervals_are_accepted(): void
+    {
+        $company = $this->createSchedulingCompany();
+        $service = app(CompanySchedulingSettingService::class);
+
+        foreach ([360, 720, 1440] as $minutes) {
+            $setting = $service->update($company, ['slot_interval_minutes' => $minutes]);
+            $this->assertSame($minutes, $setting->slot_interval_minutes);
+        }
+
+        $this->assertSame('06:00:00', CompanySchedulingSettingService::slotDurationForCalendar(360));
+        $this->assertSame('12:00:00', CompanySchedulingSettingService::slotDurationForCalendar(720));
+        $this->assertSame('24:00:00', CompanySchedulingSettingService::slotDurationForCalendar(1440));
+        $this->assertSame('00:15:00', CompanySchedulingSettingService::slotDurationForCalendar(15));
+        $this->assertSame('01:00:00', CompanySchedulingSettingService::slotDurationForCalendar(60));
+    }
+
     public function test_calendar_end_before_start_is_rejected(): void
     {
         $company = $this->createSchedulingCompany();

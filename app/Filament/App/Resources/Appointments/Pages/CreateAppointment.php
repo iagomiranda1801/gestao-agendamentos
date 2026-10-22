@@ -45,6 +45,7 @@ class CreateAppointment extends CreateRecord
                 'client_id' => $tattooRequest->client_id,
                 'professional_id' => $tattooRequest->professional_id,
                 'service_selection_mode' => 'to_be_defined',
+                'is_tattoo' => true,
                 'duration_minutes_snapshot' => $tattooRequest->quotes()->latest('version')->value('minutes_per_session') ?: 60,
                 'internal_notes' => 'Pedido de tatuagem #'.$tattooRequest->getKey().': '.$tattooRequest->description,
             ]));
@@ -76,6 +77,7 @@ class CreateAppointment extends CreateRecord
         $professional = Professional::query()->findOrFail($data['professional_id']);
 
         if ($this->tattooRequestId !== null) {
+            $data['is_tattoo'] = true;
             $tattooRequest = TattooRequest::query()->where('company_id', $company->getKey())
                 ->where('status', 'accepted')->whereNull('appointment_id')->findOrFail($this->tattooRequestId);
             $this->assertTattooDepositConfirmed($tattooRequest);

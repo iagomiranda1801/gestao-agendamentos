@@ -177,6 +177,7 @@ abstract class WhatsAppAIConversationService
                 : $this->evolution->sendText($instance, $conversation->phone_normalized, (string) $out->body);
             $gate->recordSuccess($company);
             $out->update(['status' => 'sent']);
+            $this->afterReplySent($conversation, $out);
         } catch (Throwable $exception) {
             $out->update(['status' => 'failed']);
             $gate->recordFailure($company);
@@ -189,6 +190,8 @@ abstract class WhatsAppAIConversationService
 
         return 'sent';
     }
+
+    protected function afterReplySent(TattooAiConversation $conversation, TattooAiMessage $message): void {}
 
     /**
      * Atraso humano da resposta: entre min e max segundos contados da chegada

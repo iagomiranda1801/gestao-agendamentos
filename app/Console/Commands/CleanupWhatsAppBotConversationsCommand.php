@@ -19,7 +19,15 @@ class CleanupWhatsAppBotConversationsCommand extends Command
 
         $abandoned = WhatsAppBotConversation::query()
             ->whereNull('finished_at')
-            ->where('last_activity_at', '<', $threshold)
+            ->where(function ($query) use ($threshold): void {
+                $query->where(function ($regular) use ($threshold): void {
+                    $regular->where(function ($scope): void {
+                        $scope->whereNull('menu_choice')->orWhere('menu_choice', '!=', 1);
+                    })->where('last_activity_at', '<', $threshold);
+                })->orWhere(function ($quote): void {
+                    $quote->where('menu_choice', 1)->where('expires_at', '<', now());
+                });
+            })
             ->update([
                 'finished_at' => now(),
                 'finished_reason' => 'expired',
@@ -27,6 +35,7 @@ class CleanupWhatsAppBotConversationsCommand extends Command
 
         TattooRequest::query()->where('status', 'collecting')
             ->where('created_at', '<', $threshold)
+            ->whereDoesntHave('conversation', fn ($query) => $query->where('menu_choice', 1)->whereNull('finished_at'))
             ->update(['status' => 'cancelled']);
 
         $purged = WhatsAppBotConversation::query()

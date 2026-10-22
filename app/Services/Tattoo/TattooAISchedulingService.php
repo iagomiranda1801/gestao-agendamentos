@@ -27,13 +27,14 @@ class TattooAISchedulingService
         $duration = (int) ($quote->minutes_per_session ?: 60);
         $interval = (int) $company->schedulingSetting?->slot_interval_minutes ?: 15;
         $today = CompanyDateTime::nowLocal($company);
+        $customFlow = (bool) $company->schedulingSetting?->tattoo_custom_flow_enabled;
         $slots = [];
         for ($day = 0; $day < 14 && count($slots) < 5; $day++) {
             $date = $today->addDays($day)->format('Y-m-d');
-            for ($minute = 8 * 60; $minute <= 20 * 60 && count($slots) < 5; $minute += $interval) {
+            for ($minute = ($customFlow ? 14 : 8) * 60; $minute <= ($customFlow ? 22 * 60 - $interval : 20 * 60) && count($slots) < 5; $minute += $interval) {
                 $time = sprintf('%02d:%02d', intdiv($minute, 60), $minute % 60);
                 $start = CompanyDateTime::parseLocal($company, $date, $time);
-                if ($this->availability->assertAvailable($company, $professional, null, $start, $duration, 0, 0)->available) {
+                if ($this->availability->assertAvailable($company, $professional, null, $start, $duration, 0, 0, isTattoo: true)->available) {
                     $slots[] = $date.' '.$time;
                 }
             }
@@ -60,7 +61,8 @@ class TattooAISchedulingService
                 CompanyDateTime::parseLocal($conversation->company, substr($selected, 0, 10), substr($selected, 11, 5)),
                 ['service_selection_mode' => 'to_be_defined', 'duration_minutes_snapshot' => $quote->minutes_per_session ?: 60,
                     'internal_notes' => 'Pedido de tatuagem #'.$request->id.': '.$request->description,
-                    'send_whatsapp_confirmation' => false, 'reference_key' => 'tattoo-ai-'.$request->id],
+                    'send_whatsapp_confirmation' => false, 'reference_key' => 'tattoo-ai-'.$request->id,
+                    'is_tattoo' => true],
             );
             $locked->update(['appointment_id' => $appointment->id, 'status' => 'booked']);
             $conversation->update(['status' => 'converted_to_appointment']);

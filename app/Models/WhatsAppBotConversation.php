@@ -23,6 +23,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'expires_at',
     'finished_at',
     'finished_reason',
+    'menu_choice',
+    'last_bot_question_at',
+    'quote_followup_sent_at',
 ])]
 class WhatsAppBotConversation extends Model
 {
@@ -44,6 +47,9 @@ class WhatsAppBotConversation extends Model
             'last_activity_at' => 'datetime',
             'expires_at' => 'datetime',
             'finished_at' => 'datetime',
+            'menu_choice' => 'integer',
+            'last_bot_question_at' => 'datetime',
+            'quote_followup_sent_at' => 'datetime',
         ];
     }
 

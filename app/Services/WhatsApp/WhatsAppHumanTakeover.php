@@ -3,6 +3,7 @@
 namespace App\Services\WhatsApp;
 
 use App\Models\CompanyWhatsAppInstance;
+use App\Models\TattooAiConversation;
 use App\Models\WhatsAppBotConversation;
 use App\Support\PhoneNormalizer;
 use Illuminate\Support\Facades\Cache;
@@ -61,6 +62,13 @@ class WhatsAppHumanTakeover
                 ->whereIn('phone_normalized', PhoneNormalizer::candidates($phone))
                 ->whereNull('finished_at')
                 ->update(['finished_at' => now(), 'finished_reason' => 'human_takeover']);
+            if (CompanyWhatsAppInstance::query()->where('instance_name', $instance)
+                ->whereHas('company.schedulingSetting', fn ($query) => $query->where('tattoo_custom_flow_enabled', true))
+                ->exists()) {
+                TattooAiConversation::query()->where('company_id', $companyId)
+                    ->whereIn('phone_normalized', PhoneNormalizer::candidates($phone))
+                    ->update(['human_takeover' => true, 'status' => 'human_takeover']);
+            }
         }
     }
 
