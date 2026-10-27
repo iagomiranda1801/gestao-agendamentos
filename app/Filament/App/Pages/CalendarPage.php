@@ -155,7 +155,7 @@ class CalendarPage extends Page
         $company = Filament::getTenant();
 
         try {
-            app(AppointmentService::class)->createFromSelection($company, auth()->user(), $data);
+            $appointment = app(AppointmentService::class)->createFromSelection($company, auth()->user(), $data);
         } catch (ValidationException $exception) {
             AppointmentSchedulingForm::notifyAndRethrow(
                 $exception,
@@ -165,7 +165,7 @@ class CalendarPage extends Page
 
         Notification::make()
             ->success()
-            ->title('Agendamento criado')
+            ->title($appointment->isMarkedAsFitIn() ? 'Encaixe criado' : 'Agendamento criado')
             ->send();
 
         $this->dispatch('scheduling-calendar:refresh');
@@ -395,6 +395,7 @@ class CalendarPage extends Page
                                 ->all();
                         })
                         ->required()
+                        ->live()
                         ->native(false),
                     TextInput::make('duration_minutes_snapshot')
                         ->label('Duração prevista')
@@ -403,16 +404,28 @@ class CalendarPage extends Page
                         ->maxValue(480)
                         ->suffix('min')
                         ->required(fn (callable $get): bool => blank($get('service_id')))
-                        ->visible(fn (callable $get): bool => blank($get('service_id'))),
+                        ->visible(fn (callable $get): bool => blank($get('service_id')))
+                        ->live(),
                     DatePicker::make('appointment_date')
                         ->label('Data')
                         ->required()
-                        ->native(false),
+                        ->native(false)
+                        ->live(),
                     AppointmentSchedulingForm::timePicker(
                         TimePicker::make('appointment_time')
                             ->label('Hora inicial')
-                            ->required(),
+                            ->required()
+                            ->live(),
                     ),
+                    $this->exceptionOverlapPlaceholder(false),
+                    Textarea::make('fit_in_reason')
+                        ->label('Motivo do encaixe')
+                        ->helperText('Este horário já tem outro compromisso. Informe o motivo para gravar os dois juntos.')
+                        ->rows(2)
+                        ->maxLength(500)
+                        ->visible(fn (callable $get): bool => $this->exceptionSlotOverlaps($get, false))
+                        ->required(fn (callable $get): bool => $this->exceptionSlotOverlaps($get, false))
+                        ->columnSpanFull(),
                     Textarea::make('appointment_reason')
                         ->label('Motivo da consulta')
                         ->rows(2)

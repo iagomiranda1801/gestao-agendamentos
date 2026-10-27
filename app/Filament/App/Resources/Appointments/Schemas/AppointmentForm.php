@@ -167,6 +167,35 @@ class AppointmentForm
                             ->disabled()
                             ->dehydrated(false)
                             ->visible(fn (?string $operation): bool => $operation !== 'create'),
+                        Placeholder::make('create_overlap_summary')
+                            ->label('Compromissos afetados')
+                            ->visible(fn (?string $operation): bool => $operation === 'create')
+                            ->content(function (Get $get): HtmlString {
+                                $company = Filament::getTenant();
+
+                                if (! $company instanceof Company) {
+                                    return new HtmlString('—');
+                                }
+
+                                return new HtmlString(app(AppointmentService::class)->overlapSummaryHtml(
+                                    $company,
+                                    filled($get('professional_id')) ? (int) $get('professional_id') : null,
+                                    filled($get('service_id')) ? (int) $get('service_id') : null,
+                                    filled($get('duration_minutes_snapshot')) ? (int) $get('duration_minutes_snapshot') : null,
+                                    $get('appointment_date') ?: null,
+                                    $get('appointment_time') ?: null,
+                                    false,
+                                ));
+                            })
+                            ->columnSpanFull(),
+                        Textarea::make('fit_in_reason')
+                            ->label('Motivo do encaixe')
+                            ->helperText('Este horário já tem outro compromisso. Informe o motivo para gravar os dois juntos.')
+                            ->rows(2)
+                            ->maxLength(500)
+                            ->visible(fn (Get $get, ?string $operation): bool => $operation === 'create' && self::createSlotOverlaps($get))
+                            ->required(fn (Get $get, ?string $operation): bool => $operation === 'create' && self::createSlotOverlaps($get))
+                            ->columnSpanFull(),
                         Toggle::make('send_whatsapp_confirmation')
                             ->label('Enviar confirmação ao cliente por WhatsApp')
                             ->helperText('A mensagem será enviada após salvar o agendamento.')
@@ -418,6 +447,25 @@ class AppointmentForm
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();
+    }
+
+    protected static function createSlotOverlaps(Get $get): bool
+    {
+        $company = Filament::getTenant();
+
+        if (! $company instanceof Company) {
+            return false;
+        }
+
+        return app(AppointmentService::class)->formSlotHasOverlap(
+            $company,
+            filled($get('professional_id')) ? (int) $get('professional_id') : null,
+            filled($get('service_id')) ? (int) $get('service_id') : null,
+            filled($get('duration_minutes_snapshot')) ? (int) $get('duration_minutes_snapshot') : null,
+            $get('appointment_date') ?: null,
+            $get('appointment_time') ?: null,
+            false,
+        );
     }
 
     protected static function isOpenServiceSelection(Get $get): bool

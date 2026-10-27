@@ -8,11 +8,9 @@ use App\Filament\App\Support\AppointmentSchedulingForm;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\Professional;
-use App\Models\Service;
 use App\Models\TattooAiConversation;
 use App\Models\TattooRequest;
 use App\Services\Scheduling\AppointmentService;
-use App\Support\CompanyDateTime;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
@@ -71,9 +69,6 @@ class CreateAppointment extends CreateRecord
         $company = Filament::getTenant();
 
         $client = Client::query()->findOrFail($data['client_id']);
-        $service = filled($data['service_id'] ?? null)
-            ? Service::query()->findOrFail($data['service_id'])
-            : null;
         $professional = Professional::query()->findOrFail($data['professional_id']);
 
         if ($this->tattooRequestId !== null) {
@@ -87,20 +82,10 @@ class CreateAppointment extends CreateRecord
             }
         }
 
-        $localStart = CompanyDateTime::parseLocal(
-            $company,
-            $data['appointment_date'],
-            $data['appointment_time'],
-        );
-
         try {
-            return app(AppointmentService::class)->createInternalAppointment(
+            return app(AppointmentService::class)->createFromSelection(
                 $company,
                 auth()->user(),
-                $client,
-                $professional,
-                $service,
-                $localStart,
                 $data,
             );
         } catch (ValidationException $exception) {

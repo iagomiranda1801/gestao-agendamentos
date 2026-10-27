@@ -475,6 +475,28 @@ class AppointmentService
         $professional = Professional::query()->findOrFail($data['professional_id']);
         $localStart = CompanyDateTime::parseLocal($company, $data['appointment_date'], $data['appointment_time']);
 
+        $overlaps = $this->formSlotHasOverlap(
+            $company,
+            (int) $professional->getKey(),
+            $service?->getKey(),
+            filled($data['duration_minutes_snapshot'] ?? null) ? (int) $data['duration_minutes_snapshot'] : null,
+            (string) $data['appointment_date'],
+            (string) $data['appointment_time'],
+            false,
+        );
+
+        if ($overlaps) {
+            return $this->createFitInAppointment(
+                $company,
+                $user,
+                $client,
+                $professional,
+                $service,
+                $localStart,
+                $data,
+            );
+        }
+
         return $this->createInternalAppointment(
             $company,
             $user,

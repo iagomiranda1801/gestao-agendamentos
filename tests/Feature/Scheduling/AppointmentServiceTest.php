@@ -412,6 +412,42 @@ class AppointmentServiceTest extends TestCase
         $this->assertSame($otherProfessional->getKey(), $rescheduled->professional_id);
     }
 
+    public function test_calendar_selection_with_a_conflict_becomes_a_fit_in(): void
+    {
+        $setup = $this->createBookableSetup();
+        $service = app(AppointmentService::class);
+
+        $service->createInternalAppointment(
+            $setup['company'],
+            $setup['admin'],
+            $setup['client'],
+            $setup['professional'],
+            $setup['service'],
+            $setup['localStart'],
+        );
+
+        $payload = [
+            'client_id' => $setup['client']->getKey(),
+            'professional_id' => $setup['professional']->getKey(),
+            'service_id' => $setup['service']->getKey(),
+            'appointment_date' => $setup['localStart']->toDateString(),
+            'appointment_time' => $setup['localStart']->format('H:i'),
+        ];
+
+        $this->assertSchedulingRejected(
+            fn () => $service->createFromSelection($setup['company'], $setup['admin'], $payload),
+            'Informe o motivo do encaixe.',
+        );
+
+        $fitIn = $service->createFromSelection($setup['company'], $setup['admin'], [
+            ...$payload,
+            'fit_in_reason' => 'Cliente chegou antes',
+        ]);
+
+        $this->assertSame(AppointmentFlowKind::FitIn, $fitIn->flow_kind);
+        $this->assertSame(AppointmentStatus::Confirmed, $fitIn->status);
+    }
+
     public function test_fit_in_overlaps_another_appointment_and_records_authorization(): void
     {
         $setup = $this->createBookableSetup();
