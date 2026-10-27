@@ -2,6 +2,7 @@
 
 namespace App\Filament\App\Resources\Appointments\Schemas;
 
+use App\Enums\AppointmentFlowKind;
 use App\Enums\AppointmentOrigin;
 use App\Enums\CompanyPermission;
 use App\Enums\CompanyRole;
@@ -14,6 +15,7 @@ use App\Models\PatientClinicalAlert;
 use App\Models\Professional;
 use App\Models\Service;
 use App\Services\Company\CompanyPermissionService;
+use App\Services\Scheduling\AppointmentService;
 use App\Support\CompanyDateTime;
 use App\Support\CompanyTerminology;
 use Filament\Facades\Filament;
@@ -228,6 +230,59 @@ class AppointmentForm
                     ])
                     ->columns(2)
                     ->visible(fn (?Appointment $record): bool => $record !== null && $record->origin === AppointmentOrigin::Online),
+                Section::make('Encaixe')
+                    ->schema([
+                        TextInput::make('flow_label')
+                            ->label('Fluxo')
+                            ->disabled()
+                            ->dehydrated(false),
+                        TextInput::make('fit_in_authorized_by_name')
+                            ->label('Autorizado por')
+                            ->disabled()
+                            ->dehydrated(false),
+                        TextInput::make('fit_in_authorized_at_label')
+                            ->label('Autorizado em')
+                            ->disabled()
+                            ->dehydrated(false),
+                        Textarea::make('fit_in_reason_display')
+                            ->label('Motivo autorizado')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->rows(2)
+                            ->columnSpanFull(),
+                        Placeholder::make('edit_overlap_summary')
+                            ->label('Compromissos afetados')
+                            ->visible(fn (?Appointment $record): bool => ! $readOnly && $record?->flow_kind === AppointmentFlowKind::FitIn)
+                            ->content(function (Get $get, ?Appointment $record): HtmlString {
+                                $company = Filament::getTenant();
+
+                                if (! $company instanceof Company) {
+                                    return new HtmlString('—');
+                                }
+
+                                return new HtmlString(app(AppointmentService::class)->overlapSummaryHtml(
+                                    $company,
+                                    filled($get('professional_id')) ? (int) $get('professional_id') : null,
+                                    filled($get('service_id')) ? (int) $get('service_id') : null,
+                                    filled($get('duration_minutes_snapshot')) ? (int) $get('duration_minutes_snapshot') : null,
+                                    $get('appointment_date') ?: null,
+                                    $get('appointment_time') ?: null,
+                                    false,
+                                    $record?->getKey(),
+                                ));
+                            })
+                            ->columnSpanFull(),
+                        Textarea::make('fit_in_reason')
+                            ->label('Novo motivo da sobreposição')
+                            ->helperText('Obrigatório se a mudança de horário ou profissional continuar sobre outro compromisso.')
+                            ->rows(2)
+                            ->maxLength(500)
+                            ->visible(fn (?Appointment $record): bool => ! $readOnly && $record?->flow_kind === AppointmentFlowKind::FitIn)
+                            ->dehydrated(fn (?Appointment $record): bool => ! $readOnly && $record?->flow_kind === AppointmentFlowKind::FitIn)
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2)
+                    ->visible(fn (?Appointment $record): bool => $record?->isMarkedAsFitIn() ?? false),
                 Section::make('Informações')
                     ->schema([
                         Textarea::make('appointment_reason')
@@ -261,6 +316,23 @@ class AppointmentForm
                         }),
                 ])->visible(fn (?Appointment $record): bool => $record?->tattooRequest()->exists() ?? false),
             ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function flowFormState(Appointment $record, Company $company): array
+    {
+        $record->loadMissing('fitInAuthorizer');
+
+        return [
+            'flow_label' => $record->flowLabel(),
+            'fit_in_reason_display' => $record->fit_in_reason ?: '—',
+            'fit_in_authorized_by_name' => $record->fitInAuthorizer?->name ?? '—',
+            'fit_in_authorized_at_label' => $record->fit_in_authorized_at
+                ? CompanyDateTime::formatLocal($company, $record->fit_in_authorized_at)
+                : '—',
+        ];
     }
 
     protected static function canViewInternalNotes(): bool

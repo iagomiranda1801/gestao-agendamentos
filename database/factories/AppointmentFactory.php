@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\AppointmentFlowKind;
 use App\Enums\AppointmentOrigin;
 use App\Enums\AppointmentStatus;
 use App\Models\Appointment;
@@ -34,6 +35,7 @@ class AppointmentFactory extends Factory
             'service_id' => Service::factory(),
             'status' => AppointmentStatus::Confirmed,
             'origin' => AppointmentOrigin::Internal,
+            'flow_kind' => AppointmentFlowKind::Normal,
             'send_whatsapp_confirmation' => true,
             'reference_key' => null,
             'start_at' => $start,

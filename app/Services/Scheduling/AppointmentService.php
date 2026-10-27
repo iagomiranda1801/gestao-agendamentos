@@ -2,6 +2,7 @@
 
 namespace App\Services\Scheduling;
 
+use App\Enums\AppointmentFlowKind;
 use App\Enums\AppointmentHistoryType;
 use App\Enums\AppointmentOrigin;
 use App\Enums\AppointmentStatus;
@@ -28,6 +29,7 @@ class AppointmentService
     public function __construct(
         protected AvailabilityService $availabilityService,
         protected AppointmentSnapshotResolver $snapshotResolver,
+        protected AppointmentConflictService $conflictService,
     ) {}
 
     /**
@@ -41,8 +43,11 @@ class AppointmentService
         ?Service $service,
         CarbonImmutable $localStart,
         array $data = [],
+        bool $ignoreAppointmentConflicts = false,
+        bool $ignoreSlotAlignment = false,
+        AppointmentFlowKind $flowKind = AppointmentFlowKind::Normal,
     ): Appointment {
-        return DB::transaction(function () use ($company, $user, $client, $professional, $service, $localStart, $data): Appointment {
+        return DB::transaction(function () use ($company, $user, $client, $professional, $service, $localStart, $data, $ignoreAppointmentConflicts, $ignoreSlotAlignment, $flowKind): Appointment {
             $professional = Professional::query()->whereKey($professional->getKey())->lockForUpdate()->firstOrFail();
 
             $isOpenService = ($data['service_selection_mode'] ?? 'defined') === 'to_be_defined' || $service === null;
@@ -56,6 +61,25 @@ class AppointmentService
                 : $this->resolveSnapshots($company, $professional, $service);
             $startUtc = CompanyDateTime::localToUtc($company, $localStart);
             $endUtc = $startUtc->addMinutes($snapshots['duration_minutes_snapshot']);
+            $fitInReason = $this->normalizedFitInReason($data['fit_in_reason'] ?? null, $flowKind);
+
+            $conflicts = $this->conflictService->conflictingAppointments(
+                $company,
+                $professional,
+                $startUtc,
+                $endUtc,
+                $snapshots['buffer_before_minutes_snapshot'],
+                $snapshots['buffer_after_minutes_snapshot'],
+            );
+
+            if ($flowKind === AppointmentFlowKind::QuickAttendance && $conflicts->isNotEmpty() && $fitInReason === null) {
+                throw ValidationException::withMessages([
+                    'fit_in_reason' => 'Há outro compromisso neste horário. Informe o motivo do encaixe para atender agora.',
+                ]);
+            }
+
+            $ignoreConflicts = $ignoreAppointmentConflicts
+                || ($flowKind === AppointmentFlowKind::QuickAttendance && $conflicts->isNotEmpty());
 
             $this->availabilityService->assertAvailable(
                 $company,
@@ -66,12 +90,19 @@ class AppointmentService
                 $snapshots['buffer_before_minutes_snapshot'],
                 $snapshots['buffer_after_minutes_snapshot'],
                 isTattoo: (bool) ($data['is_tattoo'] ?? false),
+                ignoreAppointmentConflicts: $ignoreConflicts,
+                ignoreSlotAlignment: $ignoreSlotAlignment,
             )->assertAvailable();
+
+            $authorizesOverlap = $flowKind === AppointmentFlowKind::FitIn
+                || ($flowKind === AppointmentFlowKind::QuickAttendance && $conflicts->isNotEmpty());
 
             $appointment = new Appointment([
                 'status' => AppointmentStatus::Confirmed,
                 'origin' => AppointmentOrigin::Internal,
+                'flow_kind' => $flowKind,
                 'send_whatsapp_confirmation' => (bool) ($data['send_whatsapp_confirmation'] ?? true),
+                'fit_in_reason' => $authorizesOverlap ? $fitInReason : null,
                 'service_selection_mode' => $isOpenService ? 'to_be_defined' : 'defined',
                 'is_tattoo' => (bool) ($data['is_tattoo'] ?? false),
                 'start_at' => $startUtc,
@@ -99,17 +130,92 @@ class AppointmentService
             $appointment->creator()->associate($user);
             $appointment->confirmer()->associate($user);
             $appointment->confirmed_at = now();
+
+            if ($authorizesOverlap) {
+                $appointment->fitInAuthorizer()->associate($user);
+                $appointment->fit_in_authorized_at = now();
+            }
+
             $appointment->save();
 
-            $this->recordHistory($company, $user, $appointment, AppointmentHistoryType::Created, [
+            $historyAttributes = [
                 'new_status' => $appointment->status,
                 'new_start_at' => $appointment->start_at,
                 'new_end_at' => $appointment->end_at,
-            ]);
+            ];
+
+            if ($flowKind !== AppointmentFlowKind::Normal) {
+                $historyAttributes = array_merge(
+                    $historyAttributes,
+                    $this->flowHistoryAttributes($company, $flowKind, $conflicts, $fitInReason),
+                );
+            }
+
+            $this->recordHistory($company, $user, $appointment, AppointmentHistoryType::Created, $historyAttributes);
 
             DB::afterCommit(fn () => event(new AppointmentCreated($appointment->refresh())));
 
             return $appointment->refresh();
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function createFitInAppointment(
+        Company $company,
+        User $user,
+        Client $client,
+        Professional $professional,
+        ?Service $service,
+        CarbonImmutable $localStart,
+        array $data = [],
+    ): Appointment {
+        $this->assertCanBookException($user, $company);
+
+        return $this->createInternalAppointment(
+            $company,
+            $user,
+            $client,
+            $professional,
+            $service,
+            $localStart,
+            $data,
+            ignoreAppointmentConflicts: true,
+            flowKind: AppointmentFlowKind::FitIn,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function createQuickAttendance(
+        Company $company,
+        User $user,
+        Client $client,
+        Professional $professional,
+        ?Service $service,
+        array $data = [],
+    ): Appointment {
+        $this->assertCanBookException($user, $company);
+
+        return DB::transaction(function () use ($company, $user, $client, $professional, $service, $data): Appointment {
+            $data['send_whatsapp_confirmation'] = (bool) ($data['send_whatsapp_confirmation'] ?? false);
+            $localStart = CompanyDateTime::nowLocal($company);
+
+            $appointment = $this->createInternalAppointment(
+                $company,
+                $user,
+                $client,
+                $professional,
+                $service,
+                $localStart,
+                $data,
+                ignoreSlotAlignment: true,
+                flowKind: AppointmentFlowKind::QuickAttendance,
+            );
+
+            return app(AppointmentStatusService::class)->start($company, $user, $appointment);
         });
     }
 
@@ -158,6 +264,26 @@ class AppointmentService
             $startUtc = CompanyDateTime::localToUtc($company, $localStart);
             $endUtc = $startUtc->addMinutes($snapshots['duration_minutes_snapshot']);
             $isTattoo = $appointment->tattooRequest()->exists() || (bool) ($data['is_tattoo'] ?? $appointment->is_tattoo);
+            $conflicts = $this->conflictService->conflictingAppointments(
+                $company,
+                $professional,
+                $startUtc,
+                $endUtc,
+                $snapshots['buffer_before_minutes_snapshot'],
+                $snapshots['buffer_after_minutes_snapshot'],
+                $appointment,
+            );
+            $scheduleWillChange = ! $oldStart->equalTo($startUtc)
+                || ! $oldEnd->equalTo($endUtc)
+                || $oldProfessionalId !== (int) $professional->getKey();
+            $isFitIn = $appointment->flow_kind === AppointmentFlowKind::FitIn;
+            $newFitInReason = $this->normalizedFitInReason($data['fit_in_reason'] ?? null, AppointmentFlowKind::Normal);
+
+            if ($isFitIn && $scheduleWillChange && $conflicts->isNotEmpty() && $newFitInReason === null) {
+                throw ValidationException::withMessages([
+                    'fit_in_reason' => 'O novo horário conflita com outro compromisso. Informe o motivo para autorizar a sobreposição.',
+                ]);
+            }
 
             $this->availabilityService->assertAvailable(
                 $company,
@@ -169,6 +295,7 @@ class AppointmentService
                 $snapshots['buffer_after_minutes_snapshot'],
                 $appointment,
                 $isTattoo,
+                ignoreAppointmentConflicts: $isFitIn && $conflicts->isNotEmpty(),
             )->assertAvailable();
 
             $appointment->fill([
@@ -189,16 +316,34 @@ class AppointmentService
                 'appointment_reason' => $data['appointment_reason'] ?? $appointment->appointment_reason,
                 'updated_by' => $user->getKey(),
             ]);
+
+            $reauthorizedOverlap = $isFitIn && $scheduleWillChange && $conflicts->isNotEmpty();
+
+            if ($reauthorizedOverlap) {
+                $appointment->fit_in_reason = $newFitInReason;
+                $appointment->fitInAuthorizer()->associate($user);
+                $appointment->fit_in_authorized_at = now();
+            }
+
             $appointment->save();
 
-            $this->recordHistory($company, $user, $appointment, AppointmentHistoryType::Updated, [
+            $historyAttributes = [
                 'old_status' => $appointment->status,
                 'new_status' => $appointment->status,
                 'old_start_at' => $oldStart,
                 'new_start_at' => $appointment->start_at,
                 'old_end_at' => $oldEnd,
                 'new_end_at' => $appointment->end_at,
-            ]);
+            ];
+
+            if ($reauthorizedOverlap) {
+                $historyAttributes = array_merge(
+                    $historyAttributes,
+                    $this->flowHistoryAttributes($company, AppointmentFlowKind::FitIn, $conflicts, $newFitInReason),
+                );
+            }
+
+            $this->recordHistory($company, $user, $appointment, AppointmentHistoryType::Updated, $historyAttributes);
 
             $scheduleChanged = ! $oldStart->equalTo(CarbonImmutable::parse($appointment->start_at))
                 || ! $oldEnd->equalTo(CarbonImmutable::parse($appointment->end_at))
@@ -559,16 +704,25 @@ class AppointmentService
             $title .= " + {$appointment->professional->name}";
         }
 
+        $markedAsFitIn = $appointment->isMarkedAsFitIn();
+
+        if ($markedAsFitIn) {
+            $title = 'Encaixe · '.$title;
+        }
+
         return [
             'id' => (string) $appointment->getKey(),
             'title' => $title,
             'start' => $localStart->toIso8601String(),
             'end' => $localEnd->toIso8601String(),
             'backgroundColor' => $this->resolveEventColor($appointment),
-            'borderColor' => $this->resolveEventColor($appointment),
+            'borderColor' => $markedAsFitIn ? '#d97706' : $this->resolveEventColor($appointment),
+            'classNames' => $markedAsFitIn ? ['fc-event-fit-in'] : [],
             'extendedProps' => [
                 'status' => $appointment->status->value,
                 'statusLabel' => $appointment->status->label(),
+                'flowKind' => $appointment->flow_kind?->value,
+                'fitIn' => $markedAsFitIn,
                 'client' => $appointment->client->name,
                 'service' => $appointment->service_name_snapshot,
                 'professional' => $appointment->professional->name,
@@ -678,5 +832,278 @@ class AppointmentService
                 ->whereNull('professional_id')
                 ->orWhere('professional_id', $professionalId);
         });
+    }
+
+    public function formWindowLabel(
+        Company $company,
+        ?int $professionalId,
+        ?int $serviceId,
+        ?int $durationMinutes,
+        ?string $date,
+        ?string $time,
+        bool $useNow,
+    ): string {
+        $slot = $this->resolveFormSlot($company, $professionalId, $serviceId, $durationMinutes, $date, $time, $useNow);
+
+        if ($slot === null) {
+            if ($useNow) {
+                return CompanyDateTime::nowLocal($company)->format('d/m/Y H:i:s').' · informe a duração para ver o fim previsto';
+            }
+
+            return 'Informe o profissional e o horário.';
+        }
+
+        $localStart = CompanyDateTime::utcToLocal($company, $slot['start_utc']);
+        $localEnd = CompanyDateTime::utcToLocal($company, $slot['end_utc']);
+        $format = $useNow ? 'd/m/Y H:i:s' : 'd/m/Y H:i';
+
+        return $localStart->format($format).' até '.$localEnd->format('H:i');
+    }
+
+    public function overlapSummaryHtml(
+        Company $company,
+        ?int $professionalId,
+        ?int $serviceId,
+        ?int $durationMinutes,
+        ?string $date,
+        ?string $time,
+        bool $useNow,
+        ?int $ignoreAppointmentId = null,
+    ): string {
+        $slot = $this->resolveFormSlot($company, $professionalId, $serviceId, $durationMinutes, $date, $time, $useNow);
+
+        if ($slot === null) {
+            return 'Informe o profissional e o horário para ver os compromissos afetados.';
+        }
+
+        $ignore = $ignoreAppointmentId
+            ? Appointment::query()->where('company_id', $company->getKey())->find($ignoreAppointmentId)
+            : null;
+
+        $conflicts = $this->conflictService->conflictingAppointments(
+            $company,
+            $slot['professional'],
+            $slot['start_utc'],
+            $slot['end_utc'],
+            $slot['buffer_before'],
+            $slot['buffer_after'],
+            $ignore,
+        );
+
+        if ($conflicts->isEmpty()) {
+            return 'Nenhum outro compromisso neste horário.';
+        }
+
+        $items = $conflicts
+            ->map(fn (Appointment $existing): string => '<li>'.e($this->conflictLine($company, $existing)).'</li>')
+            ->implode('');
+
+        return 'Estes compromissos serão mantidos junto com este horário:<ul>'.$items.'</ul>';
+    }
+
+    public function formSlotHasOverlap(
+        Company $company,
+        ?int $professionalId,
+        ?int $serviceId,
+        ?int $durationMinutes,
+        ?string $date,
+        ?string $time,
+        bool $useNow,
+        ?int $ignoreAppointmentId = null,
+    ): bool {
+        $slot = $this->resolveFormSlot($company, $professionalId, $serviceId, $durationMinutes, $date, $time, $useNow);
+
+        if ($slot === null) {
+            return false;
+        }
+
+        $ignore = $ignoreAppointmentId
+            ? Appointment::query()->where('company_id', $company->getKey())->find($ignoreAppointmentId)
+            : null;
+
+        return $this->conflictService->conflictingAppointments(
+            $company,
+            $slot['professional'],
+            $slot['start_utc'],
+            $slot['end_utc'],
+            $slot['buffer_before'],
+            $slot['buffer_after'],
+            $ignore,
+        )->isNotEmpty();
+    }
+
+    protected function assertCanBookException(User $user, Company $company): void
+    {
+        abort_unless($user->is_active, 403);
+
+        if ($user->is_super_admin) {
+            abort_unless($user->canAccessTenant($company), 403);
+
+            return;
+        }
+
+        abort_unless($user->hasActiveRoleInCompany(
+            $company,
+            CompanyRole::CompanyAdmin,
+            CompanyRole::Manager,
+            CompanyRole::Receptionist,
+        ), 403);
+    }
+
+    protected function normalizedFitInReason(mixed $reason, AppointmentFlowKind $flowKind): ?string
+    {
+        $reason = trim((string) ($reason ?? ''));
+
+        if ($reason === '') {
+            if ($flowKind === AppointmentFlowKind::FitIn) {
+                throw ValidationException::withMessages([
+                    'fit_in_reason' => 'Informe o motivo do encaixe.',
+                ]);
+            }
+
+            return null;
+        }
+
+        if (mb_strlen($reason) > 500) {
+            throw ValidationException::withMessages([
+                'fit_in_reason' => 'O motivo do encaixe deve ter no máximo 500 caracteres.',
+            ]);
+        }
+
+        return $reason;
+    }
+
+    /**
+     * @param  Collection<int, Appointment>  $conflicts
+     * @return array{description: string, metadata: array<string, mixed>}
+     */
+    protected function flowHistoryAttributes(
+        Company $company,
+        AppointmentFlowKind $flowKind,
+        Collection $conflicts,
+        ?string $reason,
+    ): array {
+        $hadConflict = $conflicts->isNotEmpty();
+        $summary = $conflicts
+            ->map(fn (Appointment $existing): string => $this->conflictLine($company, $existing))
+            ->implode('; ');
+
+        $description = match (true) {
+            $flowKind === AppointmentFlowKind::FitIn && $hadConflict => 'Encaixe autorizado. Compromissos afetados: '.$summary.'.',
+            $flowKind === AppointmentFlowKind::FitIn => 'Encaixe autorizado sem conflito no momento de salvar.',
+            $hadConflict => 'Atendimento rápido com encaixe autorizado. Compromissos afetados: '.$summary.'.',
+            default => 'Atendimento rápido registrado no horário atual.',
+        };
+
+        return [
+            'description' => $description,
+            'metadata' => [
+                'flow_kind' => $flowKind->value,
+                'fit_in_reason' => $reason,
+                'had_conflict' => $hadConflict,
+                'conflicts' => $conflicts->map(fn (Appointment $existing): array => [
+                    'id' => $existing->getKey(),
+                    'client_name' => $existing->client?->name,
+                    'service_name' => $existing->service_name_snapshot,
+                    'start_at' => CarbonImmutable::parse($existing->start_at)->toIso8601String(),
+                    'end_at' => CarbonImmutable::parse($existing->end_at)->toIso8601String(),
+                    'buffer_before_minutes' => (int) $existing->buffer_before_minutes_snapshot,
+                    'buffer_after_minutes' => (int) $existing->buffer_after_minutes_snapshot,
+                ])->values()->all(),
+            ],
+        ];
+    }
+
+    protected function conflictLine(Company $company, Appointment $existing): string
+    {
+        $start = CompanyDateTime::formatLocal($company, $existing->start_at, 'd/m/Y H:i');
+        $end = CompanyDateTime::formatLocal($company, $existing->end_at, 'H:i');
+        $client = $existing->client?->name ?? 'Cliente';
+        $service = $existing->service_name_snapshot ?: 'A definir no atendimento';
+        $line = "{$client} · {$service} · {$start}–{$end}";
+        $before = (int) $existing->buffer_before_minutes_snapshot;
+        $after = (int) $existing->buffer_after_minutes_snapshot;
+
+        if ($before > 0 || $after > 0) {
+            $line .= " (preparação {$before} min, finalização {$after} min)";
+        }
+
+        return $line;
+    }
+
+    /**
+     * @return array{
+     *     professional: Professional,
+     *     start_utc: CarbonImmutable,
+     *     end_utc: CarbonImmutable,
+     *     buffer_before: int,
+     *     buffer_after: int
+     * }|null
+     */
+    protected function resolveFormSlot(
+        Company $company,
+        ?int $professionalId,
+        ?int $serviceId,
+        ?int $durationMinutes,
+        ?string $date,
+        ?string $time,
+        bool $useNow,
+    ): ?array {
+        if ($professionalId === null) {
+            return null;
+        }
+
+        $professional = Professional::query()
+            ->where('company_id', $company->getKey())
+            ->find($professionalId);
+
+        if ($professional === null) {
+            return null;
+        }
+
+        if ($useNow) {
+            $localStart = CompanyDateTime::nowLocal($company);
+        } elseif (filled($date) && filled($time)) {
+            try {
+                $localStart = CompanyDateTime::parseLocal($company, (string) $date, (string) $time);
+            } catch (\Throwable) {
+                return null;
+            }
+        } else {
+            return null;
+        }
+
+        if ($serviceId !== null) {
+            $service = Service::query()
+                ->where('company_id', $company->getKey())
+                ->find($serviceId);
+
+            if ($service === null) {
+                return null;
+            }
+
+            $snapshots = $this->snapshotResolver->resolve($company, $professional, $service);
+            $duration = $snapshots['duration_minutes_snapshot'];
+            $bufferBefore = $snapshots['buffer_before_minutes_snapshot'];
+            $bufferAfter = $snapshots['buffer_after_minutes_snapshot'];
+        } else {
+            $duration = (int) $durationMinutes;
+            $bufferBefore = 0;
+            $bufferAfter = 0;
+
+            if ($duration < 15) {
+                return null;
+            }
+        }
+
+        $startUtc = CompanyDateTime::localToUtc($company, $localStart);
+
+        return [
+            'professional' => $professional,
+            'start_utc' => $startUtc,
+            'end_utc' => $startUtc->addMinutes($duration),
+            'buffer_before' => $bufferBefore,
+            'buffer_after' => $bufferAfter,
+        ];
     }
 }

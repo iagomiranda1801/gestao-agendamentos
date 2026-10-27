@@ -8,6 +8,7 @@ use App\Enums\CompanyRole;
 use App\Enums\ScheduleBlockType;
 use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Filament\App\Resources\Appointments\AppointmentResource;
+use App\Filament\App\Resources\Appointments\Concerns\ProvidesExceptionAppointmentActions;
 use App\Filament\App\Support\AppointmentSchedulingForm;
 use App\Filament\App\Support\QuickCreateFields;
 use App\Models\Appointment;
@@ -45,6 +46,7 @@ use UnitEnum;
 
 class CalendarPage extends Page
 {
+    use ProvidesExceptionAppointmentActions;
     use RequiresCompanyModule;
 
     protected static ?string $slug = 'agenda';
@@ -330,7 +332,7 @@ class CalendarPage extends Page
     protected function getHeaderActions(): array
     {
         if (! $this->canManageCalendar()) {
-            return [];
+            return $this->exceptionAppointmentHeaderActions();
         }
 
         return [
@@ -489,6 +491,7 @@ class CalendarPage extends Page
                 ->action(function (array $data): void {
                     $this->createBlockFromSelection($data);
                 }),
+            ...$this->exceptionAppointmentHeaderActions(),
         ];
     }
 

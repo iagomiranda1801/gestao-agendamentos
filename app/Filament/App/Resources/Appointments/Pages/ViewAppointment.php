@@ -71,6 +71,6 @@ class ViewAppointment extends ViewRecord
             ? CompanyDateTime::utcToLocal($company, $record->terms_accepted_at)->format('d/m/Y H:i')
             : '—';
 
-        return $data;
+        return array_merge($data, AppointmentForm::flowFormState($record, $company));
     }
 }

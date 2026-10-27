@@ -4,13 +4,14 @@ namespace App\Filament\App\Resources\Appointments\Pages;
 
 use App\Filament\App\Resources\Appointments\AppointmentResource;
 use App\Filament\App\Resources\Appointments\Concerns\InteractsWithAppointmentActions;
+use App\Filament\App\Resources\Appointments\Schemas\AppointmentForm;
+use App\Filament\App\Resources\Pages\EditRecord;
 use App\Filament\App\Support\AppointmentSchedulingForm;
 use App\Models\Appointment;
 use App\Models\Company;
 use App\Services\Scheduling\AppointmentService;
 use App\Support\CompanyDateTime;
 use Filament\Facades\Filament;
-use App\Filament\App\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 
@@ -38,7 +39,7 @@ class EditAppointment extends EditRecord
         $data['appointment_time'] = $localStart->format('H:i');
         $data['status_label'] = $record->status->label();
 
-        return $data;
+        return array_merge($data, AppointmentForm::flowFormState($record, $company));
     }
 
     protected function handleRecordUpdate(Model $record, array $data): Model

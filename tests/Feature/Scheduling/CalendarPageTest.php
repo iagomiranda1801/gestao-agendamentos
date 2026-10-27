@@ -325,4 +325,24 @@ class CalendarPageTest extends TestCase
         $this->assertStringContainsString((string) $appointment->getKey(), $events[0]['extendedProps']['viewUrl']);
         $this->assertStringNotContainsString('/painel/', $events[0]['extendedProps']['viewUrl']);
     }
+
+    public function test_employee_cannot_store_a_fit_in_from_the_calendar(): void
+    {
+        $setup = $this->createBookableSetup();
+        $employee = $this->createCompanyUser($setup['company'], [], CompanyRole::Employee);
+
+        $linkedProfessional = Professional::factory()
+            ->forCompany($setup['company'])
+            ->linkedToUser($employee)
+            ->bookable()
+            ->active()
+            ->create();
+
+        $this->seedStandardWorkingHours($setup['company'], $linkedProfessional);
+        $this->authenticateForAppTenant($employee, $setup['company']);
+
+        Livewire::test(CalendarPage::class)
+            ->call('storeFitIn', [])
+            ->assertForbidden();
+    }
 }

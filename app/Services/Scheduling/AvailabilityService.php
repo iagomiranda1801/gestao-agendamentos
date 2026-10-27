@@ -34,6 +34,8 @@ class AvailabilityService
         int $bufferAfter,
         ?Appointment $ignore = null,
         bool $isTattoo = false,
+        bool $ignoreAppointmentConflicts = false,
+        bool $ignoreSlotAlignment = false,
     ): AvailabilityResult {
         if (! $company->is_active) {
             return AvailabilityResult::fail('A empresa está inativa.');
@@ -53,7 +55,7 @@ class AvailabilityService
         }
 
         if ($service === null) {
-            return $this->assertScheduleAvailability($company, $professional, $localStart, $durationMinutes, $bufferBefore, $bufferAfter, $ignore, $isTattoo);
+            return $this->assertScheduleAvailability($company, $professional, $localStart, $durationMinutes, $bufferBefore, $bufferAfter, $ignore, $isTattoo, $ignoreAppointmentConflicts, $ignoreSlotAlignment);
         }
 
         $linked = $professional->services()
@@ -65,7 +67,7 @@ class AvailabilityService
             return AvailabilityResult::fail('Profissional não está associado a este serviço.');
         }
 
-        return $this->assertScheduleAvailability($company, $professional, $localStart, $durationMinutes, $bufferBefore, $bufferAfter, $ignore, $isTattoo);
+        return $this->assertScheduleAvailability($company, $professional, $localStart, $durationMinutes, $bufferBefore, $bufferAfter, $ignore, $isTattoo, $ignoreAppointmentConflicts, $ignoreSlotAlignment);
     }
 
     protected function assertScheduleAvailability(
@@ -77,15 +79,23 @@ class AvailabilityService
         int $bufferAfter,
         ?Appointment $ignore,
         bool $isTattoo,
+        bool $ignoreAppointmentConflicts = false,
+        bool $ignoreSlotAlignment = false,
     ): AvailabilityResult {
-        if ($localStart->lt(CompanyDateTime::nowLocal($company))) {
+        $now = CompanyDateTime::nowLocal($company);
+
+        if ($ignoreSlotAlignment) {
+            if ($localStart->lt($now->subSeconds(90))) {
+                return AvailabilityResult::fail('Não é possível agendar no passado.');
+            }
+        } elseif ($localStart->lt($now)) {
             return AvailabilityResult::fail('Não é possível agendar no passado.');
         }
 
         $settings = $this->settingsService->getOrCreate($company);
         $minutesFromMidnight = ($localStart->hour * 60) + $localStart->minute;
 
-        if ($minutesFromMidnight % $settings->slot_interval_minutes !== 0) {
+        if (! $ignoreSlotAlignment && $minutesFromMidnight % $settings->slot_interval_minutes !== 0) {
             return AvailabilityResult::fail('Horário não alinhado ao intervalo da agenda.');
         }
 
@@ -122,7 +132,7 @@ class AvailabilityService
             return AvailabilityResult::fail('Horário conflita com bloqueio da agenda.');
         }
 
-        if ($this->conflictService->hasConflictWithExistingBuffers(
+        if (! $ignoreAppointmentConflicts && $this->conflictService->hasConflictWithExistingBuffers(
             $company,
             $professional,
             $startUtc,

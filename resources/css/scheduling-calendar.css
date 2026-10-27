@@ -241,6 +241,11 @@
     filter: brightness(0.97);
 }
 
+.scheduling-calendar .fc-event.fc-event-fit-in {
+    border: 2px solid #d97706;
+    box-shadow: inset 0 0 0 1px #d97706;
+}
+
 .scheduling-calendar .fc-timegrid-now-indicator-line {
     border-color: var(--primary-500);
     border-width: 2px;

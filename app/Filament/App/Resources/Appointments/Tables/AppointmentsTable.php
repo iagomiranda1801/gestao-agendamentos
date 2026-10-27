@@ -2,6 +2,7 @@
 
 namespace App\Filament\App\Resources\Appointments\Tables;
 
+use App\Enums\AppointmentFlowKind;
 use App\Enums\AppointmentOrigin;
 use App\Enums\AppointmentStatus;
 use App\Models\Appointment;
@@ -73,6 +74,16 @@ class AppointmentsTable
                         AppointmentStatus::Cancelled => 'gray',
                         AppointmentStatus::NoShow => 'danger',
                     }),
+                TextColumn::make('flow_kind')
+                    ->label('Fluxo')
+                    ->badge()
+                    ->formatStateUsing(fn (AppointmentFlowKind $state, Appointment $record): string => $record->flowLabel())
+                    ->color(fn (AppointmentFlowKind $state): string => match ($state) {
+                        AppointmentFlowKind::FitIn => 'warning',
+                        AppointmentFlowKind::QuickAttendance => 'info',
+                        AppointmentFlowKind::Normal => 'gray',
+                    })
+                    ->toggleable(),
                 TextColumn::make('origin')
                     ->label('Origem')
                     ->badge()
@@ -132,6 +143,9 @@ class AppointmentsTable
                 SelectFilter::make('origin')
                     ->label('Origem')
                     ->options(AppointmentOrigin::options()),
+                SelectFilter::make('flow_kind')
+                    ->label('Fluxo')
+                    ->options(AppointmentFlowKind::options()),
                 Filter::make('online_only')
                     ->label('Somente agendamentos online')
                     ->toggle()

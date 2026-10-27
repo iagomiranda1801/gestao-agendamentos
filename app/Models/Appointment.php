@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AppointmentFlowKind;
 use App\Enums\AppointmentOrigin;
 use App\Enums\AppointmentStatus;
 use Carbon\CarbonImmutable;
@@ -23,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'is_tattoo',
     'status',
     'origin',
+    'flow_kind',
     'send_whatsapp_confirmation',
     'reference_key',
     'appointment_reason',
@@ -35,6 +37,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'buffer_after_minutes_snapshot',
     'notes',
     'internal_notes',
+    'fit_in_reason',
     'cancellation_reason',
     'public_confirmation_code',
     'client_name_snapshot',
@@ -56,8 +59,10 @@ class Appointment extends Model
         'cancelled_by',
         'confirmed_by',
         'started_by',
+        'fit_in_authorized_by',
         'confirmed_at',
         'started_at',
+        'fit_in_authorized_at',
         'cancelled_at',
         'no_show_at',
     ];
@@ -70,6 +75,7 @@ class Appointment extends Model
         return [
             'status' => AppointmentStatus::class,
             'origin' => AppointmentOrigin::class,
+            'flow_kind' => AppointmentFlowKind::class,
             'send_whatsapp_confirmation' => 'boolean',
             'is_tattoo' => 'boolean',
             'start_at' => 'datetime',
@@ -80,6 +86,7 @@ class Appointment extends Model
             'buffer_after_minutes_snapshot' => 'integer',
             'confirmed_at' => 'datetime',
             'started_at' => 'datetime',
+            'fit_in_authorized_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'no_show_at' => 'datetime',
             'privacy_accepted_at' => 'datetime',
@@ -133,6 +140,11 @@ class Appointment extends Model
         return $this->belongsTo(User::class, 'started_by');
     }
 
+    public function fitInAuthorizer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'fit_in_authorized_by');
+    }
+
     public function histories(): HasMany
     {
         return $this->hasMany(AppointmentHistory::class);
@@ -170,6 +182,23 @@ class Appointment extends Model
     public function isBlockingTime(): bool
     {
         return $this->status->blocksTime();
+    }
+
+    public function isMarkedAsFitIn(): bool
+    {
+        return $this->flow_kind === AppointmentFlowKind::FitIn
+            || $this->fit_in_authorized_at !== null;
+    }
+
+    public function flowLabel(): string
+    {
+        $label = $this->flow_kind?->label() ?? AppointmentFlowKind::Normal->label();
+
+        if ($this->flow_kind === AppointmentFlowKind::QuickAttendance && $this->fit_in_authorized_at !== null) {
+            return $label.' · Encaixe';
+        }
+
+        return $label;
     }
 
     public function isCancelled(): bool
