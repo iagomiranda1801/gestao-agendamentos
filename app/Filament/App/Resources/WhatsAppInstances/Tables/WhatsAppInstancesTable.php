@@ -110,6 +110,32 @@ class WhatsAppInstancesTable
                                 ->send();
                         }
                     }),
+                Action::make('configureWebhook')
+                    ->label('Configurar recebimento')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->requiresConfirmation()
+                    ->modalDescription('Configura esta instância da Evolution para enviar mensagens recebidas ao sistema.')
+                    ->action(function (CompanyWhatsAppInstance $record): void {
+                        /** @var Company $company */
+                        $company = Filament::getTenant();
+
+                        try {
+                            app(CompanyWhatsAppInstanceService::class)->configureInboundWebhook($company, $record);
+
+                            Notification::make()
+                                ->success()
+                                ->title('Recebimento de mensagens configurado')
+                                ->send();
+                        } catch (Throwable $exception) {
+                            report($exception);
+
+                            Notification::make()
+                                ->danger()
+                                ->title('Não foi possível configurar o recebimento')
+                                ->body(self::evolutionErrorMessage($exception))
+                                ->send();
+                        }
+                    }),
                 Action::make('delete')
                     ->label('Excluir')
                     ->icon('heroicon-o-trash')

@@ -134,6 +134,7 @@ class WhatsAppInstanceResourceTest extends TestCase
                 'instance' => ['state' => 'qrcode'],
                 'qrcode' => ['base64' => 'data:image/png;base64,abc'],
             ]),
+            'https://evolution.test/webhook/set/estudio-ana' => Http::response(['webhook' => ['enabled' => true]]),
         ]);
 
         $company = $this->createCompany();
@@ -152,6 +153,59 @@ class WhatsAppInstanceResourceTest extends TestCase
         $this->assertSame('qrcode', $instance->status);
         $this->assertSame('data:image/png;base64,abc', $instance->qr_code);
         $this->assertSame('data:image/png;base64,abc', $setting->whatsapp_instance_qr_code);
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://evolution.test/webhook/set/estudio-ana'
+            && $request['webhook']['events'] === ['MESSAGES_UPSERT', 'MESSAGES_UPDATE']);
+    }
+
+    public function test_existing_instance_can_configure_inbound_webhook(): void
+    {
+        config([
+            'app.url' => 'https://agenda.example',
+            'services.evolution.url' => 'https://evolution.test',
+            'services.evolution.key' => 'secret',
+            'services.evolution.webhook_token' => 'webhook-secret',
+        ]);
+
+        Http::fake([
+            'https://evolution.test/webhook/set/arena-padel' => Http::response(['webhook' => ['enabled' => true]]),
+        ]);
+
+        $company = $this->createCompany();
+        $instance = app(CompanyWhatsAppInstanceService::class)->create($company, [
+            'name' => 'Principal',
+            'instance_name' => 'arena-padel',
+            'is_default' => true,
+        ]);
+
+        app(CompanyWhatsAppInstanceService::class)->configureInboundWebhook($company, $instance);
+
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://evolution.test/webhook/set/arena-padel'
+            && $request['webhook']['url'] === 'https://agenda.example/webhooks/evolution/arena-padel'
+            && $request['webhook']['headers']['X-Evolution-Webhook-Token'] === 'webhook-secret'
+            && $request['webhook']['webhookByEvents'] === false
+            && $request['webhook']['events'] === ['MESSAGES_UPSERT', 'MESSAGES_UPDATE']);
+    }
+
+    public function test_scheduling_settings_instance_can_configure_inbound_webhook_without_instance_record(): void
+    {
+        config([
+            'app.url' => 'https://agenda.example',
+            'services.evolution.url' => 'https://evolution.test',
+            'services.evolution.key' => 'secret',
+        ]);
+        Http::fake([
+            'https://evolution.test/webhook/set/arena-legacy' => Http::response(['webhook' => ['enabled' => true]]),
+        ]);
+
+        $company = $this->createCompany();
+        app(CompanySchedulingSettingService::class)->update($company, [
+            'whatsapp_instance' => 'arena-legacy',
+        ]);
+
+        app(CompanyWhatsAppInstanceService::class)->configureInboundWebhookForCompany($company);
+
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://evolution.test/webhook/set/arena-legacy'
+            && $request['webhook']['url'] === 'https://agenda.example/webhooks/evolution/arena-legacy');
     }
 
     public function test_existing_evolution_instance_is_reused_by_phone_without_creating_another_one(): void

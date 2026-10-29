@@ -11,6 +11,7 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class CompanyWhatsAppInstanceService
 {
@@ -80,6 +81,7 @@ class CompanyWhatsAppInstanceService
             : Str::random(48);
 
         $existing = $this->findExistingInEvolution($instanceName, $instance->sender_phone);
+        $createdInEvolution = false;
 
         if ($existing !== null) {
             $existingName = $this->extractInstanceName($existing) ?: $instanceName;
@@ -101,6 +103,7 @@ class CompanyWhatsAppInstanceService
             ]);
         } elseif (blank($instance->status) || $instance->status === 'error') {
             $response = $this->client->createInstance($instanceName, $token, true);
+            $createdInEvolution = true;
 
             $instance->fill([
                 'instance_name' => $instanceName,
@@ -121,11 +124,48 @@ class CompanyWhatsAppInstanceService
 
         $instance->save();
 
+        if ($createdInEvolution) {
+            $this->configureInboundWebhook($company, $instance);
+        }
+
         if ($instance->is_default) {
             $this->syncDefaultToSchedulingSettings($instance);
         }
 
         return $instance->refresh();
+    }
+
+    public function configureInboundWebhook(Company $company, CompanyWhatsAppInstance $instance): void
+    {
+        $this->ensureBelongsToCompany($company, $instance);
+
+        $this->configureInboundWebhookName((string) $instance->instance_name);
+    }
+
+    public function configureInboundWebhookForCompany(Company $company): void
+    {
+        $instanceName = $this->defaultForCompany($company)?->instance_name
+            ?: $this->settings->getOrCreate($company)->whatsapp_instance;
+
+        $this->configureInboundWebhookName((string) $instanceName);
+    }
+
+    private function configureInboundWebhookName(string $instanceName): void
+    {
+        $instanceName = trim($instanceName);
+        if ($instanceName === '') {
+            throw ValidationException::withMessages(['instance_name' => 'Informe a instância Evolution antes de configurar o webhook.']);
+        }
+
+        $baseUrl = rtrim((string) config('app.url'), '/');
+        $webhookUrl = $baseUrl.route('webhooks.evolution', ['instance' => $instanceName], absolute: false);
+        $token = trim((string) config('services.evolution.webhook_token'));
+
+        $this->client->setWebhook(
+            $instanceName,
+            $webhookUrl,
+            $token !== '' ? ['X-Evolution-Webhook-Token' => $token] : [],
+        );
     }
 
     public function refreshConnectionState(Company $company, CompanyWhatsAppInstance $instance): CompanyWhatsAppInstance

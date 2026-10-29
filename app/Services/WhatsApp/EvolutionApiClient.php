@@ -216,6 +216,33 @@ class EvolutionApiClient
     }
 
     /**
+     * @param  array<string, string>  $headers
+     * @return array<string, mixed>
+     */
+    public function setWebhook(string $instanceName, string $url, array $headers = []): array
+    {
+        $response = $this->http()
+            ->acceptJson()
+            ->timeout(20)
+            ->post($this->url('/webhook/set/'.$instanceName), [
+                'webhook' => [
+                    'enabled' => true,
+                    'url' => $url,
+                    'webhookByEvents' => false,
+                    'webhookBase64' => false,
+                    'events' => ['MESSAGES_UPSERT', 'MESSAGES_UPDATE'],
+                    'headers' => $headers,
+                ],
+            ]);
+
+        if ($response->failed()) {
+            throw new RequestException($response);
+        }
+
+        return $response->json() ?? [];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function deleteInstance(string $instanceName): array

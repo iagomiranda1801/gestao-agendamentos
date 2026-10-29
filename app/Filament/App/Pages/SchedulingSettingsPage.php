@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Policies\CompanySchedulingSettingPolicy;
 use App\Services\Scheduling\CompanyBusinessHoursService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
+use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Services\WhatsApp\Automations\WhatsAppAutomationService;
 use App\Support\Segment;
 use BackedEnum;
@@ -33,6 +34,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Validation\ValidationException;
 use UnitEnum;
+use Throwable;
 
 class SchedulingSettingsPage extends Page
 {
@@ -388,6 +390,31 @@ class SchedulingSettingsPage extends Page
                             ->mask('(99) 99999-9999')
                             ->required(fn (Get $get): bool => (bool) $get('whatsapp_notifications_enabled'))
                             ->maxLength(20),
+                        Actions::make([
+                            Action::make('configureInboundWebhook')
+                                ->label('Configurar recebimento de mensagens')
+                                ->requiresConfirmation()
+                                ->modalDescription('Salve as configurações antes de continuar. A instância Evolution será configurada para enviar mensagens recebidas ao sistema.')
+                                ->action(function (): void {
+                                    /** @var Company $company */
+                                    $company = Filament::getTenant();
+
+                                    try {
+                                        app(CompanyWhatsAppInstanceService::class)->configureInboundWebhookForCompany($company);
+
+                                        Notification::make()->success()
+                                            ->title('Recebimento de mensagens configurado')
+                                            ->send();
+                                    } catch (Throwable $exception) {
+                                        report($exception);
+
+                                        Notification::make()->danger()
+                                            ->title('Não foi possível configurar o recebimento')
+                                            ->body('Verifique a instância salva e a conexão com a Evolution.')
+                                            ->send();
+                                    }
+                                }),
+                        ])->columnSpanFull(),
                         Textarea::make('whatsapp_confirmation_template')
                             ->label('Modelo da mensagem')
                             ->helperText('Placeholders: {nome}, {servico}, {profissional}, {data}, {hora}, {codigo}, {link}, {empresa}, {placa}')
