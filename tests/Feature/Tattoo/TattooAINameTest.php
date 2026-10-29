@@ -92,7 +92,7 @@ class TattooAINameTest extends TestCase
         $this->assertArrayNotHasKey('artist_preference', $data);
         $this->assertStringNotContainsString('Mencionou tatuador', (string) ($data['notes'] ?? ''));
         $this->assertStringStartsWith('Show, Lucas!', $reply);
-        $this->assertStringContainsString('preferência de artista', $reply);
+        $this->assertStringContainsString('imagina a tattoo', $reply);
         $this->assertDatabaseHas('clients', ['company_id' => $company->id, 'name' => 'Lucas', 'phone_normalized' => $this->phone]);
     }
 
@@ -114,7 +114,7 @@ class TattooAINameTest extends TestCase
         $this->assertArrayNotHasKey('artist_preference', $other->collected_data);
     }
 
-    public function test_asking_for_the_artist_still_records_the_preference(): void
+    public function test_asking_for_an_artist_does_not_record_a_preference(): void
     {
         [$company, $instance] = $this->setupAI();
         Professional::factory()->forCompany($company)->create(['name' => 'Lucas']);
@@ -126,7 +126,8 @@ class TattooAINameTest extends TestCase
 
         $data = $this->conversation()->collected_data;
         $this->assertSame('Ana', $data['name']);
-        $this->assertSame('Lucas', $data['artist_preference']);
+        $this->assertArrayNotHasKey('artist_preference', $data);
+        $this->assertStringNotContainsString('Lucas', (string) ($data['notes'] ?? ''));
     }
 
     public function test_full_artist_name_is_confirmed_once_and_the_answer_decides(): void
@@ -156,7 +157,6 @@ class TattooAINameTest extends TestCase
         $this->assertSame('Não peguei seu nome. Como você se chama?', $this->send($company, $instance, 'queria fazer um outro orçamento de tatto', 'r2'));
         $this->assertArrayNotHasKey('description', $this->conversation()->collected_data ?? []);
         $this->send($company, $instance, 'lucas', 'r3');
-        $this->send($company, $instance, 'sem preferência', 'r4');
         $this->send($company, $instance, 'o nome Maria em letra cursiva', 'r5');
         $this->send($company, $instance, 'no antebraço, parte de cima', 'r6');
         $this->assertStringContainsString('estilo em mente', $this->send($company, $instance, '25cm', 'r7'));
@@ -214,7 +214,7 @@ class TattooAINameTest extends TestCase
         $reply = $this->send($company, $instance, 'prefiro não falar', 'l3');
 
         $this->assertStringStartsWith('Tranquilo, vamos seguindo!', $reply);
-        $this->assertStringContainsString('preferência de artista', $reply);
+        $this->assertStringContainsString('imagina a tattoo', $reply);
         $data = $this->conversation()->collected_data;
         $this->assertSame('placeholder', $data['name_source']);
         $this->assertStringContainsString('não informou o nome', (string) $data['notes']);
@@ -299,7 +299,7 @@ class TattooAINameTest extends TestCase
         $reply = $this->send($company, $instance, 'oi', 'v1', 'Zé');
 
         $this->assertStringStartsWith('Opa, Lucas, tudo bem? Aqui é a assistente do *GODS TATOO*', $reply);
-        $this->assertStringContainsString('preferência de artista', $reply);
+        $this->assertStringContainsString('imagina a tattoo', $reply);
         $this->assertSame('client', $this->conversation()->collected_data['name_source']);
         $this->assertDatabaseHas('clients', ['company_id' => $company->id, 'name' => 'Lucas Silva']);
     }
