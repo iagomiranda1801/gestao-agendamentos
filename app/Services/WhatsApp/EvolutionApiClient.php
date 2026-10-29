@@ -231,7 +231,7 @@ class EvolutionApiClient
                     'webhookByEvents' => false,
                     'webhookBase64' => false,
                     'events' => ['MESSAGES_UPSERT', 'MESSAGES_UPDATE'],
-                    'headers' => $headers,
+                    ...($headers !== [] ? ['headers' => $headers] : []),
                 ],
             ]);
 

@@ -124,6 +124,7 @@ class WhatsAppInstanceResourceTest extends TestCase
     public function test_generate_qr_updates_instance_and_legacy_settings(): void
     {
         config([
+            'services.evolution.webhook_base_url' => 'https://agenda.example',
             'services.evolution.url' => 'https://evolution.test',
             'services.evolution.key' => 'secret',
         ]);
@@ -160,7 +161,7 @@ class WhatsAppInstanceResourceTest extends TestCase
     public function test_existing_instance_can_configure_inbound_webhook(): void
     {
         config([
-            'app.url' => 'https://agenda.example',
+            'services.evolution.webhook_base_url' => 'https://agenda.example',
             'services.evolution.url' => 'https://evolution.test',
             'services.evolution.key' => 'secret',
             'services.evolution.webhook_token' => 'webhook-secret',
@@ -180,8 +181,8 @@ class WhatsAppInstanceResourceTest extends TestCase
         app(CompanyWhatsAppInstanceService::class)->configureInboundWebhook($company, $instance);
 
         Http::assertSent(fn ($request): bool => $request->url() === 'https://evolution.test/webhook/set/arena-padel'
-            && $request['webhook']['url'] === 'https://agenda.example/webhooks/evolution/arena-padel'
-            && $request['webhook']['headers']['X-Evolution-Webhook-Token'] === 'webhook-secret'
+            && $request['webhook']['url'] === 'https://agenda.example/webhooks/evolution/arena-padel?token=webhook-secret'
+            && ! array_key_exists('headers', $request['webhook'])
             && $request['webhook']['webhookByEvents'] === false
             && $request['webhook']['events'] === ['MESSAGES_UPSERT', 'MESSAGES_UPDATE']);
     }
@@ -189,7 +190,7 @@ class WhatsAppInstanceResourceTest extends TestCase
     public function test_scheduling_settings_instance_can_configure_inbound_webhook_without_instance_record(): void
     {
         config([
-            'app.url' => 'https://agenda.example',
+            'services.evolution.webhook_base_url' => 'https://agenda.example',
             'services.evolution.url' => 'https://evolution.test',
             'services.evolution.key' => 'secret',
         ]);

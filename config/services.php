@@ -40,6 +40,7 @@ return [
         'key' => env('EVOLUTION_API_KEY'),
         'instance' => env('EVOLUTION_INSTANCE'),
         'webhook_token' => env('EVOLUTION_WEBHOOK_TOKEN'),
+        'webhook_base_url' => env('EVOLUTION_WEBHOOK_BASE_URL', env('APP_URL')),
         // Minutos que o bot fica em silencio numa conversa depois que a empresa responde manualmente.
         'human_takeover_minutes' => (int) env('WHATSAPP_HUMAN_TAKEOVER_MINUTES', 120),
         // Mensagens da empresa que saem logo depois da mensagem do cliente (saudacao/ausencia automatica do WhatsApp Business) nao pausam o bot.

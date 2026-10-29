@@ -124,7 +124,7 @@ class CompanyWhatsAppInstanceService
 
         $instance->save();
 
-        if ($createdInEvolution) {
+        if ($createdInEvolution && $this->hasPublicWebhookBaseUrl()) {
             $this->configureInboundWebhook($company, $instance);
         }
 
@@ -157,15 +157,32 @@ class CompanyWhatsAppInstanceService
             throw ValidationException::withMessages(['instance_name' => 'Informe a instância Evolution antes de configurar o webhook.']);
         }
 
-        $baseUrl = rtrim((string) config('app.url'), '/');
+        if (! $this->hasPublicWebhookBaseUrl()) {
+            throw ValidationException::withMessages([
+                'whatsapp_instance' => 'Configure EVOLUTION_WEBHOOK_BASE_URL com o endereço público do sistema antes de ativar o recebimento.',
+            ]);
+        }
+
+        $baseUrl = rtrim((string) config('services.evolution.webhook_base_url'), '/');
         $webhookUrl = $baseUrl.route('webhooks.evolution', ['instance' => $instanceName], absolute: false);
         $token = trim((string) config('services.evolution.webhook_token'));
+        if ($token !== '') {
+            $webhookUrl .= '?'.http_build_query(['token' => $token]);
+        }
 
-        $this->client->setWebhook(
-            $instanceName,
-            $webhookUrl,
-            $token !== '' ? ['X-Evolution-Webhook-Token' => $token] : [],
-        );
+        $this->client->setWebhook($instanceName, $webhookUrl);
+    }
+
+    private function hasPublicWebhookBaseUrl(): bool
+    {
+        $url = (string) config('services.evolution.webhook_base_url');
+        $host = parse_url($url, PHP_URL_HOST);
+
+        return filter_var($url, FILTER_VALIDATE_URL) !== false
+            && is_string($host)
+            && $host !== 'localhost'
+            && $host !== '127.0.0.1'
+            && ! str_ends_with($host, '.test');
     }
 
     public function refreshConnectionState(Company $company, CompanyWhatsAppInstance $instance): CompanyWhatsAppInstance
