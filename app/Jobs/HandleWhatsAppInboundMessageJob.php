@@ -6,6 +6,7 @@ use App\Enums\CompanyModule;
 use App\Enums\WhatsAppOutboundKind;
 use App\Jobs\Concerns\DefersViaWhatsAppOutboundGate;
 use App\Models\Company;
+use App\Models\CompanySchedulingSetting;
 use App\Models\CompanyWhatsAppInstance;
 use App\Models\WhatsAppBotConversation;
 use App\Services\Beauty\BeautyAIConversationService;
@@ -144,10 +145,11 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
             return;
         }
 
-        if (! $this->bookingBotIsAllowed($company, $modules, $settingsService)) {
+        if ($reason = $this->bookingBotDisabledReason($company, $modules, $settingsService)) {
             Log::info('WhatsApp bot: disabled for company.', [
                 'company_id' => $company->getKey(),
                 'instance' => $this->instanceName,
+                'reason' => $reason,
             ]);
 
             return;
@@ -185,37 +187,44 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
             return $instance->company;
         }
 
-        return null;
+        // The scheduling settings also allow an Evolution instance to be configured
+        // directly, without creating a CompanyWhatsAppInstance record.
+        $settings = CompanySchedulingSetting::query()
+            ->where('whatsapp_instance', $this->instanceName)
+            ->limit(2)
+            ->get();
+
+        return $settings->count() === 1 ? $settings->first()->company : null;
     }
 
-    protected function bookingBotIsAllowed(
+    protected function bookingBotDisabledReason(
         Company $company,
         CompanyModuleService $modules,
         CompanySchedulingSettingService $settingsService,
-    ): bool {
+    ): ?string {
         if (! $company->is_active) {
-            return false;
+            return 'inactive_company';
         }
 
         if (! $modules->hasModule($company, CompanyModule::WhatsApp)) {
-            return false;
+            return 'whatsapp_module_disabled';
         }
 
         if (! $modules->hasModule($company, CompanyModule::Scheduling)) {
-            return false;
+            return 'scheduling_module_disabled';
         }
 
         $settings = $settingsService->getOrCreate($company);
 
         if (! (bool) ($settings->public_booking_enabled ?? false)) {
-            return false;
+            return 'public_booking_disabled';
         }
 
         if (! (bool) ($settings->whatsapp_bot_enabled ?? false)) {
-            return false;
+            return 'bot_disabled';
         }
 
-        return true;
+        return null;
     }
 
     protected function sendReply(Company $company, EvolutionApiClient $client, ?string $reply): void

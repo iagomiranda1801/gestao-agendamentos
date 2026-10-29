@@ -126,6 +126,36 @@ class BookingBotDisabledTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_custom_company_bot_uses_instance_configured_in_scheduling_settings(): void
+    {
+        $company = $this->createSchedulingCompany();
+        $company->update([
+            'business_profile' => 'custom',
+            'enabled_modules' => [
+                CompanyModule::Scheduling->value,
+                CompanyModule::WhatsApp->value,
+            ],
+        ]);
+        $this->enablePublicBooking($company, [
+            'whatsapp_bot_enabled' => true,
+            'whatsapp_instance' => 'custom-settings-instance',
+        ]);
+
+        app()->call([new HandleWhatsAppInboundMessageJob(
+            instanceName: 'custom-settings-instance',
+            remoteJid: '5511922224444@s.whatsapp.net',
+            phone: '5511922224444',
+            text: 'oi',
+            messageId: 'custom-inbound-1',
+        ), 'handle']);
+
+        $this->assertDatabaseHas('whatsapp_bot_conversations', [
+            'company_id' => $company->getKey(),
+            'phone_normalized' => '5511922224444',
+        ]);
+        Http::assertSentCount(1);
+    }
+
     protected function createInstance(Company $company): CompanyWhatsAppInstance
     {
         $instance = new CompanyWhatsAppInstance([
