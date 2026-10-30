@@ -2,6 +2,7 @@
 
 namespace App\Services\Tattoo;
 
+use App\Jobs\NotifyTattooHandoffJob;
 use App\Models\Professional;
 use App\Models\TattooAiConversation;
 use App\Models\TattooAiMessage;
@@ -33,7 +34,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
 
     protected function handoffPrefixes(): array
     {
-        return ['Beleza, vou chamar o pessoal', 'Fechou, já chamei o pessoal', 'Sobre workshop', TattooStudioMenu::HANDOFF];
+        return ['Beleza, vou chamar o pessoal', 'Fechou, já chamei o pessoal', 'Sobre workshop', 'Já avisei', TattooStudioMenu::HANDOFF];
     }
 
     protected function logLabel(): string
@@ -87,6 +88,9 @@ class TattooAIConversationService extends WhatsAppAIConversationService
                 }
             }
         }
+        if (($studioReply = $this->studioInfoReply($conversation, $normalized)) !== null) {
+            return $studioReply;
+        }
         if ((bool) $conversation->company->schedulingSetting?->tattoo_custom_flow_enabled && $conversation->menu_choice === null) {
             $existingReply = $conversation->messages()->where('direction', 'out')->where('id', '<', $message->id)->exists();
             if ($request || $existingReply && ($conversation->status !== 'awaiting_menu')) {
@@ -95,6 +99,10 @@ class TattooAIConversationService extends WhatsAppAIConversationService
                 $conversation->update(['status' => 'awaiting_menu']);
 
                 return TattooStudioMenu::TEXT;
+            } elseif (in_array($normalized, ['5', '6'], true)) {
+                return $normalized === '5'
+                    ? $this->aftercareReply($conversation)
+                    : $this->addressReply($conversation);
             } elseif (in_array($normalized, ['1', '2', '3', '4'], true)) {
                 $conversation->update(['menu_choice' => (int) $normalized,
                     'status' => $normalized === '1' ? 'collecting_information' : 'human_takeover',
@@ -853,6 +861,56 @@ class TattooAIConversationService extends WhatsAppAIConversationService
     protected function studioAssistantIntro(TattooAiConversation $conversation, ?string $name = null): string
     {
         return 'Opa'.($name !== null ? ', '.$name : '').', tudo bem? Aqui é a assistente do *'.$conversation->company->name.'*, o tatuador acompanha a conversa por aqui 🤙';
+    }
+
+    /**
+     * Cuidados com tatuagem já feita, endereço do estúdio e pedido para falar
+     * com o tatuador. Roda antes do Gemini, então vale com ou sem a IA.
+     */
+    protected function studioInfoReply(TattooAiConversation $conversation, string $normalized): ?string
+    {
+        $company = $conversation->company;
+        if (TattooStudioInfo::asksForArtist($normalized, $company)) {
+            return $this->handOverToArtist($conversation, 'Cliente pediu para falar com o tatuador', '');
+        }
+        if (TattooStudioInfo::isSeriousIssue($normalized)) {
+            return $this->handOverToArtist($conversation, 'Possível problema na tatuagem: '.Str::limit($normalized, 120), ' sobre isso');
+        }
+        if (TattooStudioInfo::isAftercareQuestion($normalized)) {
+            return $this->aftercareReply($conversation);
+        }
+        if (TattooStudioInfo::isAddressQuestion($normalized)) {
+            return $this->addressReply($conversation);
+        }
+
+        return null;
+    }
+
+    protected function aftercareReply(TattooAiConversation $conversation): string
+    {
+        Log::info('Tattoo AI aftercare reply.', ['company_id' => $conversation->company_id, 'conversation_id' => $conversation->id]);
+
+        return TattooStudioInfo::aftercare($conversation->company);
+    }
+
+    protected function addressReply(TattooAiConversation $conversation): string
+    {
+        $address = TattooStudioInfo::address($conversation->company);
+        if ($address !== null) {
+            return $address;
+        }
+
+        return $this->handOverToArtist($conversation, 'Cliente pediu o endereço (não cadastrado nas configurações)', ' pra te mandar o endereço');
+    }
+
+    protected function handOverToArtist(TattooAiConversation $conversation, string $reason, string $about): string
+    {
+        $conversation->update(['human_takeover' => true, 'status' => 'human_takeover']);
+        NotifyTattooHandoffJob::dispatch($conversation->id, $reason);
+        Log::info('Tattoo AI handed over to artist.', ['company_id' => $conversation->company_id,
+            'conversation_id' => $conversation->id, 'reason' => $reason]);
+
+        return TattooStudioInfo::handoffMessage($conversation->company, $about);
     }
 
     protected function isWorkshopTopic(string $normalized): bool

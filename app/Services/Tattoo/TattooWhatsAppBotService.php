@@ -135,7 +135,13 @@ class TattooWhatsAppBotService
         }
 
         if ($customFlow && $conversation->menu_choice === null && $conversation->state === State::Greeting) {
-            if (! in_array($normalized, ['1', '2', '3', '4'], true)) {
+            if ($normalized === '5') {
+                return $this->reply($conversation, $messageId, TattooStudioInfo::aftercare($company));
+            }
+            if ($normalized === '6' && ($address = TattooStudioInfo::address($company)) !== null) {
+                return $this->reply($conversation, $messageId, $address);
+            }
+            if (! in_array($normalized, ['1', '2', '3', '4', '6'], true)) {
                 return $this->reply($conversation, $messageId, TattooStudioMenu::TEXT);
             }
             $conversation->menu_choice = (int) $normalized;

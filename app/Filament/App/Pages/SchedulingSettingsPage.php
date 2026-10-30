@@ -19,6 +19,7 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
+use App\Services\Tattoo\TattooStudioInfo;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
@@ -112,6 +113,10 @@ class SchedulingSettingsPage extends Page
             'tattoo_ai_enabled' => $setting->tattoo_ai_enabled,
             'tattoo_custom_flow_enabled' => $setting->tattoo_custom_flow_enabled,
             'tattoo_ai_prompt' => $setting->tattoo_ai_prompt,
+            'tattoo_artist_name' => $setting->tattoo_artist_name,
+            'tattoo_aftercare_message' => $setting->tattoo_aftercare_message ?: TattooStudioInfo::DEFAULT_AFTERCARE,
+            'tattoo_studio_address' => $setting->tattoo_studio_address,
+            'tattoo_address_message' => $setting->tattoo_address_message ?: TattooStudioInfo::DEFAULT_ADDRESS,
             'ai_provider' => $setting->ai_provider,
             'ai_model' => $setting->ai_model,
             'ai_api_key' => '',
@@ -443,10 +448,22 @@ class SchedulingSettingsPage extends Page
                             ->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
                         Toggle::make('tattoo_custom_flow_enabled')
                             ->label('Menu e regras especiais de tatuagem')
-                            ->helperText('Ativa o menu de quatro opções, uma tatuagem por tatuador ao dia e o retorno após quatro dias sem resposta.')
+                            ->helperText('Ativa o menu (orçamento, horário, finalizar, workshop, cuidados e endereço), uma tatuagem por tatuador ao dia e o retorno após quatro dias sem resposta.')
                             ->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
                         Textarea::make('tattoo_ai_prompt')->label('Orientações adicionais para a IA')
                             ->maxLength(3000)->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
+                        TextInput::make('tattoo_artist_name')->label('Nome do tatuador que assume a conversa')
+                            ->helperText('Ex.: Gustavo. Vazio: usa o único tatuador ativo ou "o tatuador".')
+                            ->maxLength(100)->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
+                        Textarea::make('tattoo_aftercare_message')->label('Mensagem de cuidados com tatuagem já feita')
+                            ->helperText('Enviada quando o cliente pergunta sobre cuidados/cicatrização (ou escolhe 5 no menu). Inflamação, pus, dor forte, alergia ou retoque vão direto para o tatuador.')
+                            ->rows(7)->maxLength(3000)->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
+                        TextInput::make('tattoo_studio_address')->label('Endereço do estúdio')
+                            ->helperText('Vazio: a IA avisa o tatuador para mandar o endereço.')
+                            ->maxLength(500)->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
+                        Textarea::make('tattoo_address_message')->label('Mensagem do endereço')
+                            ->helperText('Use {endereco} e {empresa}.')
+                            ->rows(3)->maxLength(1000)->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
                         Toggle::make('beauty_ai_enabled')->label('Atendimento com IA')
                             ->helperText('A IA conversa com a cliente, mostra horários livres reais e marca o agendamento. Usa a chave de IA da empresa configurada abaixo.')
                             ->visible(fn (): bool => (bool) Filament::getTenant()?->isSalon()),
