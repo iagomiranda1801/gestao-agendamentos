@@ -23,6 +23,7 @@ use App\Filament\App\Resources\Products\ProductResource;
 use App\Filament\App\Resources\Purchases\PurchaseResource;
 use App\Filament\App\Resources\Receivables\ReceivableResource;
 use App\Filament\App\Resources\ScheduleBlocks\ScheduleBlockResource;
+use App\Filament\App\Resources\ServiceOrders\ServiceOrderResource;
 use App\Filament\App\Resources\StockAdjustments\StockAdjustmentResource;
 use App\Filament\App\Resources\StockMovements\StockMovementResource;
 use App\Filament\App\Resources\Suppliers\SupplierResource;
@@ -30,6 +31,7 @@ use App\Filament\App\Resources\TattooRequests\TattooRequestResource;
 use App\Filament\App\Resources\Transfers\TransferResource;
 
 return [
+    CompanyModule::ServiceOrders->value => [ServiceOrderResource::class],
     CompanyModule::Scheduling->value => [
         CalendarPage::class,
         SchedulingSettingsPage::class,

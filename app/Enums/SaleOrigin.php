@@ -4,6 +4,7 @@ namespace App\Enums;
 
 enum SaleOrigin: string
 {
+    case ServiceOrder = 'service_order';
     case Pos = 'pos';
     case QuickSale = 'quick_sale';
     case AttendanceCheckout = 'attendance_checkout';
@@ -12,6 +13,7 @@ enum SaleOrigin: string
     public function label(): string
     {
         return match ($this) {
+            self::ServiceOrder => 'Ordem de serviço',
             self::Pos => 'PDV',
             self::QuickSale => 'Venda rápida',
             self::AttendanceCheckout => 'Checkout de atendimento',

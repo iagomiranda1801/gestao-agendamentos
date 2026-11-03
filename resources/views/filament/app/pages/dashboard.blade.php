@@ -10,6 +10,20 @@
     $tone = fn (?string $color): string => 'agendaqui-dashboard-tone--'.($color ?: 'primary');
 @endphp
 
+@if(\Filament\Facades\Filament::getTenant()?->isTechnicalAssistance())
+<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:24px">
+    @if(\App\Filament\App\Resources\ServiceOrders\ServiceOrderResource::canCreate())
+    <x-filament::button tag="a" href="{{ \App\Filament\App\Resources\ServiceOrders\ServiceOrderResource::getUrl('create') }}" icon="heroicon-o-plus">Receber aparelho</x-filament::button>
+    @endif
+    @if(\App\Filament\App\Resources\ServiceOrders\ServiceOrderResource::canViewAny())
+    <x-filament::button tag="a" href="{{ \App\Filament\App\Resources\ServiceOrders\ServiceOrderResource::getUrl() }}" icon="heroicon-o-wrench-screwdriver">Ver consertos</x-filament::button>
+    @endif
+    @if(\App\Filament\App\Pages\PointOfSalePage::canAccess())
+    <x-filament::button tag="a" href="{{ \App\Filament\App\Pages\PointOfSalePage::getUrl() }}" icon="heroicon-o-shopping-cart">Vender produto</x-filament::button>
+    @endif
+</div>
+@endif
+
 @once
     <style>
         .agendaqui-dashboard {
@@ -419,9 +433,21 @@
 
         <section class="agendaqui-dashboard-panel">
             <div class="agendaqui-dashboard-panel__header">
-                <h3 class="agendaqui-dashboard-panel__title">Agenda de hoje</h3>
+                <h3 class="agendaqui-dashboard-panel__title">{{ $company?->isTechnicalAssistance() ? 'Consertos em andamento' : 'Agenda de hoje' }}</h3>
             </div>
             <div class="agendaqui-dashboard-list">
+                @if($company?->isTechnicalAssistance())
+                    @forelse($serviceOrderSummary ?? [] as $repair)
+                        <a class="agendaqui-dashboard-list__item agendaqui-dashboard-list__item--link" href="{{ \App\Filament\App\Resources\ServiceOrders\ServiceOrderResource::getUrl('edit', ['record' => $repair]) }}">
+                            <div>
+                                <p class="agendaqui-dashboard-list__title">OS #{{ $repair->number }} · {{ $repair->device }}</p>
+                                <p class="agendaqui-dashboard-list__description">{{ $repair->client->name }} · {{ \App\Models\ServiceOrder::STATUSES[$repair->status] }}</p>
+                            </div>
+                        </a>
+                    @empty
+                        <div class="agendaqui-dashboard-empty">Nenhum conserto em andamento.</div>
+                    @endforelse
+                @else
                 @forelse ($agenda as $appointment)
                     <div class="agendaqui-dashboard-list__item">
                         <div class="agendaqui-dashboard-list__row">
@@ -436,6 +462,7 @@
                 @empty
                     <div class="agendaqui-dashboard-empty">Nenhum agendamento para hoje.</div>
                 @endforelse
+                @endif
             </div>
         </section>
     </div>

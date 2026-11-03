@@ -3,6 +3,7 @@
 namespace App\Filament\App\Pages;
 
 use App\Enums\CompanyRole;
+use App\Filament\App\Resources\ServiceOrders\ServiceOrderResource;
 use App\Models\Company;
 use App\Services\Company\PersonalTrainerSetupService;
 use App\Services\Dashboard\OperationalDashboardAggregator;
@@ -35,6 +36,10 @@ class Dashboard extends BaseDashboard
                             ? app(OperationalDashboardAggregator::class)->aggregate($company)
                             : [],
                         'userName' => auth()->user()?->name ?? 'Usuário',
+                        'serviceOrderSummary' => $company?->isTechnicalAssistance()
+                            && ServiceOrderResource::canViewAny()
+                                ? $company->serviceOrders()->with('client')->whereNotIn('status', ['delivered', 'returned', 'reversed'])->latest('id')->limit(5)->get()
+                                : collect(),
                         'personalTrainerSetup' => $company && auth()->user()?->hasActiveRoleInCompany(
                             $company,
                             CompanyRole::CompanyAdmin,

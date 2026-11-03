@@ -1,8 +1,9 @@
 <?php
 
 use App\Http\Controllers\EvolutionWebhookController;
-use App\Http\Controllers\PwaController;
 use App\Http\Controllers\PrintDentalTreatmentPlanController;
+use App\Http\Controllers\PwaController;
+use App\Http\Controllers\ServiceOrderDocumentController;
 use App\Http\Controllers\TattooImageController;
 use App\Http\Controllers\TattooQuotePdfController;
 use App\Http\Controllers\TattooReceiptController;
@@ -12,6 +13,11 @@ use App\Livewire\PublicOrders\OrderWizard;
 use App\Livewire\Signup\CompanySignupWizard;
 use App\Support\Segment;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/os/documento/{token}', [ServiceOrderDocumentController::class, 'document'])->where('token', '[A-Za-z0-9]{64}')->middleware('throttle:60,1')->name('service-orders.document');
+Route::get('/os/orcamento/{token}', [ServiceOrderDocumentController::class, 'quote'])->where('token', '[A-Za-z0-9]{64}')->middleware('throttle:60,1')->name('service-orders.quote');
+Route::post('/os/orcamento/{token}', [ServiceOrderDocumentController::class, 'decide'])->where('token', '[A-Za-z0-9]{64}')->middleware('throttle:10,1')->name('service-orders.decide');
+Route::get('/os/fotos/{photo}', [ServiceOrderDocumentController::class, 'photo'])->name('service-orders.photo');
 
 foreach (Segment::hosts('salon') as $salonHost) {
     Route::domain($salonHost)->group(function (): void {

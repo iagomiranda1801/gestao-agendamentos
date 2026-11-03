@@ -268,12 +268,14 @@ class CompanyWhatsAppInstanceService
             ->first();
     }
 
-    public function resolvedNameForCompany(Company $company): string
+    public function resolvedNameForCompany(Company $company, bool $allowGlobalFallback = true): string
     {
         $settings = $company->schedulingSetting ?? $this->settings->getOrCreate($company);
         $default = $this->defaultForCompany($company);
 
-        return $this->client->resolveInstance($default?->instance_name ?: $settings?->whatsapp_instance);
+        $name = trim((string) ($default?->instance_name ?: $settings?->whatsapp_instance));
+
+        return $allowGlobalFallback ? $this->client->resolveInstance($name) : $name;
     }
 
     protected function defaultInstanceName(Company $company): string

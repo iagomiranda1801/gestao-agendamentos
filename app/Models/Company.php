@@ -414,6 +414,16 @@ class Company extends Model
     /**
      * @return HasMany<Payable, $this>
      */
+    public function serviceOrders(): HasMany
+    {
+        return $this->hasMany(ServiceOrder::class);
+    }
+
+    public function isTechnicalAssistance(): bool
+    {
+        return $this->business_profile === CompanyProfile::TechnicalAssistance;
+    }
+
     public function payables(): HasMany
     {
         return $this->hasMany(Payable::class);

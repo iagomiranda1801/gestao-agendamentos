@@ -1,0 +1,5 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>@yield('title', 'Ordem de serviço')</title>
+<style>
+body{font:16px/1.6 system-ui,sans-serif;background:#f1f5f9;color:#172033;margin:0;padding:20px}main{max-width:760px;margin:auto;background:white;padding:28px;border-radius:16px}h1{line-height:1.2}h2{font-size:19px;margin-top:28px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 4px;border-bottom:1px solid #ddd}button{padding:12px 18px;border:0;border-radius:8px;background:#075985;color:#fff;font:inherit;cursor:pointer;margin:4px}button.decline{background:#9f1239}.text{white-space:pre-wrap;overflow-wrap:anywhere}.notice{padding:12px;background:#f1f5f9;border-radius:8px}.actions{display:flex;flex-wrap:wrap;gap:8px}@media(max-width:480px){body{padding:8px}main{padding:18px}th,td{font-size:14px}}@media print{body{background:white;padding:0}main{padding:0}.actions{display:none}}
+</style></head><body><main>@yield('content')</main></body></html>

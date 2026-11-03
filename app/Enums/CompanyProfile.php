@@ -4,6 +4,7 @@ namespace App\Enums;
 
 enum CompanyProfile: string
 {
+    case TechnicalAssistance = 'technical_assistance';
     case Professional = 'professional';
     case PersonalTrainer = 'personal_trainer';
     case Clinic = 'clinic';
@@ -20,6 +21,7 @@ enum CompanyProfile: string
     public function label(): string
     {
         return match ($this) {
+            self::TechnicalAssistance => 'Assistência técnica e loja',
             self::Professional => 'Profissional autônomo',
             self::PersonalTrainer => 'Personal trainer',
             self::Clinic => 'Clínica ou empresa de atendimentos',
@@ -38,6 +40,7 @@ enum CompanyProfile: string
     public function description(): string
     {
         return match ($this) {
+            self::TechnicalAssistance => 'Para assistência de celulares: ordens de serviço, orçamentos, peças, vendas e WhatsApp.',
             self::Professional => 'Para psicólogos, médicos, nutricionistas, terapeutas e profissionais que trabalham com horário marcado. O prontuário clínico pode ser ligado à parte.',
             self::PersonalTrainer => 'Para personal autônomo que atende alunos em sessões individuais com horário marcado.',
             self::Clinic => 'Para operações com equipe, pacientes, agenda, financeiro e, se quiser, prontuário clínico compartilhado.',
@@ -63,6 +66,7 @@ enum CompanyProfile: string
     public function defaultModules(): array
     {
         return match ($this) {
+            self::TechnicalAssistance => [CompanyModule::ServiceOrders, CompanyModule::Sales, CompanyModule::Stock, CompanyModule::Finance, CompanyModule::WhatsApp],
             self::Professional => [CompanyModule::Scheduling, CompanyModule::WhatsApp],
             self::PersonalTrainer => [CompanyModule::Scheduling, CompanyModule::WhatsApp, CompanyModule::Finance],
             self::Clinic => [CompanyModule::Scheduling, CompanyModule::Finance, CompanyModule::WhatsApp],

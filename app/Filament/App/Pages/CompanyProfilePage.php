@@ -2,6 +2,7 @@
 
 namespace App\Filament\App\Pages;
 
+use App\Enums\CompanyModule;
 use App\Enums\CompanyRole;
 use App\Models\Company;
 use App\Models\User;
@@ -153,6 +154,9 @@ class CompanyProfilePage extends Page
                 Section::make(fn (): string => $this->usesPublicOrdersChannel()
                     ? 'Pedidos online'
                     : 'Agendamento público')
+                    ->visible(fn (): bool => ! Filament::getTenant()?->isTechnicalAssistance()
+                        || app(CompanyModuleService::class)->hasModule(Filament::getTenant(), CompanyModule::Scheduling)
+                        || $this->usesPublicOrdersChannel())
                     ->description(fn (): ?string => $this->usesPublicOrdersChannel()
                         ? 'Este é o link do cardápio para os clientes. Ative ou desative pedidos online nas configurações de pedidos.'
                         : null)

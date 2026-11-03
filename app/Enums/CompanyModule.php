@@ -4,6 +4,7 @@ namespace App\Enums;
 
 enum CompanyModule: string
 {
+    case ServiceOrders = 'service_orders';
     case Scheduling = 'scheduling';
     case ClinicalRecords = 'clinical_records';
     case Stock = 'stock';
@@ -16,6 +17,7 @@ enum CompanyModule: string
     public function label(): string
     {
         return match ($this) {
+            self::ServiceOrders => 'Ordens de serviço',
             self::Scheduling => 'Agenda',
             self::ClinicalRecords => 'Prontuário clínico',
             self::Stock => 'Estoque',
@@ -30,6 +32,7 @@ enum CompanyModule: string
     public function description(): string
     {
         return match ($this) {
+            self::ServiceOrders => 'Recebimento de aparelhos, orçamentos, consertos e entrega.',
             self::Scheduling => 'Agenda, agendamentos, bloqueios, atendimentos e configurações da agenda.',
             self::ClinicalRecords => 'Pacientes, anamneses, alertas, evoluções, documentos e, na odontologia, odontograma e planos de tratamento.',
             self::Stock => 'Produtos, fornecedores, compras, ajustes e movimentações de estoque.',

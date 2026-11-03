@@ -57,7 +57,7 @@ class SaleService
             ? Carbon::parse($data['sold_at'])
             : now();
 
-        $validatedItems = $this->validateItems($company, $data['items'] ?? []);
+        $validatedItems = $this->validateItems($company, $data['items'] ?? [], ($data['origin'] ?? null) === SaleOrigin::ServiceOrder->value);
         $grossAmount = $this->calculateGrossAmount($validatedItems);
         $discountAmount = $this->normalizeNonNegativeMoney($data['discount_amount'] ?? '0', 'discount_amount');
         $finalAmount = DecimalMoney::round(bcsub($grossAmount, $discountAmount, 4));
@@ -138,7 +138,7 @@ class SaleService
      * @param  list<array<string, mixed>>  $items
      * @return list<array{type: SaleItemType, product?: Product, service?: Service, name: string, quantity: string, unit_price: string, unit_cost: string, discount_amount: string, line_total: string, tracks_stock: bool}>
      */
-    protected function validateItems(Company $company, array $items): array
+    protected function validateItems(Company $company, array $items, bool $allowRepairParts = false): array
     {
         if ($items === []) {
             throw ValidationException::withMessages([
@@ -164,7 +164,7 @@ class SaleService
             $tracksStock = false;
 
             if ($type === SaleItemType::Product) {
-                $product = $this->resolveProductItem($company, $item, $index);
+                $product = $this->resolveProductItem($company, $item, $index, $allowRepairParts);
                 $providedName = trim((string) ($item['name'] ?? ''));
                 $name = $providedName !== '' ? $providedName : $product->name;
                 $unitCost = $product->getCurrentUnitCost();
@@ -366,7 +366,7 @@ class SaleService
     /**
      * @param  array<string, mixed>  $item
      */
-    protected function resolveProductItem(Company $company, array $item, int $index): Product
+    protected function resolveProductItem(Company $company, array $item, int $index, bool $allowRepairParts = false): Product
     {
         $product = Product::query()
             ->whereKey((int) ($item['product_id'] ?? 0))
@@ -379,7 +379,7 @@ class SaleService
             ]);
         }
 
-        if (! $product->is_active || $product->type !== ProductType::Sale) {
+        if (! $product->is_active || ! in_array($product->type, $allowRepairParts ? [ProductType::Sale, ProductType::Consumable] : [ProductType::Sale], true)) {
             throw ValidationException::withMessages([
                 "items.{$index}.product_id" => 'O produto precisa estar ativo e com tipo Produto de venda.',
             ]);

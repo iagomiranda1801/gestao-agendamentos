@@ -4,6 +4,7 @@ namespace App\Enums;
 
 enum CompanyPermission: string
 {
+    case ManageServiceOrders = 'manage_service_orders';
     case ManagePatients = 'manage_patients';
     case ManageAppointments = 'manage_appointments';
     case ViewClinicalAlerts = 'view_clinical_alerts';
@@ -24,6 +25,7 @@ enum CompanyPermission: string
     {
         return match ($role) {
             CompanyRole::CompanyAdmin => [
+                self::ManageServiceOrders,
                 self::ManagePatients,
                 self::ManageAppointments,
                 self::ViewClinicalAlerts,
@@ -40,6 +42,7 @@ enum CompanyPermission: string
                 self::KitchenOrders,
             ],
             CompanyRole::Manager => [
+                self::ManageServiceOrders,
                 self::ManagePatients,
                 self::ManageAppointments,
                 self::ManageTreatmentPlans,
@@ -50,6 +53,7 @@ enum CompanyPermission: string
                 self::KitchenOrders,
             ],
             CompanyRole::Receptionist => [
+                self::ManageServiceOrders,
                 self::ManagePatients,
                 self::ManageAppointments,
                 self::ViewTreatmentPrices,
@@ -67,6 +71,7 @@ enum CompanyPermission: string
                 self::ManageTreatmentPlans,
             ],
             CompanyRole::Employee => [
+                self::ManageServiceOrders,
                 self::KitchenOrders,
             ],
         };
@@ -76,6 +81,7 @@ enum CompanyPermission: string
     public static function options(): array
     {
         return [
+            self::ManageServiceOrders->value => 'Gerenciar ordens de serviço',
             self::ManagePatients->value => 'Gerenciar pacientes',
             self::ManageAppointments->value => 'Gerenciar agendamentos',
             self::ViewClinicalAlerts->value => 'Ver alertas clínicos',
