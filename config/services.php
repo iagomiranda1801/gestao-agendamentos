@@ -66,4 +66,8 @@ return [
         'timeout' => (int) env('AI_TIMEOUT', 30),
     ],
 
+    'tabela_peliculas' => [
+        'url' => env('TABELA_PELICULAS_API_URL', 'https://tabelapeliculas.com.br/index'),
+    ],
+
 ];
