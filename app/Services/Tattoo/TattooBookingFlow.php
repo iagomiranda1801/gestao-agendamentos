@@ -211,7 +211,7 @@ class TattooBookingFlow
     }
 
     /** @param list<string> $days */
-    protected function pickDay(TattooAiConversation $conversation, array $days, string $normalized, bool $numbers = true): ?string
+    public function pickDay(TattooAiConversation $conversation, array $days, string $normalized, bool $numbers = true): ?string
     {
         $normalized = trim($normalized);
         if ($numbers && preg_match('/^(?:dia\s*)?(\d{1,2})[.)!]?$/u', $normalized, $m) && isset($days[(int) $m[1] - 1])) {
@@ -250,7 +250,7 @@ class TattooBookingFlow
     }
 
     /** @param list<string> $times */
-    protected function pickTime(array $times, string $normalized): ?string
+    public function pickTime(array $times, string $normalized): ?string
     {
         $normalized = trim($normalized);
         if (preg_match('/^(\d{1,2})[.)!]?$/u', $normalized, $m) && isset($times[(int) $m[1] - 1])) {

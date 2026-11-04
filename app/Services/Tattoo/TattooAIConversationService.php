@@ -963,6 +963,15 @@ class TattooAIConversationService extends WhatsAppAIConversationService
     protected function returningCustomerReply(TattooAiConversation $conversation, string $text): ?string
     {
         $data = $conversation->collected_data ?: [];
+        if (! empty($data['_manage'])) {
+            $managed = app(TattooAppointmentSelfService::class)->handle($conversation, $text, $this->normalizedText($text));
+            if ($managed !== null) {
+                return $managed === TattooAppointmentSelfService::HANDOFF
+                    ? $this->handOverToArtist($conversation, 'Cliente quer mudar o horário marcado', ' que você quer mudar o horário')
+                    : $managed;
+            }
+            $data = $conversation->fresh()->collected_data ?: [];
+        }
         if (! empty($data['_appointment_notice_pending'])) {
             unset($data['_appointment_notice_pending']);
             $conversation->update(['collected_data' => $data]);
@@ -973,6 +982,12 @@ class TattooAIConversationService extends WhatsAppAIConversationService
                 (bool) preg_match('/^3\b|falar|conversar/u', $normalized) => 'falar',
                 default => null,
             };
+            if (in_array($choice, ['remarcar', 'cancelar'], true)
+                && ($appointment = Appointment::query()->find((int) ($data['_appointment_notice'] ?? 0))) !== null
+                && ($started = app(TattooAppointmentSelfService::class)->start($conversation, $appointment, $choice)) !== null
+                && $started !== TattooAppointmentSelfService::HANDOFF) {
+                return $started;
+            }
             if ($choice !== null) {
                 return $this->handOverToArtist($conversation, match ($choice) {
                     'remarcar' => 'Cliente quer remarcar o horário',

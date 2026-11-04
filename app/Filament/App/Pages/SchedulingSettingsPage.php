@@ -116,6 +116,9 @@ class SchedulingSettingsPage extends Page
             'tattoo_artist_name' => $setting->tattoo_artist_name,
             'tattoo_artist_notify_phone' => $setting->tattoo_artist_notify_phone,
             'tattoo_fixed_deposit_amount' => $setting->tattoo_fixed_deposit_amount,
+            'tattoo_self_service_min_hours' => $setting->tattoo_self_service_min_hours,
+            'tattoo_cancel_deposit_policy' => $setting->tattoo_cancel_deposit_policy ?: 'reter',
+            'tattoo_refund_cutoff_hours' => $setting->tattoo_refund_cutoff_hours,
             'tattoo_aftercare_message' => $setting->tattoo_aftercare_message ?: TattooStudioInfo::DEFAULT_AFTERCARE,
             'tattoo_studio_address' => $setting->tattoo_studio_address,
             'tattoo_address_message' => $setting->tattoo_address_message ?: TattooStudioInfo::DEFAULT_ADDRESS,
@@ -460,6 +463,19 @@ class SchedulingSettingsPage extends Page
                         TextInput::make('tattoo_fixed_deposit_amount')->label('Sinal fixo (R$)')
                             ->helperText('Usado quando o orçamento não diz o valor do sinal. Vazio: sem sinal padrão.')
                             ->numeric()->minValue(0)->maxValue(100000)->prefix('R$')
+                            ->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
+                        TextInput::make('tattoo_self_service_min_hours')->label('Antecedência mínima para remarcar/cancelar sozinho (horas)')
+                            ->helperText('Abaixo disso o cliente é passado para o tatuador. Vazio: sem limite.')
+                            ->integer()->minValue(0)->maxValue(720)->suffix('h')
+                            ->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
+                        Select::make('tattoo_cancel_deposit_policy')->label('Sinal quando o cliente cancela')
+                            ->options(['reter' => 'Reter o sinal', 'reembolsar' => 'Reembolsar o sinal'])
+                            ->default('reter')->selectablePlaceholder(false)
+                            ->helperText('O reembolso não é automático: o tatuador recebe o aviso para devolver o PIX.')
+                            ->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
+                        TextInput::make('tattoo_refund_cutoff_hours')->label('Reembolsar só se cancelar com pelo menos (horas)')
+                            ->helperText('Vale quando a política é reembolsar. Vazio: sempre reembolsa.')
+                            ->integer()->minValue(0)->maxValue(720)->suffix('h')
                             ->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
                         TextInput::make('tattoo_artist_name')->label('Nome do tatuador que assume a conversa')
                             ->helperText('Ex.: Gustavo. Vazio: usa o único tatuador ativo ou "o tatuador".')

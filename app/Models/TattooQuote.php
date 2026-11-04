@@ -11,7 +11,7 @@ class TattooQuote extends Model
 
     protected function casts(): array
     {
-        return ['amount_min' => 'decimal:2', 'amount_max' => 'decimal:2', 'deposit_amount' => 'decimal:2', 'valid_until' => 'date', 'sent_at' => 'datetime', 'accepted_at' => 'datetime'];
+        return ['amount_min' => 'decimal:2', 'amount_max' => 'decimal:2', 'deposit_amount' => 'decimal:2', 'valid_until' => 'date', 'sent_at' => 'datetime', 'accepted_at' => 'datetime', 'deposit_outcome_at' => 'datetime'];
     }
 
     public function request(): BelongsTo

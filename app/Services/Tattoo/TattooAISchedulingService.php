@@ -84,9 +84,9 @@ class TattooAISchedulingService
      *
      * @return list<string>
      */
-    public function days(TattooAiConversation $conversation, int $limit = 7): array
+    public function days(TattooAiConversation $conversation, int $limit = 7, ?Appointment $ignore = null): array
     {
-        $professional = $this->professional($conversation);
+        $professional = $ignore?->professional ?? $this->professional($conversation);
         if (! $professional) {
             return [];
         }
@@ -96,7 +96,7 @@ class TattooAISchedulingService
         $days = [];
         for ($i = 0; $i <= min($maxDays, 120) && count($days) < $limit; $i++) {
             $date = $today->addDays($i)->format('Y-m-d');
-            if ($this->times($conversation, $date, 1, $professional) !== []) {
+            if ($this->times($conversation, $date, 1, $professional, $ignore) !== []) {
                 $days[] = $date;
             }
         }
@@ -109,16 +109,16 @@ class TattooAISchedulingService
      *
      * @return list<string>
      */
-    public function times(TattooAiConversation $conversation, string $date, int $limit = 12, ?Professional $professional = null): array
+    public function times(TattooAiConversation $conversation, string $date, int $limit = 12, ?Professional $professional = null, ?Appointment $ignore = null): array
     {
-        $professional ??= $this->professional($conversation);
+        $professional ??= $ignore?->professional ?? $this->professional($conversation);
         if (! $professional) {
             return [];
         }
         $company = $conversation->company;
         $setting = $company->schedulingSetting;
         $interval = max(5, (int) ($setting?->slot_interval_minutes ?: 15));
-        $duration = $this->duration($conversation);
+        $duration = $ignore ? max(15, (int) $ignore->duration_minutes_snapshot ?: 60) : $this->duration($conversation);
         $now = CompanyDateTime::nowLocal($company);
         $earliest = $now->addMinutes((int) ($setting?->minimum_advance_minutes ?? 0));
         $latest = $now->startOfDay()->addDays((int) ($setting?->maximum_advance_days ?: 60))->endOfDay();
@@ -135,7 +135,7 @@ class TattooAISchedulingService
                 if ($start->lt($earliest) || $start->gt($latest)) {
                     continue;
                 }
-                if ($this->availability->assertAvailable($company, $professional, null, $start, $duration, 0, 0, isTattoo: true)->available) {
+                if ($this->availability->assertAvailable($company, $professional, null, $start, $duration, 0, 0, $ignore, isTattoo: true)->available) {
                     $times[] = $time;
                 }
             }
@@ -165,14 +165,14 @@ class TattooAISchedulingService
         return (bool) $conversation->company->schedulingSetting?->tattoo_custom_flow_enabled ? [[14 * 60, 22 * 60]] : [[8 * 60, 21 * 60]];
     }
 
-    public function isFree(TattooAiConversation $conversation, string $slot): bool
+    public function isFree(TattooAiConversation $conversation, string $slot, ?Appointment $ignore = null): bool
     {
         if (! preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $slot)) {
             return false;
         }
-        $professional = $this->professional($conversation);
+        $professional = $ignore?->professional ?? $this->professional($conversation);
 
-        return $professional !== null && in_array(substr($slot, 11, 5), $this->times($conversation, substr($slot, 0, 10), 200, $professional), true);
+        return $professional !== null && in_array(substr($slot, 11, 5), $this->times($conversation, substr($slot, 0, 10), 200, $professional, $ignore), true);
     }
 
     public function label(TattooAiConversation $conversation, string $date): string
