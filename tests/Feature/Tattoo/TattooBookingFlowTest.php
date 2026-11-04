@@ -327,6 +327,7 @@ class TattooBookingFlowTest extends TestCase
 
     private function sendReceiptAfterChoosing(): TattooPaymentReceipt
     {
+        $this->createCompanyUser($this->company); // responsável pela agenda
         $this->quote();
         $this->chooseWednesdayTen();
         $this->send('', 'pix-img', 'image/png');
