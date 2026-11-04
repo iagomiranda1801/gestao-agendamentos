@@ -11,7 +11,7 @@ class TattooPaymentReceipt extends Model
 
     protected function casts(): array
     {
-        return ['analysis' => 'array', 'reviewed_at' => 'datetime'];
+        return ['analysis' => 'array', 'reviewed_at' => 'datetime', 'artist_notified_at' => 'datetime'];
     }
 
     public function request(): BelongsTo

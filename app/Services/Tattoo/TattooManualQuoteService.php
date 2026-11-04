@@ -8,6 +8,7 @@ use App\Models\CompanySchedulingSetting;
 use App\Models\CompanyWhatsAppInstance;
 use App\Models\TattooAiConversation;
 use App\Models\TattooManualQuoteDetection;
+use App\Models\TattooPaymentReceipt;
 use App\Models\TattooQuote;
 use App\Models\TattooRequest;
 use App\Services\Client\ClientService;
@@ -92,17 +93,46 @@ class TattooManualQuoteService
         if (! $company || ! $setting || ! $this->matchesArtist($setting, $phone)) {
             return false;
         }
-        $answer = Str::of(Str::ascii($text))->lower()->trim()->rtrim('.!')->value();
-        $choice = match (true) {
-            in_array($answer, ['1', 'sim', 'salvar', 'salva', 's'], true) => 'save',
-            in_array($answer, ['2', 'nao', 'ignorar', 'ignora', 'n'], true) => 'ignore',
-            default => null,
-        };
-        $detection = $choice === null ? null : TattooManualQuoteDetection::query()->where('company_id', $company->id)
-            ->where('status', 'pending')->latest('id')->first();
+        $answer = Str::of(Str::ascii($text))->lower()->squish()->rtrim('.!')->value();
+        if (! preg_match('/^(1|2|sim|s|nao|n|salvar|salva|ignorar|ignora|confirmar|confirma|recusar|recusa)(?:\s*#?\s*([co])?\s*(\d+))?$/', $answer, $m)) {
+            return true;
+        }
+        $yes = in_array($m[1], ['1', 'sim', 's', 'salvar', 'salva', 'confirmar', 'confirma'], true);
+        $kind = $m[2] ?? '';
+        $ref = isset($m[3]) && $m[3] !== '' ? (int) $m[3] : null;
+        $receipts = TattooPaymentReceipt::query()->where('company_id', $company->id)
+            ->where('payment_status', 'receipt_received')->whereNotNull('artist_notified_at');
+        $detections = TattooManualQuoteDetection::query()->where('company_id', $company->id)->where('status', 'pending');
+        $receipt = null;
+        $detection = null;
+        if ($ref !== null) {
+            if ($kind !== 'o') {
+                $receipt = TattooPaymentReceipt::query()->where('company_id', $company->id)->find($ref);
+            }
+            if ($receipt === null && $kind !== 'c') {
+                $detection = (clone $detections)->find($ref);
+            }
+            if ($receipt === null && $detection === null) {
+                $this->notifyArtist($instance, $setting, 'Não achei nada pendente com o código #'.strtoupper($kind).$ref.'.');
+
+                return true;
+            }
+        } else {
+            $receipt = (clone $receipts)->latest('artist_notified_at')->latest('id')->first();
+            $detection = (clone $detections)->latest('id')->first();
+            if ($receipt && $detection) {
+                $receipt->artist_notified_at->gte($detection->created_at) ? $detection = null : $receipt = null;
+            }
+        }
+        if ($receipt !== null) {
+            $this->notifyArtist($instance, $setting, app(TattooReceiptConfirmationService::class)->answer($receipt, $yes));
+
+            return true;
+        }
         if ($detection === null) {
             return true;
         }
+        $choice = $yes ? 'save' : 'ignore';
         $who = $detection->customer_name ?: $this->formatPhone($detection->phone_normalized);
         if ($choice === 'ignore') {
             $detection->update(['status' => 'ignored', 'resolved_at' => now()]);
@@ -224,7 +254,7 @@ class TattooManualQuoteService
             : '';
 
         return 'Orçamento detectado pro '.$who.': total '.$this->money((float) $detection->total).', '.$deposit.'.'
-            .$ambiguous.' Responde 1 pra salvar ou 2 pra ignorar.';
+            .$ambiguous.' Responde 1 pra salvar ou 2 pra ignorar (#O'.$detection->id.').';
     }
 
     protected function notifyArtist(?CompanyWhatsAppInstance $instance, CompanySchedulingSetting $setting, string $message): void

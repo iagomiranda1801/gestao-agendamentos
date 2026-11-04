@@ -108,7 +108,7 @@ class TattooManualQuoteTest extends TestCase
 
         $prompt = $this->textsTo($this->artist);
         $this->assertCount(1, $prompt);
-        $this->assertSame('Orçamento detectado pro Bia Souza: total R$ 800,00, sinal R$ 150,00. Responde 1 pra salvar ou 2 pra ignorar.', $prompt[0]);
+        $this->assertSame('Orçamento detectado pro Bia Souza: total R$ 800,00, sinal R$ 150,00. Responde 1 pra salvar ou 2 pra ignorar (#O'.TattooManualQuoteDetection::query()->sole()->id.').', $prompt[0]);
         $this->assertSame([], $this->textsTo($this->customer));
 
         $this->webhook($this->artist, '1', false);

@@ -158,6 +158,18 @@ class TattooReceiptService
      */
     public function analyzeOrFlag(TattooPaymentReceipt $receipt): TattooPaymentReceipt
     {
+        $receipt = $this->analyzeOrFlagOnly($receipt);
+        try {
+            app(TattooReceiptConfirmationService::class)->forward($receipt);
+        } catch (Throwable $exception) {
+            Log::warning('Tattoo receipt forward to artist failed.', ['receipt_id' => $receipt->id, 'error_type' => $exception::class]);
+        }
+
+        return $receipt->refresh();
+    }
+
+    protected function analyzeOrFlagOnly(TattooPaymentReceipt $receipt): TattooPaymentReceipt
+    {
         try {
             return $this->analyze($receipt);
         } catch (Throwable $exception) {
@@ -249,18 +261,23 @@ class TattooReceiptService
             ->orderByDesc('is_default_receipt_account')->orderBy('id')->first();
     }
 
-    public function review(TattooPaymentReceipt $receipt, User $user, bool $confirm): void
+    /**
+     * Confirma/rejeita o sinal (painel ou "1/2" do tatuador no WhatsApp).
+     * Atômico: só o primeiro a resolver vale; retorna false se já resolvido.
+     */
+    public function review(TattooPaymentReceipt $receipt, ?User $user, bool $confirm, string $via = 'panel'): bool
     {
-        if ($receipt->payment_status !== 'receipt_received') {
-            return;
-        }
-        $receipt->update([
+        $updated = TattooPaymentReceipt::query()->whereKey($receipt->id)->where('payment_status', 'receipt_received')->update([
             'payment_status' => $confirm ? 'confirmed' : 'rejected',
-            'reviewed_by' => $user->id, 'reviewed_at' => now(),
+            'reviewed_by' => $user?->id, 'reviewed_at' => now(), 'reviewed_via' => $via,
         ]);
+        if ($updated === 0) {
+            return false;
+        }
+        $receipt->refresh();
         $receipt->conversation->update(['status' => $confirm ? 'payment_confirmed' : 'waiting_payment_receipt']);
         if (! $confirm) {
-            return;
+            return true;
         }
         // Sinal aprovado: agenda o horário escolhido (se ainda livre) e avisa cliente e tatuador.
         try {
@@ -272,5 +289,7 @@ class TattooReceiptService
         } catch (Throwable $exception) {
             Log::warning('Tattoo booking after payment failed.', ['receipt_id' => $receipt->id, 'error_type' => $exception::class]);
         }
+
+        return true;
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AsaasWebhookController;
 use App\Http\Controllers\EvolutionWebhookController;
 use App\Http\Controllers\PrintDentalTreatmentPlanController;
 use App\Http\Controllers\PwaController;
@@ -46,6 +47,9 @@ Route::get('/pedir/{company:slug}', OrderWizard::class)->name('public.orders.sho
 Route::get('/agendamento/{token}', ManageAppointment::class)->name('public.appointment.manage');
 Route::post('/webhooks/evolution/{instance?}', EvolutionWebhookController::class)
     ->name('webhooks.evolution');
+
+Route::post('/webhooks/asaas/{company:slug}', AsaasWebhookController::class)
+    ->name('webhooks.asaas');
 
 Route::get('/app/empresa/{company:slug}/clinico/planos/{plan}/imprimir', PrintDentalTreatmentPlanController::class)
     ->middleware('auth')

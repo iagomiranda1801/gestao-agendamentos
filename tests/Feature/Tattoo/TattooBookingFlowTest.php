@@ -18,7 +18,9 @@ use App\Models\TattooQuote;
 use App\Models\TattooRequest;
 use App\Services\Tattoo\TattooAIConversationService;
 use App\Services\Tattoo\TattooReceiptService;
+use App\Services\WhatsApp\EvolutionWebhookService;
 use App\Services\WhatsApp\WhatsAppHumanTakeover;
+use App\Models\TattooManualQuoteDetection;
 use App\Support\CompanyDateTime;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
@@ -286,7 +288,8 @@ class TattooBookingFlowTest extends TestCase
         $receipt = TattooPaymentReceipt::query()->firstOrFail();
         $this->assertSame('inconsistent', $receipt->receipt_analysis_status);
         $this->assertSame('receipt_received', $receipt->payment_status);
-        $this->assertStringContainsString('Comprovante com problema: Bia Souza', implode("\n", $this->textsTo($this->artistPhone)));
+        $this->assertStringContainsString('Valor diferente do sinal esperado', $this->mediaTo($this->artistPhone)[0]);
+        $this->assertStringNotContainsString('Comprovante com problema', implode("\n", $this->textsTo($this->artistPhone)));
         $this->assertStringContainsString('1. Seg 09/11', $reply);
         $this->assertStringContainsString('Anotado: Seg 09/11', $this->send('1', 'img-2').$this->send('1', 'img-3'));
         $this->assertNull($request->fresh()->appointment_id);
@@ -305,5 +308,140 @@ class TattooBookingFlowTest extends TestCase
         $this->assertNotNull($request->fresh()->appointment_id);
         $artist = implode("\n", $this->textsTo($this->artistPhone));
         $this->assertStringContainsString('Agendamento confirmado: Bia Souza dia 10/11 às 11:00 ✅', $artist);
+    }
+
+    /** @return list<string> */
+    private function mediaTo(string $phone): array
+    {
+        return collect(Http::recorded())->map(fn ($pair) => $pair[0])
+            ->filter(fn ($r) => str_contains($r->url(), 'sendMedia') && str_contains((string) ($r->data()['number'] ?? ''), substr($phone, -8)))
+            ->map(fn ($r) => (string) ($r->data()['caption'] ?? ''))->values()->all();
+    }
+
+    private function artistSays(string $text): void
+    {
+        app(EvolutionWebhookService::class)->handle(['event' => 'messages.upsert', 'instance' => 'booking-test',
+            'data' => ['key' => ['remoteJid' => $this->artistPhone.'@s.whatsapp.net', 'fromMe' => false, 'id' => 'art-'.uniqid()],
+                'pushName' => 'Gustavo', 'message' => ['conversation' => $text]]]);
+    }
+
+    private function sendReceiptAfterChoosing(): TattooPaymentReceipt
+    {
+        $this->quote();
+        $this->chooseWednesdayTen();
+        $this->send('', 'pix-img', 'image/png');
+
+        return TattooPaymentReceipt::query()->sole();
+    }
+
+    public function test_receipt_is_forwarded_to_artist_with_summary_and_nothing_is_booked(): void
+    {
+        $receipt = $this->sendReceiptAfterChoosing();
+
+        $caption = $this->mediaTo($this->artistPhone)[0];
+        $this->assertStringContainsString('Comprovante de sinal recebido #C'.$receipt->id, $caption);
+        $this->assertStringContainsString('Bia Souza ((11) 98888-8888)', $caption);
+        $this->assertStringContainsString('Horário escolhido: 11/11 às 10:00', $caption);
+        $this->assertStringContainsString('Sinal esperado: R$ 100,00 · lido no comprovante: R$ 90,00', $caption);
+        $this->assertStringContainsString('Valor diferente do sinal esperado', $caption);
+        $this->assertStringContainsString('Responde 1 pra confirmar o sinal ou 2 pra recusar', $caption);
+        $this->assertNotNull($receipt->artist_notified_at);
+        $this->assertSame('receipt_received', $receipt->payment_status);
+        $this->assertNull($receipt->request->appointment_id);
+    }
+
+    public function test_artist_reply_one_confirms_and_books_only_once(): void
+    {
+        $receipt = $this->sendReceiptAfterChoosing();
+
+        $this->artistSays('1');
+        $this->artistSays('1');
+        $this->artistSays('1 #C'.$receipt->id);
+
+        $this->assertSame(1, Appointment::query()->where('reference_key', 'tattoo-ai-'.$receipt->tattoo_request_id)->count());
+        $receipt->refresh();
+        $this->assertSame('confirmed', $receipt->payment_status);
+        $this->assertSame('whatsapp', $receipt->reviewed_via);
+        $this->assertNull($receipt->reviewed_by);
+        $artist = implode("\n", $this->textsTo($this->artistPhone));
+        $this->assertStringContainsString('Agendamento confirmado: Bia Souza dia 11/11', $artist);
+        $this->assertStringContainsString('Sinal do Bia Souza confirmado ✅ e horário agendado.', $artist);
+        $this->assertStringContainsString('já tinha sido resolvido', $artist);
+        $this->assertStringContainsString('Fechado! ✅', implode("\n", $this->textsTo($this->phone)));
+    }
+
+    public function test_artist_confirm_with_taken_slot_sends_new_days_without_pix(): void
+    {
+        $receipt = $this->sendReceiptAfterChoosing();
+        $this->appointmentAt('2026-11-11 10:00');
+
+        $this->artistSays('1');
+
+        $this->assertNull($receipt->request->fresh()->appointment_id);
+        $message = (string) TattooAiMessage::query()->where('provider_message_id', 'payment-confirmed:'.$receipt->id)->value('body');
+        $this->assertStringContainsString('acabou de ser ocupado', $message);
+        $this->assertStringNotContainsString('Chave PIX', $message);
+        $this->assertStringContainsString('mandei os dias livres', implode("\n", $this->textsTo($this->artistPhone)));
+    }
+
+    public function test_artist_reply_two_rejects_and_hands_off(): void
+    {
+        $receipt = $this->sendReceiptAfterChoosing();
+
+        $this->artistSays('2');
+
+        $this->assertSame('rejected', $receipt->fresh()->payment_status);
+        $this->assertNull($receipt->request->fresh()->appointment_id);
+        $conversation = $this->conversation();
+        $this->assertTrue((bool) $conversation->human_takeover);
+        $this->assertSame('human_takeover', $conversation->status);
+        $this->assertStringContainsString('Não consegui confirmar teu comprovante', implode("\n", $this->textsTo($this->phone)));
+        $this->assertStringContainsString('recusado', implode("\n", $this->textsTo($this->artistPhone)));
+    }
+
+    public function test_code_disambiguates_receipt_from_pending_quote_detection(): void
+    {
+        $receipt = $this->sendReceiptAfterChoosing();
+        $this->travel(1)->minutes();
+        $detection = new TattooManualQuoteDetection(['phone_normalized' => '5511955554444', 'message_text' => 'fica R$ 500',
+            'total' => 500, 'status' => 'pending']);
+        $detection->company_id = $this->company->id;
+        $detection->save();
+
+        $this->artistSays('1 #C'.$receipt->id);
+
+        $this->assertSame('confirmed', $receipt->fresh()->payment_status);
+        $this->assertSame('pending', $detection->fresh()->status);
+
+        // "2" sem código responde o item pendente mais recente (o orçamento).
+        $this->artistSays('2');
+        $this->assertSame('ignored', $detection->fresh()->status);
+    }
+
+    public function test_plain_reply_answers_most_recent_pending_item(): void
+    {
+        $detection = new TattooManualQuoteDetection(['phone_normalized' => '5511955554444', 'message_text' => 'fica R$ 500',
+            'total' => 500, 'status' => 'pending']);
+        $detection->company_id = $this->company->id;
+        $detection->save();
+        $this->travel(1)->minutes();
+        $receipt = $this->sendReceiptAfterChoosing();
+
+        $this->artistSays('1');
+
+        $this->assertSame('confirmed', $receipt->fresh()->payment_status);
+        $this->assertSame('pending', $detection->fresh()->status);
+    }
+
+    public function test_without_artist_phone_receipt_stays_panel_only(): void
+    {
+        $this->company->schedulingSetting->update(['tattoo_artist_notify_phone' => null]);
+        $receipt = $this->sendReceiptAfterChoosing();
+
+        $this->assertSame([], $this->mediaTo($this->artistPhone));
+        $this->assertNull($receipt->artist_notified_at);
+        $this->assertSame('receipt_received', $receipt->payment_status);
+        app(TattooReceiptService::class)->review($receipt, $this->createCompanyUser($this->company), true);
+        $this->assertNotNull($receipt->request->fresh()->appointment_id);
     }
 }

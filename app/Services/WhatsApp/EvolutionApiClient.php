@@ -94,6 +94,37 @@ class EvolutionApiClient
         return $response->json() ?? [];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function sendDocument(string $instance, string $phoneDigits, string $binary, string $mimeType, string $fileName, string $caption): array
+    {
+        $instance = $this->resolveInstance($instance);
+
+        if ($instance === '') {
+            throw new RuntimeException('Instância Evolution não configurada.');
+        }
+
+        $number = $this->toWhatsAppNumber($phoneDigits);
+        app(WhatsAppHumanTakeover::class)->rememberBotSend($instance, $phoneDigits, $caption);
+
+        $response = $this->http()->acceptJson()->timeout(45)
+            ->post($this->url("/message/sendMedia/{$instance}"), [
+                'number' => $number,
+                'mediatype' => 'document',
+                'mimetype' => $mimeType,
+                'caption' => $caption,
+                'media' => base64_encode($binary),
+                'fileName' => $fileName,
+            ]);
+
+        if ($response->failed()) {
+            throw new RequestException($response);
+        }
+
+        return $response->json() ?? [];
+    }
+
     public function getMediaBase64(string $instance, string $messageId): string
     {
         $response = $this->http()->acceptJson()->timeout(45)

@@ -173,6 +173,9 @@ class TattooBookingFlow
 
     public function receiptProblem(TattooAiConversation $conversation, TattooPaymentReceipt $receipt): void
     {
+        if ($receipt->fresh()?->artist_notified_at !== null) {
+            return; // alertas já foram junto com o comprovante encaminhado
+        }
         $warnings = $receipt->analysis['warnings'] ?? [];
         $this->notifyArtist($conversation, 'Comprovante com problema: '.$this->clientName($conversation)
             .($warnings !== [] ? ' — '.implode('; ', $warnings) : '').'. Confere no painel.');

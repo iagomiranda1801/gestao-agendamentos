@@ -276,6 +276,132 @@ class ReceivableService
         });
     }
 
+    /**
+     * Quitação vinda do Asaas. O valor que o cliente pagou baixa a conta;
+     * a taxa do gateway sai do caixa e não deixa saldo em aberto.
+     */
+    public function registerGatewayPayment(
+        Company $company,
+        Receivable $receivable,
+        PaymentData $data,
+    ): Payment {
+        return DB::transaction(function () use ($company, $receivable, $data): Payment {
+            $lockedReceivable = $this->lockReceivable($receivable);
+            $this->ensureReceivableBelongsToCompany($company, $lockedReceivable);
+
+            if ($lockedReceivable->status === ReceivableStatus::Cancelled) {
+                throw ValidationException::withMessages([
+                    'status' => 'Não é possível registrar pagamentos em uma conta cancelada.',
+                ]);
+            }
+
+            if ($lockedReceivable->status === ReceivableStatus::Paid) {
+                throw ValidationException::withMessages([
+                    'status' => 'Esta conta a receber já está quitada.',
+                ]);
+            }
+
+            $account = FinancialAccount::query()
+                ->whereKey($data->financialAccountId)
+                ->where('company_id', $company->getKey())
+                ->first();
+
+            if ($account === null) {
+                throw ValidationException::withMessages([
+                    'financial_account_id' => 'A conta financeira informada não pertence a esta empresa.',
+                ]);
+            }
+
+            if (! $account->isActive()) {
+                throw ValidationException::withMessages([
+                    'financial_account_id' => 'A conta financeira precisa estar ativa.',
+                ]);
+            }
+
+            $settings = $this->financialSettingService->getOrCreate($company);
+            $amount = $this->calculator->calculateNetAmount($data->amount, '0');
+            $feeAmount = $this->calculator->calculateNetAmount($data->feeAmount, '0');
+            if (bccomp($feeAmount, $amount, 2) > 0) {
+                throw ValidationException::withMessages([
+                    'fee_amount' => 'A taxa não pode ser maior que o valor do pagamento.',
+                ]);
+            }
+
+            $outstandingAmount = (string) $lockedReceivable->outstanding_amount;
+            if (bccomp($amount, $outstandingAmount, 2) > 0) {
+                throw ValidationException::withMessages([
+                    'amount' => 'O pagamento não pode ser maior que o saldo em aberto.',
+                ]);
+            }
+
+            if (
+                ! $settings->allow_partial_payments
+                && bccomp($amount, $outstandingAmount, 2) !== 0
+            ) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Pagamentos parciais não são permitidos para esta empresa.',
+                ]);
+            }
+
+            $cashSessionId = $this->cashSessionService->resolveCashSessionIdForTransaction(
+                $company,
+                $account,
+                $data->method,
+            );
+
+            $payment = new Payment([
+                'amount' => $amount,
+                'fee_amount' => $feeAmount,
+                'net_amount' => $amount,
+                'method' => $data->method,
+                'status' => PaymentStatus::Confirmed,
+                'paid_at' => $data->paidAt,
+                'notes' => $data->notes,
+            ]);
+            $payment->company()->associate($company);
+            $payment->receivable()->associate($lockedReceivable);
+            $payment->attendance()->associate($lockedReceivable->attendance);
+            $payment->sale()->associate($lockedReceivable->sale);
+            $payment->financialAccount()->associate($account);
+            $payment->save();
+
+            $this->ledgerService->postInbound(
+                $company,
+                $account,
+                $amount,
+                FinancialTransactionType::CustomerPayment,
+                CarbonImmutable::parse($data->paidAt),
+                'Recebimento de cliente',
+                $payment->inboundLedgerReferenceKey(),
+                $payment,
+                null,
+                $cashSessionId,
+            );
+
+            if (bccomp($feeAmount, '0', 2) > 0) {
+                $this->ledgerService->postOutbound(
+                    $company,
+                    $account,
+                    $feeAmount,
+                    FinancialTransactionType::PaymentFee,
+                    CarbonImmutable::parse($data->paidAt),
+                    'Taxa do pagamento',
+                    $payment->feeLedgerReferenceKey(),
+                    $payment,
+                    null,
+                    $cashSessionId,
+                );
+            }
+
+            $this->recalculateValues($lockedReceivable->refresh());
+            if ($lockedReceivable->attendance_id !== null) {
+                $this->recalculateAttendanceFinancials($lockedReceivable->attendance()->firstOrFail());
+            }
+
+            return $payment->refresh();
+        });
+    }
+
     public function cancelPayment(
         Company $company,
         Payment $payment,

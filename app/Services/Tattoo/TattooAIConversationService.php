@@ -5,16 +5,16 @@ namespace App\Services\Tattoo;
 use App\Enums\AppointmentStatus;
 use App\Jobs\NotifyTattooHandoffJob;
 use App\Models\Appointment;
+use App\Models\AsaasCharge;
 use App\Models\Client;
 use App\Models\Professional;
-use App\Models\AsaasCharge;
 use App\Models\TattooAiConversation;
 use App\Models\TattooAiMessage;
 use App\Models\TattooQuote;
 use App\Models\TattooRequest;
-use App\Services\Asaas\AsaasChargeService;
 use App\Services\AI\CompanyAIService;
 use App\Services\AI\WhatsAppAIConversationService;
+use App\Services\Asaas\AsaasChargeService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\WhatsAppHumanTakeover;
 use App\Support\CompanyDateTime;
@@ -26,7 +26,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
 
@@ -911,7 +910,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         return $this->handOverToArtist($conversation, 'Cliente pediu o endereço (não cadastrado nas configurações)', ' pra te mandar o endereço');
     }
 
-        /**
+    /**
      * Cliente que pede pra agendar tira a conversa do atendimento humano: a
      * IA volta no ponto do pedido/orçamento (aceite, PIX, horários).
      */
@@ -1045,7 +1044,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             .". Quer remarcar, cancelar ou falar com ele?\n1 Remarcar\n2 Cancelar\n3 Falar com ".$artist;
     }
 
-protected function handOverToArtist(TattooAiConversation $conversation, string $reason, string $about): string
+    protected function handOverToArtist(TattooAiConversation $conversation, string $reason, string $about): string
     {
         $conversation->update(['human_takeover' => true, 'status' => 'human_takeover']);
         NotifyTattooHandoffJob::dispatch($conversation->id, $reason);

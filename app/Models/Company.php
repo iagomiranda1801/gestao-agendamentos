@@ -292,6 +292,22 @@ class Company extends Model
     }
 
     /**
+     * @return HasOne<CompanyAsaasSetting, $this>
+     */
+    public function asaasSetting(): HasOne
+    {
+        return $this->hasOne(CompanyAsaasSetting::class);
+    }
+
+    /**
+     * @return HasMany<AsaasCharge, $this>
+     */
+    public function asaasCharges(): HasMany
+    {
+        return $this->hasMany(AsaasCharge::class);
+    }
+
+    /**
      * @return HasMany<CompanyBusinessHour, $this>
      */
     public function businessHours(): HasMany

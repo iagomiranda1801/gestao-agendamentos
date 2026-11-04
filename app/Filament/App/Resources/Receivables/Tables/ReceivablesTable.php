@@ -2,18 +2,27 @@
 
 namespace App\Filament\App\Resources\Receivables\Tables;
 
+use App\Enums\AsaasBillingType;
 use App\Enums\ReceivableStatus;
 use App\Filament\App\Resources\Concerns\InteractsWithPaymentRegistration;
 use App\Models\Company;
 use App\Models\Receivable;
+use App\Services\Asaas\AsaasChargeService;
+use App\Services\Asaas\CompanyAsaasSettingService;
 use App\Support\CompanyDateTime;
+use App\Support\DecimalMoney;
+use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 
 class ReceivablesTable
 {
@@ -114,7 +123,73 @@ class ReceivablesTable
             ->defaultSort('due_date')
             ->recordActions([
                 self::makeRegisterPaymentTableAction(),
+                self::makeAsaasChargeTableAction(),
             ])
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['attendance', 'client']));
+    }
+
+    protected static function makeAsaasChargeTableAction(): Action
+    {
+        return Action::make('chargeAsaas')
+            ->label('Cobrar no Asaas')
+            ->icon('heroicon-o-qr-code')
+            ->visible(function (Receivable $record): bool {
+                if (! in_array($record->status, [ReceivableStatus::Open, ReceivableStatus::Partial], true)) {
+                    return false;
+                }
+
+                $company = Filament::getTenant();
+                if (! $company instanceof Company || app(CompanyAsaasSettingService::class)->ready($company) === null) {
+                    return false;
+                }
+
+                return auth()->user()?->can('registerPayment', $record) ?? false;
+            })
+            ->schema(fn (Receivable $record): array => [
+                Select::make('billing_type')
+                    ->label('Forma de cobrança')
+                    ->options(AsaasBillingType::options())
+                    ->default(AsaasBillingType::Pix->value)
+                    ->required()
+                    ->native(false),
+                TextInput::make('amount')
+                    ->label('Valor')
+                    ->numeric()
+                    ->minValue(0.01)
+                    ->step(0.01)
+                    ->prefix('R$')
+                    ->required()
+                    ->default((string) $record->outstanding_amount),
+                DatePicker::make('due_date')
+                    ->label('Vencimento')
+                    ->native(false)
+                    ->default($record->due_date?->toDateString() ?? now()->toDateString())
+                    ->required(),
+            ])
+            ->action(function (Receivable $record, array $data): void {
+                /** @var Company $company */
+                $company = Filament::getTenant();
+                $charge = app(AsaasChargeService::class)->createForReceivable(
+                    $company,
+                    $record,
+                    AsaasBillingType::from($data['billing_type']),
+                    DecimalMoney::round((string) $data['amount']),
+                    Carbon::parse($data['due_date']),
+                );
+
+                $body = filled($charge->pix_payload)
+                    ? "PIX copia e cola:\n".$charge->pix_payload
+                    : (string) ($charge->bank_slip_url ?: $charge->invoice_url);
+                if (filled($charge->invoice_url) && filled($charge->pix_payload)) {
+                    $body .= "\n\nLink: ".$charge->invoice_url;
+                }
+
+                Notification::make()
+                    ->success()
+                    ->title('Cobrança criada no Asaas')
+                    ->body($body)
+                    ->persistent()
+                    ->send();
+            });
     }
 }
