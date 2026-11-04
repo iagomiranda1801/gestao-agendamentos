@@ -4,13 +4,23 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::table('company_scheduling_settings', function (Blueprint $table): void {
-            $table->string('tattoo_artist_notify_phone', 32)->nullable();
-            $table->decimal('tattoo_fixed_deposit_amount', 12, 2)->nullable();
+            if (! Schema::hasColumn('company_scheduling_settings', 'tattoo_artist_notify_phone')) {
+                $table->string('tattoo_artist_notify_phone', 32)->nullable();
+            }
+            if (! Schema::hasColumn('company_scheduling_settings', 'tattoo_fixed_deposit_amount')) {
+                $table->decimal('tattoo_fixed_deposit_amount', 12, 2)->nullable();
+            }
         });
+
+        // MySQL can keep earlier DDL changes after an interrupted migration.
+        if (Schema::hasTable('tattoo_manual_quote_detections')) {
+            return;
+        }
 
         Schema::create('tattoo_manual_quote_detections', function (Blueprint $table): void {
             $table->id();
