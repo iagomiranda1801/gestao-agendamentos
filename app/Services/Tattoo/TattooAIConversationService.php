@@ -7,10 +7,12 @@ use App\Jobs\NotifyTattooHandoffJob;
 use App\Models\Appointment;
 use App\Models\Client;
 use App\Models\Professional;
+use App\Models\AsaasCharge;
 use App\Models\TattooAiConversation;
 use App\Models\TattooAiMessage;
 use App\Models\TattooQuote;
 use App\Models\TattooRequest;
+use App\Services\Asaas\AsaasChargeService;
 use App\Services\AI\CompanyAIService;
 use App\Services\AI\WhatsAppAIConversationService;
 use App\Services\WhatsApp\EvolutionApiClient;
@@ -171,11 +173,16 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             if ((float) $quote->deposit_amount <= 0) {
                 $conversation->update(['status' => 'ready_to_schedule']);
 
-                return 'Fechado! Agora vamos combinar o melhor horário com a equipe.';
+                return 'Fechado! '.$this->booking()->showDays($conversation);
+            }
+            $conversation->update(['status' => 'offering_slots']);
+            $days = $this->booking()->showDays($conversation, "Fechado! 🙌 Bora escolher o horário. O horário só fica reservado depois do sinal.\n\n");
+            if (isset(($conversation->fresh()->collected_data ?: [])['_schedule'])) {
+                return $days;
             }
             $conversation->update(['status' => 'waiting_payment_receipt']);
 
-            return $this->pixMessage($conversation, $quote);
+            return 'Fechado! '.$this->pixMessage($conversation, $quote);
         }
         if ($quote && $quote->accepted_at && $quote->deposit_amount > 0 && $message->media_mime
             && ! in_array($conversation->status, ['payment_confirmed', 'converted_to_appointment'], true)) {
@@ -184,26 +191,15 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         if ($quote && $quote->accepted_at && preg_match('/\b(pix|chave|sinal|pagar)\b/u', $normalized)) {
             return $this->pixMessage($conversation, $quote);
         }
+        if ($quote && ($flowReply = $this->booking()->handle($conversation, $quote, $text, $normalized,
+            fn (): string => $this->pixMessage($conversation->refresh(), $quote->refresh()))) !== null) {
+            return $flowReply;
+        }
         if ($conversation->status === 'receipt_received') {
             return 'Seu comprovante tá na conferência. Assim que confirmar o sinal, te aviso aqui.';
         }
         if (in_array($conversation->status, ['payment_confirmed', 'ready_to_schedule'], true)) {
-            $slots = $this->scheduling->slots($conversation);
-            if ($slots === []) {
-                return 'Vou conferir os horários com a equipe e já te chamo.';
-            }
-            $selected = preg_match('/\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}\b/', $text, $match) ? $match[0] : null;
-            if ($selected !== null) {
-                try {
-                    $this->scheduling->book($conversation, $selected);
-
-                    return 'Fechado, ficou marcado pra '.date('d/m/Y H:i', strtotime($selected)).'. Qualquer coisa é só chamar aqui!';
-                } catch (ValidationException) {
-                    return 'Esse horário acabou de sair. Tenho estes: '.implode(', ', $slots).'.';
-                }
-            }
-
-            return 'Tenho estes horários: '.implode(', ', $slots).'. Me responde com a data e a hora igualzinho tá aí em cima que eu já marco.';
+            return 'Vou conferir os horários com a equipe e já te chamo.';
         }
         if ($conversation->status === 'converted_to_appointment') {
             return 'Seu horário já tá marcado! Se precisar mudar algo, é só falar.';
@@ -946,7 +942,8 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             $request->status === 'booked' || $request->appointment_id !== null => 'converted_to_appointment',
             ! $quote?->accepted_at => 'waiting_professional_quote',
             (float) $quote->deposit_amount <= 0 => 'ready_to_schedule',
-            $conversation->receipts()->where('payment_status', 'confirmed')->exists() => 'payment_confirmed',
+            $conversation->receipts()->where('payment_status', 'confirmed')->exists()
+                || AsaasCharge::depositIsPaid((int) $conversation->company_id, (int) $quote->id) => 'payment_confirmed',
             default => 'waiting_payment_receipt',
         };
     }
@@ -1100,6 +1097,15 @@ protected function handOverToArtist(TattooAiConversation $conversation, string $
         }
         $receipt = $this->receipts->analyzeOrFlag($receipt);
         $conversation->update(['status' => 'receipt_received']);
+        if ($receipt->receipt_analysis_status !== 'compatible') {
+            $this->booking()->receiptProblem($conversation, $receipt);
+        }
+        if (! $this->booking()->hasChosenSlot($conversation) && $receipt->payment_status === 'receipt_received') {
+            $days = $this->booking()->showDays($conversation, "\n\nEnquanto isso, já escolhe o dia:\n");
+            if (isset(($conversation->fresh()->collected_data ?: [])['_schedule'])) {
+                return 'Recebi o comprovante! Vou conferir aqui e já te falo.'.$days;
+            }
+        }
 
         return $receipt->receipt_analysis_status === 'compatible' || ($receipt->analysis['analysis_failed'] ?? false)
             ? 'Recebi o comprovante! Vou conferir aqui e já te falo.'
@@ -1426,11 +1432,43 @@ protected function handOverToArtist(TattooAiConversation $conversation, string $
         return $binary;
     }
 
+    protected function booking(): TattooBookingFlow
+    {
+        return app(TattooBookingFlow::class);
+    }
+
     protected function pixMessage(TattooAiConversation $conversation, TattooQuote $quote): string
     {
         if (! $quote->accepted_at || (float) $quote->deposit_amount <= 0) {
             return 'Vou confirmar os detalhes do sinal e já te mando o PIX.';
         }
+        if (AsaasCharge::depositIsPaid((int) $conversation->company_id, (int) $quote->getKey())) {
+            return 'Seu sinal já foi confirmado. Quando quiser, a gente segue com o horário.';
+        }
+
+        $client = $conversation->client ?? $quote->request?->client;
+        if ($client !== null && app(AsaasChargeService::class)->settingsReady($conversation->company)) {
+            try {
+                $charge = app(AsaasChargeService::class)->createForQuote($conversation->company, $quote, $client);
+                $lines = ['Sinal: R$ '.number_format((float) $quote->deposit_amount, 2, ',', '.')];
+                if (filled($charge->pix_payload)) {
+                    $lines[] = "PIX copia e cola:\n{$charge->pix_payload}";
+                }
+                if (filled($charge->invoice_url)) {
+                    $lines[] = 'Link: '.$charge->invoice_url;
+                }
+                $lines[] = 'Quando o pagamento cair, eu confirmo por aqui.';
+
+                return implode("\n", $lines);
+            } catch (Throwable $exception) {
+                Log::warning('Asaas deposit charge failed.', [
+                    'company_id' => $conversation->company_id,
+                    'quote_id' => $quote->getKey(),
+                    'error_type' => $exception::class,
+                ]);
+            }
+        }
+
         $account = $this->receipts->pixAccount($conversation->company_id);
         if (! $account || ! $account->pix_recipient_name) {
             return 'Já já te mando os dados do PIX por aqui.';

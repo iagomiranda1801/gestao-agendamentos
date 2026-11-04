@@ -259,5 +259,18 @@ class TattooReceiptService
             'reviewed_by' => $user->id, 'reviewed_at' => now(),
         ]);
         $receipt->conversation->update(['status' => $confirm ? 'payment_confirmed' : 'waiting_payment_receipt']);
+        if (! $confirm) {
+            return;
+        }
+        // Sinal aprovado: agenda o horário escolhido (se ainda livre) e avisa cliente e tatuador.
+        try {
+            $flow = app(TattooBookingFlow::class);
+            $reply = $flow->paymentConfirmed($receipt->fresh());
+            if ($reply !== null) {
+                $flow->sendToCustomer($receipt->conversation->fresh(), $reply, 'payment-confirmed:'.$receipt->id);
+            }
+        } catch (Throwable $exception) {
+            Log::warning('Tattoo booking after payment failed.', ['receipt_id' => $receipt->id, 'error_type' => $exception::class]);
+        }
     }
 }
