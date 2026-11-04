@@ -114,6 +114,8 @@ class SchedulingSettingsPage extends Page
             'tattoo_custom_flow_enabled' => $setting->tattoo_custom_flow_enabled,
             'tattoo_ai_prompt' => $setting->tattoo_ai_prompt,
             'tattoo_artist_name' => $setting->tattoo_artist_name,
+            'tattoo_artist_notify_phone' => $setting->tattoo_artist_notify_phone,
+            'tattoo_fixed_deposit_amount' => $setting->tattoo_fixed_deposit_amount,
             'tattoo_aftercare_message' => $setting->tattoo_aftercare_message ?: TattooStudioInfo::DEFAULT_AFTERCARE,
             'tattoo_studio_address' => $setting->tattoo_studio_address,
             'tattoo_address_message' => $setting->tattoo_address_message ?: TattooStudioInfo::DEFAULT_ADDRESS,
@@ -452,6 +454,13 @@ class SchedulingSettingsPage extends Page
                             ->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
                         Textarea::make('tattoo_ai_prompt')->label('Orientações adicionais para a IA')
                             ->maxLength(3000)->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
+                        TextInput::make('tattoo_artist_notify_phone')->label('WhatsApp pessoal do tatuador')
+                            ->helperText('Número pessoal (diferente do WhatsApp do estúdio). Quando você digitar um orçamento à mão pro cliente, o sistema pergunta aqui se deve salvar.')
+                            ->tel()->maxLength(32)->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
+                        TextInput::make('tattoo_fixed_deposit_amount')->label('Sinal fixo (R$)')
+                            ->helperText('Usado quando o orçamento não diz o valor do sinal. Vazio: sem sinal padrão.')
+                            ->numeric()->minValue(0)->maxValue(100000)->prefix('R$')
+                            ->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),
                         TextInput::make('tattoo_artist_name')->label('Nome do tatuador que assume a conversa')
                             ->helperText('Ex.: Gustavo. Vazio: usa o único tatuador ativo ou "o tatuador".')
                             ->maxLength(100)->visible(fn (): bool => (bool) Filament::getTenant()?->isTattooStudio()),

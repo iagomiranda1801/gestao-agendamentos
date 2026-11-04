@@ -30,6 +30,13 @@ class TattooQuoteService
             'conditions' => ['nullable', 'string', 'max:3000'],
         ])->validate();
 
+        if (blank($data['deposit_amount'] ?? null)) {
+            $fixed = (float) $request->company?->schedulingSetting?->tattoo_fixed_deposit_amount;
+            if ($fixed > 0) {
+                $data['deposit_amount'] = $fixed;
+            }
+        }
+
         $message = $this->message($request, $data);
 
         return DB::transaction(function () use ($request, $user, $data, $message): TattooQuote {

@@ -6,6 +6,7 @@ use App\Enums\WhatsAppCampaignRecipientStatus;
 use App\Jobs\HandleWhatsAppInboundMessageJob;
 use App\Models\EvolutionWebhookEvent;
 use App\Models\WhatsAppCampaignRecipient;
+use App\Services\Tattoo\TattooManualQuoteService;
 use App\Services\WhatsApp\Campaigns\WhatsAppCampaignService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
@@ -66,6 +67,11 @@ class EvolutionWebhookService
         }
 
         $text = $this->extractText($payload);
+
+        // Número pessoal do tatuador: responde "1/2" do orçamento detectado, nunca vira cliente.
+        if (app(TattooManualQuoteService::class)->handleArtistMessage($instance, $phone, $text)) {
+            return;
+        }
 
         app(WhatsAppHumanTakeover::class)->rememberInbound($instance, $phone);
 
@@ -191,6 +197,13 @@ class EvolutionWebhookService
             return;
         }
 
+        $manualQuotes = app(TattooManualQuoteService::class);
+
+        // Conversa com o próprio tatuador (avisos de orçamento): não pausa nada.
+        if ($manualQuotes->isArtistPhone($instance, $phone)) {
+            return;
+        }
+
         $takeover = app(WhatsAppHumanTakeover::class);
 
         if ($takeover->isBotEcho($instance, $phone, $this->extractText($payload), $event->message_id)) {
@@ -207,6 +220,12 @@ class EvolutionWebhookService
         }
 
         $takeover->pause($instance, $phone);
+
+        try {
+            $manualQuotes->detectFromOutbound($instance, $phone, $this->extractText($payload), $event->message_id);
+        } catch (\Throwable $exception) {
+            Log::warning('Tattoo manual quote detection failed.', ['instance' => $instance, 'error' => $exception->getMessage()]);
+        }
 
         Log::info('WhatsApp bot paused: business replied manually.', [
             'instance' => $instance,

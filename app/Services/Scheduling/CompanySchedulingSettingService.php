@@ -116,6 +116,16 @@ class CompanySchedulingSettingService
             $data['whatsapp_instance'] = trim((string) $data['whatsapp_instance']);
         }
 
+        if (array_key_exists('tattoo_artist_notify_phone', $data)) {
+            $data['tattoo_artist_notify_phone'] = PhoneNormalizer::normalize(
+                filled($data['tattoo_artist_notify_phone']) ? (string) $data['tattoo_artist_notify_phone'] : null,
+            );
+        }
+
+        if (array_key_exists('tattoo_fixed_deposit_amount', $data) && blank($data['tattoo_fixed_deposit_amount'])) {
+            $data['tattoo_fixed_deposit_amount'] = null;
+        }
+
         if (array_key_exists('whatsapp_sender_phone', $data)) {
             $data['whatsapp_sender_phone'] = PhoneNormalizer::normalize(
                 filled($data['whatsapp_sender_phone']) ? (string) $data['whatsapp_sender_phone'] : null,
