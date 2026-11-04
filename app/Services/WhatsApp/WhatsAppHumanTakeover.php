@@ -62,17 +62,37 @@ class WhatsAppHumanTakeover
                 ->whereIn('phone_normalized', PhoneNormalizer::candidates($phone))
                 ->whereNull('finished_at')
                 ->update(['finished_at' => now(), 'finished_reason' => 'human_takeover']);
-            if (CompanyWhatsAppInstance::query()->where('instance_name', $instance)
-                ->whereHas('company.schedulingSetting', fn ($query) => $query->where('tattoo_custom_flow_enabled', true))
-                ->exists()) {
-                TattooAiConversation::query()->where('company_id', $companyId)
-                    ->whereIn('phone_normalized', PhoneNormalizer::candidates($phone))
-                    ->update(['human_takeover' => true, 'status' => 'human_takeover']);
-            }
+                        $this->persistTattooTakeover($instance, (int) $companyId, $phone);
         }
     }
 
-    public function isPaused(string $instance, string $phone): bool
+        /**
+     * Estúdio de tatuagem: quando o tatuador responde pelo WhatsApp, a IA fica
+     * em silêncio de vez (não só pelas 2h da pausa), mesmo que a conversa
+     * ainda não exista porque foi ele quem chamou primeiro. Volta pelo
+     * "Retomar IA" ou quando o cliente pede pra agendar.
+     */
+    protected function persistTattooTakeover(string $instance, int $companyId, string $phone): void
+    {
+        $instanceModel = CompanyWhatsAppInstance::query()->with('company')->where('instance_name', $instance)->first();
+        if (! $instanceModel?->company?->isTattooStudio()) {
+            return;
+        }
+        $updated = TattooAiConversation::query()->where('company_id', $companyId)
+            ->whereIn('phone_normalized', PhoneNormalizer::candidates($phone))
+            ->update(['human_takeover' => true, 'status' => 'human_takeover']);
+        $normalized = PhoneNormalizer::normalize($phone);
+        if ($updated > 0 || ! $normalized) {
+            return;
+        }
+        TattooAiConversation::query()->firstOrCreate(
+            ['company_whatsapp_instance_id' => $instanceModel->id, 'phone_normalized' => $normalized],
+            ['company_id' => $companyId, 'remote_jid' => $normalized.'@s.whatsapp.net', 'status' => 'human_takeover',
+                'human_takeover' => true, 'collected_data' => ['_known_contact' => true], 'last_interaction_at' => now()],
+        );
+    }
+
+public function isPaused(string $instance, string $phone): bool
     {
         $key = $this->phoneKey($phone);
 

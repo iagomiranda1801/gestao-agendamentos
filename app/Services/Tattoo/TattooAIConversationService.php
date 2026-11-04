@@ -2,7 +2,10 @@
 
 namespace App\Services\Tattoo;
 
+use App\Enums\AppointmentStatus;
 use App\Jobs\NotifyTattooHandoffJob;
+use App\Models\Appointment;
+use App\Models\Client;
 use App\Models\Professional;
 use App\Models\TattooAiConversation;
 use App\Models\TattooAiMessage;
@@ -11,7 +14,11 @@ use App\Models\TattooRequest;
 use App\Services\AI\CompanyAIService;
 use App\Services\AI\WhatsAppAIConversationService;
 use App\Services\WhatsApp\EvolutionApiClient;
+use App\Services\WhatsApp\WhatsAppHumanTakeover;
+use App\Support\CompanyDateTime;
 use App\Support\CustomerNameDetector;
+use App\Support\PhoneNormalizer;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -64,7 +71,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             return $reply;
         }
         $conversation->refresh();
-        if ($conversation->human_takeover || $conversation->tattoo_request_id !== null) {
+        if ($conversation->human_takeover || $conversation->tattoo_request_id !== null || $this->isReturningContact($conversation)) {
             return $reply;
         }
 
@@ -75,6 +82,9 @@ class TattooAIConversationService extends WhatsAppAIConversationService
     protected function process(TattooAiConversation $conversation, TattooAiMessage $message): ?string
     {
         $text = trim((string) $message->body);
+        if (($contextReply = $this->returningCustomerReply($conversation, $text)) !== null) {
+            return $contextReply;
+        }
         $request = $conversation->request;
         $quote = $request?->quotes()->latest('version')->first();
         $normalized = Str::lower(Str::ascii($text));
@@ -93,7 +103,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         }
         if ((bool) $conversation->company->schedulingSetting?->tattoo_custom_flow_enabled && $conversation->menu_choice === null) {
             $existingReply = $conversation->messages()->where('direction', 'out')->where('id', '<', $message->id)->exists();
-            if ($request || $existingReply && ($conversation->status !== 'awaiting_menu')) {
+            if ($request || $this->isReturningContact($conversation) || $existingReply && ($conversation->status !== 'awaiting_menu')) {
                 $conversation->update(['menu_choice' => 1]);
             } elseif ($conversation->status !== 'awaiting_menu') {
                 $conversation->update(['status' => 'awaiting_menu']);
@@ -535,7 +545,9 @@ class TattooAIConversationService extends WhatsAppAIConversationService
     protected function firstMessage(TattooAiConversation $conversation): string
     {
         $candidate = $this->nameCandidateFirstName($conversation);
-        $intro = $this->studioAssistantIntro($conversation, $candidate);
+        $intro = $this->isReturningContact($conversation)
+            ? 'Opa'.($candidate !== null ? ', '.$candidate : '').'!'
+            : $this->studioAssistantIntro($conversation, $candidate);
         $confirm = $candidate !== null ? $this->nameConfirmationQuestion($conversation) : null;
 
         return $intro.' '.($confirm ?? 'Qual seu nome?');
@@ -903,7 +915,140 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         return $this->handOverToArtist($conversation, 'Cliente pediu o endereço (não cadastrado nas configurações)', ' pra te mandar o endereço');
     }
 
-    protected function handOverToArtist(TattooAiConversation $conversation, string $reason, string $about): string
+        /**
+     * Cliente que pede pra agendar tira a conversa do atendimento humano: a
+     * IA volta no ponto do pedido/orçamento (aceite, PIX, horários).
+     */
+    protected function resumeOnCustomerRequest(TattooAiConversation $conversation, TattooAiMessage $message): bool
+    {
+        if (! preg_match('/\b(agendar|agendamento|marcar|horario|horarios)\b/u', $this->normalizedText((string) $message->body))) {
+            return false;
+        }
+        $request = $conversation->request;
+        $updates = ['human_takeover' => false,
+            'status' => $this->statusForRequest($conversation, $request, $request?->quotes()->latest('version')->first())];
+        if ((bool) $conversation->company->schedulingSetting?->tattoo_custom_flow_enabled && $conversation->menu_choice === null) {
+            $updates['menu_choice'] = 1;
+        }
+        $conversation->update($updates);
+        app(WhatsAppHumanTakeover::class)->resume((string) $conversation->instance?->instance_name, $conversation->phone_normalized);
+        Log::info('Tattoo AI resumed by customer scheduling request.', ['company_id' => $conversation->company_id,
+            'conversation_id' => $conversation->id]);
+
+        return true;
+    }
+
+    /** Status da conversa que corresponde ao ponto do pedido/orçamento. */
+    protected function statusForRequest(TattooAiConversation $conversation, ?TattooRequest $request, ?TattooQuote $quote): string
+    {
+        return match (true) {
+            $request === null => 'collecting_information',
+            $request->status === 'booked' || $request->appointment_id !== null => 'converted_to_appointment',
+            ! $quote?->accepted_at => 'waiting_professional_quote',
+            (float) $quote->deposit_amount <= 0 => 'ready_to_schedule',
+            $conversation->receipts()->where('payment_status', 'confirmed')->exists() => 'payment_confirmed',
+            default => 'waiting_payment_receipt',
+        };
+    }
+
+    /** Já conversou com o estúdio (tatuador, orçamento ou horário): sem menu nem apresentação. */
+    protected function isReturningContact(TattooAiConversation $conversation): bool
+    {
+        $data = $conversation->collected_data ?: [];
+
+        return $conversation->tattoo_request_id !== null || ! empty($data['_known_contact']) || ! empty($data['_appointment_notice']);
+    }
+
+    /**
+     * Antes de responder, olha quem é o cliente: resposta ao aviso de horário
+     * marcado, orçamento já enviado (segue dele) e horário futuro (avisa uma
+     * vez por agendamento).
+     */
+    protected function returningCustomerReply(TattooAiConversation $conversation, string $text): ?string
+    {
+        $data = $conversation->collected_data ?: [];
+        if (! empty($data['_appointment_notice_pending'])) {
+            unset($data['_appointment_notice_pending']);
+            $conversation->update(['collected_data' => $data]);
+            $normalized = $this->normalizedText($text);
+            $choice = match (true) {
+                (bool) preg_match('/^1\b|remarc|reagend|mudar|trocar/u', $normalized) => 'remarcar',
+                (bool) preg_match('/^2\b|cancel|desmarc/u', $normalized) => 'cancelar',
+                (bool) preg_match('/^3\b|falar|conversar/u', $normalized) => 'falar',
+                default => null,
+            };
+            if ($choice !== null) {
+                return $this->handOverToArtist($conversation, match ($choice) {
+                    'remarcar' => 'Cliente quer remarcar o horário',
+                    'cancelar' => 'Cliente quer cancelar o horário',
+                    default => 'Cliente quer falar sobre o horário marcado',
+                }, $choice === 'falar' ? '' : " que você quer {$choice}");
+            }
+        }
+        $clientId = $conversation->client_id ?: Client::query()->where('company_id', $conversation->company_id)
+            ->whereIn('phone_normalized', PhoneNormalizer::candidates($conversation->phone_normalized))->value('id');
+        if (! $clientId) {
+            return null;
+        }
+        if ($conversation->tattoo_request_id === null) {
+            $this->linkOpenQuote($conversation, (int) $clientId);
+        }
+        $appointment = Appointment::query()->with('professional')
+            ->where('company_id', $conversation->company_id)->where('client_id', $clientId)
+            ->where('start_at', '>', now())
+            ->whereNotIn('status', [AppointmentStatus::Cancelled->value, AppointmentStatus::NoShow->value, AppointmentStatus::Completed->value])
+            ->orderBy('start_at')->first();
+        $data = $conversation->collected_data ?: [];
+        if ($appointment === null || (int) ($data['_appointment_notice'] ?? 0) === (int) $appointment->id) {
+            return null;
+        }
+        $data['_appointment_notice'] = $appointment->id;
+        $data['_appointment_notice_pending'] = true;
+        $conversation->update(['collected_data' => $data]);
+
+        return $this->appointmentNotice($conversation, $appointment);
+    }
+
+    protected function linkOpenQuote(TattooAiConversation $conversation, int $clientId): void
+    {
+        $request = TattooRequest::query()->where('company_id', $conversation->company_id)->where('client_id', $clientId)
+            ->whereNotIn('status', ['cancelled', 'declined', 'booked'])
+            ->whereHas('quotes', fn ($query) => $query->whereNotNull('sent_at'))
+            ->latest('id')->first();
+        if ($request === null) {
+            return;
+        }
+        $updates = ['client_id' => $clientId, 'tattoo_request_id' => $request->id,
+            'status' => $this->statusForRequest($conversation, $request, $request->quotes()->latest('version')->first())];
+        if ((bool) $conversation->company->schedulingSetting?->tattoo_custom_flow_enabled && $conversation->menu_choice === null) {
+            $updates['menu_choice'] = 1;
+        }
+        $conversation->update($updates);
+        $conversation->unsetRelation('request');
+        Log::info('Tattoo AI linked existing quote.', ['company_id' => $conversation->company_id,
+            'conversation_id' => $conversation->id, 'tattoo_request_id' => $request->id]);
+    }
+
+    protected function appointmentNotice(TattooAiConversation $conversation, Appointment $appointment): string
+    {
+        $company = $conversation->company;
+        $local = CompanyDateTime::utcToLocal($company, CarbonImmutable::parse($appointment->start_at));
+        $weekdays = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+        $professional = trim((string) $appointment->professional?->name);
+        $artist = $professional !== '' ? (string) Str::of($professional)->explode(' ')->first() : TattooStudioInfo::artistName($company);
+        $data = $conversation->collected_data ?: [];
+        $name = $this->addressName($data);
+        if ($name === null && $conversation->client && CustomerNameDetector::isValidStoredName($conversation->client->name)
+            && ! $this->isPlaceholderName((string) $conversation->client->name)) {
+            $name = $this->displayFirstName((string) $conversation->client->name);
+        }
+
+        return 'Opa'.($name ? ', '.$name : '').'! Vi que você tem horário marcado dia '.$local->format('d/m')
+            .' ('.$weekdays[$local->dayOfWeek].') às '.$local->format('H:i').' com '.$artist
+            .". Quer remarcar, cancelar ou falar com ele?\n1 Remarcar\n2 Cancelar\n3 Falar com ".$artist;
+    }
+
+protected function handOverToArtist(TattooAiConversation $conversation, string $reason, string $about): string
     {
         $conversation->update(['human_takeover' => true, 'status' => 'human_takeover']);
         NotifyTattooHandoffJob::dispatch($conversation->id, $reason);

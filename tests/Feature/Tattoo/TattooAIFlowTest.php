@@ -659,7 +659,7 @@ class TattooAIFlowTest extends TestCase
         $this->authenticateForAppTenant($user, $company);
 
         Livewire::test(ViewTattooAiConversation::class, ['record' => $conversation->id])
-            ->assertSee('IA pausada pelo WhatsApp')
+            ->assertSee('Equipe atendendo') // resposta manual no WhatsApp vira atendimento humano persistente
             ->assertActionVisible('resume_ai')
             ->callAction('resume_ai')
             ->assertHasNoActionErrors()

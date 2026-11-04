@@ -90,6 +90,10 @@ class TattooWhatsAppBotService
             if ($customFlow && $priorConversation?->finished_reason === 'handoff' && $normalized !== 'menu') {
                 return null;
             }
+            // O tatuador assumiu pelo WhatsApp: o bot não volta sozinho, só se o cliente pedir pra agendar.
+            if ($priorConversation?->finished_reason === 'human_takeover' && $normalized !== 'menu' && ! $wantsBooking) {
+                return null;
+            }
             if ($priorConversation !== null && ! $isGreeting && ! $wantsQuote && ! $wantsBooking && ! $wantsHuman && $normalized !== 'menu') {
                 return null;
             }

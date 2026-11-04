@@ -80,7 +80,7 @@ abstract class WhatsAppAIConversationService
                 return null;
             }
             $conversation->update(['last_interaction_at' => now(), 'remote_jid' => $jid]);
-            if ($paused || $conversation->human_takeover) {
+            if (($paused || $conversation->human_takeover) && ! $this->resumeOnCustomerRequest($conversation, $incoming)) {
                 $incoming->update(['status' => 'processed']);
 
                 return null;
@@ -192,6 +192,15 @@ abstract class WhatsAppAIConversationService
     }
 
     protected function afterReplySent(TattooAiConversation $conversation, TattooAiMessage $message): void {}
+
+    /**
+     * Conversa em atendimento humano: a IA volta só quando o próprio cliente
+     * pede algo que ela resolve (ex.: agendar). Padrão: nunca volta sozinha.
+     */
+    protected function resumeOnCustomerRequest(TattooAiConversation $conversation, TattooAiMessage $message): bool
+    {
+        return false;
+    }
 
     /**
      * Atraso humano da resposta: entre min e max segundos contados da chegada
