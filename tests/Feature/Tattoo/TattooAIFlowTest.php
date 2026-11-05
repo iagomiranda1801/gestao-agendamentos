@@ -921,4 +921,51 @@ class TattooAIFlowTest extends TestCase
         $this->assertStringContainsString('pix@example.com', TattooAiMessage::query()->where('provider_message_id', 'reply:pix-after')->firstOrFail()->body);
         $this->assertSame('accepted', $request->fresh()->status);
     }
+
+    public function test_accepted_quote_sends_pix_without_recipient_name_and_ok_does_not_restart_collection(): void
+    {
+        [$company, $instance, $phone] = $this->setupAI();
+        $client = Client::factory()->forCompany($company)->create(['phone' => $phone]);
+        $request = new TattooRequest(['client_id' => $client->id, 'description' => 'Tema medieval com magos e bruxos',
+            'body_placement' => 'Costas ou braço', 'size_description' => '30cm ou fechamento', 'status' => 'quote_sent']);
+        $request->company_id = $company->id;
+        $request->save();
+        $quote = new TattooQuote(['version' => 1, 'price_type' => 'fixed', 'amount_min' => 1500,
+            'deposit_amount' => 300, 'message_snapshot' => 'Orçamento', 'sent_at' => now()]);
+        $quote->company_id = $company->id;
+        $quote->tattoo_request_id = $request->id;
+        $quote->save();
+        TattooAiConversation::query()->create(['company_id' => $company->id,
+            'company_whatsapp_instance_id' => $instance->id, 'phone_normalized' => $phone,
+            'remote_jid' => $phone.'@s.whatsapp.net', 'client_id' => $client->id,
+            'tattoo_request_id' => $request->id, 'collected_data' => [
+                'name' => 'Cliente', 'description' => 'Tema medieval com magos e bruxos',
+                'body_placement' => 'Costas ou braço', 'size_description' => '30cm ou fechamento',
+                'style' => 'Realismo preto e cinza sombreado', 'reference_status' => 'none',
+            ]]);
+        FinancialAccount::factory()->forCompany($company)->create(['pix_key' => 'pix@estudio.test',
+            'pix_recipient_name' => null, 'is_default_receipt_account' => true]);
+        Http::fake(function ($httpRequest) {
+            if (str_contains($httpRequest->url(), 'generateContent')) {
+                return Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode([
+                    'action' => 'save_details',
+                    'details' => ['description' => 'Tema medieval com magos e bruxos'],
+                    'reply' => 'Deixa eu confirmar se entendi.',
+                ])]]]]]]);
+            }
+
+            return Http::response(['key' => ['id' => 'sent']]);
+        });
+
+        $this->send($company, $instance, $phone, 'aceito', 'pix-accept');
+        $accepted = TattooAiMessage::query()->where('provider_message_id', 'reply:pix-accept')->firstOrFail()->body;
+        $this->assertStringContainsString('pix@estudio.test', $accepted);
+        $this->assertStringNotContainsString('Já já te mando', $accepted);
+
+        $this->send($company, $instance, $phone, 'Ok', 'pix-ok');
+        $ok = TattooAiMessage::query()->where('provider_message_id', 'reply:pix-ok')->firstOrFail()->body;
+        $this->assertStringContainsString('pix@estudio.test', $ok);
+        $this->assertStringNotContainsString('Está tudo certo?', $ok);
+        $this->assertStringNotContainsString('responda *sim*', $ok);
+    }
 }

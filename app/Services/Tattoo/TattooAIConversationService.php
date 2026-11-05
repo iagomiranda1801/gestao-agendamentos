@@ -197,6 +197,10 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         if ($conversation->status === 'receipt_received') {
             return 'Seu comprovante tá na conferência. Assim que confirmar o sinal, te aviso aqui.';
         }
+        if ($quote && $quote->accepted_at && (float) $quote->deposit_amount > 0
+            && ! in_array($conversation->status, ['payment_confirmed', 'converted_to_appointment'], true)) {
+            return $this->pixMessage($conversation, $quote);
+        }
         if (in_array($conversation->status, ['payment_confirmed', 'ready_to_schedule'], true)) {
             return 'Vou conferir os horários com a equipe e já te chamo.';
         }
@@ -388,13 +392,19 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         }
         if (empty($data['name']) && $this->nameAskCount($conversation) >= 2) {
             $data = $this->proceedWithoutName($conversation, $data);
-            if ($this->readyForConfirmation($data)) {
+            if ($request === null && $this->readyForConfirmation($data)) {
                 $conversation->update(['status' => 'awaiting_confirmation']);
 
                 return $this->requestSummary($data);
             }
+            if ($request !== null) {
+                return 'Fechou, anotei aqui! O pessoal do estúdio acompanha a conversa e te responde por aqui 🤙';
+            }
 
             return $this->finishReply($conversation, 'Tranquilo, vamos seguindo! '.$this->nextQuestion($data, $conversation));
+        }
+        if ($request !== null) {
+            return 'Fechou, anotei aqui! O pessoal do estúdio acompanha a conversa e te responde por aqui 🤙';
         }
         if (empty($data['name'])) {
             return $this->finishReply($conversation, $this->askForName($conversation, $data, $text));
@@ -1552,13 +1562,22 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         }
 
         $account = $this->receipts->pixAccount($conversation->company_id);
-        if (! $account || ! $account->pix_recipient_name) {
-            return 'Já já te mando os dados do PIX por aqui.';
+        if (! $account || blank($account->pix_key)) {
+            return 'Ainda estou confirmando a chave PIX com o estúdio. Assim que sair, te mando aqui.';
         }
 
-        return 'Sinal: R$ '.number_format((float) $quote->deposit_amount, 2, ',', '.')
-            ."\nChave PIX: {$account->pix_key}\nFavorecido: {$account->pix_recipient_name}"
-            .($account->bank_name ? "\nBanco: {$account->bank_name}" : '')
-            ."\nDepois que pagar, me manda o comprovante aqui que eu confiro.";
+        $lines = [
+            'Sinal: R$ '.number_format((float) $quote->deposit_amount, 2, ',', '.'),
+            'Chave PIX: '.$account->pix_key,
+        ];
+        if (filled($account->pix_recipient_name)) {
+            $lines[] = 'Favorecido: '.$account->pix_recipient_name;
+        }
+        if (filled($account->bank_name)) {
+            $lines[] = 'Banco: '.$account->bank_name;
+        }
+        $lines[] = 'Depois que pagar, me manda o comprovante aqui que eu confiro.';
+
+        return implode("\n", $lines);
     }
 }
