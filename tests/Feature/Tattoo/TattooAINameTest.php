@@ -204,6 +204,25 @@ class TattooAINameTest extends TestCase
         $this->assertSame('Você tem alguma foto de referência pra mandar?', $reply);
     }
 
+    public function test_off_script_collection_keeps_the_model_wording_and_the_missing_question(): void
+    {
+        [$company, $instance] = $this->setupAI();
+        TattooAiConversation::query()->create([
+            'company_id' => $company->id, 'company_whatsapp_instance_id' => $instance->id,
+            'phone_normalized' => $this->phone, 'remote_jid' => $this->phone.'@s.whatsapp.net', 'status' => 'collecting_information',
+            'collected_data' => ['name' => 'Lucas'],
+        ])->messages()->create(['company_id' => $company->id, 'provider_message_id' => 'out-idea', 'direction' => 'out',
+            'status' => 'sent', 'body' => 'Me conta como você imagina a tattoo?']);
+        $this->fakeGemini([['action' => 'save_details', 'details' => ['description' => 'Leão com rosa'],
+            'reply' => 'Leão com rosa fica forte. Quer em preto ou colorido?']]);
+
+        $reply = $this->send($company, $instance, 'um leão com uma rosa, não sei o estilo', 'off-1');
+
+        $this->assertStringContainsString('Leão com rosa fica forte.', $reply);
+        $this->assertStringContainsString('qual parte do corpo', mb_strtolower($reply));
+        $this->assertStringNotContainsString('R$', $reply);
+    }
+
     public function test_name_prompt_stops_after_two_tries_and_flow_moves_on(): void
     {
         [$company, $instance] = $this->setupAI();

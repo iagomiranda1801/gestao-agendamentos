@@ -12,6 +12,7 @@ use App\Models\WhatsAppBotConversation;
 use App\Services\Beauty\BeautyAIConversationService;
 use App\Services\Company\CompanyModuleService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
+use App\Services\ServiceOrders\Bot\AssistanceBotService;
 use App\Services\Tattoo\TattooAIConversationService;
 use App\Services\Tattoo\TattooWhatsAppBotService;
 use App\Support\PhoneNormalizer;
@@ -62,6 +63,16 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
                 'instance' => $this->instanceName,
                 'phone' => $this->phone,
             ]);
+
+            return;
+        }
+
+        if ($company->isTechnicalAssistance()) {
+            if ($instance) {
+                $this->runAiConversation($company, fn () => app(AssistanceBotService::class)->receive(
+                    $company, $instance, $this->phone, $this->text, $this->messageId,
+                ));
+            }
 
             return;
         }

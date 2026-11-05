@@ -407,15 +407,25 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         $reply = is_string($result['reply'] ?? null) ? trim($result['reply']) : '';
         // Só a primeira mensagem do bot cumprimenta; o texto livre do Gemini nunca abre com "Olá, Lucas! Tudo bem?".
         $reply = $this->stripOpeningGreeting($reply);
-        if ($this->mentionsUnverifiedFacts($reply) || $this->reintroduces($reply)) {
+        if ($this->mentionsUnverifiedFacts($reply) || $this->reintroduces($reply) || $this->asksForArtist($reply)) {
             $reply = '';
         }
+        $reply = $this->withoutReaskedKnownFields($reply, $data);
         if ($reply === '' && $withoutModel && $data['name'] !== $nameBefore) {
             return $this->finishReply($conversation, 'Show'.$this->addressName($data, ', ').'! '.$this->nextQuestion($data, $conversation));
         }
+        if ($reply !== '') {
+            if (! $this->replyAsksForMissingDetail($reply, $data)) {
+                $next = $this->finishReply($conversation, $this->nextQuestion($data, $conversation));
+                if (! str_contains($this->normalizedText($reply), $this->normalizedText($next))) {
+                    $reply = rtrim($reply)."\n\n".$next;
+                }
+            }
 
-        return $this->finishReply($conversation, $reply !== '' && $this->replyAsksForMissingDetail($reply, $data)
-            ? mb_substr($reply, 0, 1000) : $this->nextQuestion($data, $conversation));
+            return mb_substr($reply, 0, 1000);
+        }
+
+        return $this->finishReply($conversation, $this->nextQuestion($data, $conversation));
     }
 
     /**
@@ -1268,17 +1278,75 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         return $this->repeatsQuestion($asked, $alternate) ? 'Pode me responder com outras palavras?' : $alternate;
     }
 
+    /**
+     * Pergunta que só repete um campo já preenchido sai; o comentário em volta fica.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function withoutReaskedKnownFields(string $reply, array $data): string
+    {
+        if ($reply === '') {
+            return '';
+        }
+        $parts = preg_split('/(?<=[.!?])\s+/u', $reply) ?: [];
+        $kept = [];
+        foreach ($parts as $part) {
+            $part = trim($part);
+            if ($part === '' || (str_contains($part, '?') && $this->asksKnownField($part, $data))) {
+                continue;
+            }
+            $kept[] = $part;
+        }
+
+        return trim(implode(' ', $kept));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function asksKnownField(string $text, array $data): bool
+    {
+        $normalized = $this->normalizedText($text);
+        $patterns = [];
+        if ($this->descriptionReady($data)) {
+            $patterns[] = '/\b(ideia|desenho|tatuagem|tattoo|elementos)\b/u';
+        }
+        if (! empty($data['body_placement'])) {
+            $patterns[] = '/\b(corpo|onde|local)\b/u';
+        }
+        if (! empty($data['size_description'])) {
+            $patterns[] = '/\b(tamanho|cm|centimetros)\b/u';
+        }
+        if (! empty($data['style'])) {
+            $patterns[] = '/\b(estilo|realismo|blackwork|fine line)\b/u';
+        }
+        if (! empty($data['reference_status'])) {
+            $patterns[] = '/\b(foto|imagem|referencia|inspiracao)\b/u';
+        }
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $normalized) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function asksForArtist(string $reply): bool
+    {
+        $normalized = $this->normalizedText($reply);
+
+        return (preg_match('/\b(preferencia|prefere|escolh\w*|quer|qual)\b/u', $normalized)
+                && preg_match('/\b(artista|tatuador|tatuadora)\b/u', $normalized))
+            || (bool) preg_match('/\bcom quem\b.*\b(tatuar|fazer)\b/u', $normalized);
+    }
+
     protected function replyAsksForMissingDetail(string $reply, array $data): bool
     {
-        if (! str_contains($reply, '?')) {
+        if (! str_contains($reply, '?') || $this->asksForArtist($reply)) {
             return false;
         }
         $normalized = $this->normalizedText($reply);
-        if ((preg_match('/\b(preferencia|prefere|escolh\w*|quer|qual)\b/u', $normalized)
-                && preg_match('/\b(artista|tatuador|tatuadora)\b/u', $normalized))
-            || preg_match('/\bcom quem\b.*\b(tatuar|fazer)\b/u', $normalized)) {
-            return false;
-        }
         $expected = match (true) {
             ! $this->descriptionReady($data) => '/\b(ideia|desenho|tatuagem|tattoo|elementos)\b/u',
             empty($data['body_placement']) => '/\b(corpo|onde|local)\b/u',

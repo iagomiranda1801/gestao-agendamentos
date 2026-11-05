@@ -45,6 +45,7 @@ class WhatsAppHumanTakeover
 
     public function pause(string $instance, string $phone): void
     {
+        app(\App\Services\ServiceOrders\Bot\AssistanceBotService::class)->pauseForPhone($instance, $phone);
         $key = $this->phoneKey($phone);
         $minutes = $this->minutes();
 
