@@ -13,6 +13,7 @@ class SalesTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->with(['items', 'fiscalDocuments']))
             ->columns([
                 TextColumn::make('id')
                     ->label('#')
@@ -69,7 +70,7 @@ class SalesTable
                     ->options(SaleOrigin::options()),
             ])
             ->defaultSort('sold_at', 'desc')
-            ->recordActions([])
+            ->recordActions([SaleFiscalActions::make()])
             ->searchable();
     }
 }

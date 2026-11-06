@@ -29,6 +29,8 @@ use UnitEnum;
 
 class AsaasSettingsPage extends Page
 {
+    private const FISCAL_SECTION_ID = 'notas-fiscais';
+
     protected static ?string $slug = 'configuracoes-asaas';
 
     protected static ?string $navigationLabel = 'Asaas';
@@ -54,6 +56,11 @@ class AsaasSettingsPage extends Page
         return $user instanceof User
             && $company instanceof Company
             && $user->hasActiveRoleInCompany($company, CompanyRole::CompanyAdmin);
+    }
+
+    public static function fiscalSettingsUrl(): string
+    {
+        return static::getUrl().'#'.self::FISCAL_SECTION_ID;
     }
 
     public function mount(): void
@@ -157,6 +164,25 @@ class AsaasSettingsPage extends Page
                         ->helperText('Obrigatória para quitar uma conta a receber. No sinal, sem conta o pagamento só libera o agendamento.'),
                 ])
                 ->columns(2),
+            Section::make('Notas fiscais de teste')
+                ->id(self::FISCAL_SECTION_ID)
+                ->description('Cadastre a URL fiscal e o token de autenticação nos webhooks de Sandbox do Asaas e do Base ERP. Habilite os eventos de notas fiscais.')
+                ->schema([
+                    TextInput::make('fiscal_sandbox_api_key')
+                        ->label('Chave Sandbox do Asaas para NFS-e')
+                        ->password()
+                        ->maxLength(2000)
+                        ->helperText('Deixe em branco para manter a chave salva ou usar a chave de cobranças quando ela estiver em Sandbox.'),
+                    TextInput::make('base_sandbox_api_key')
+                        ->label('Chave Sandbox do Base ERP')
+                        ->password()
+                        ->maxLength(2000)
+                        ->helperText('Usada na NF-e de produtos. Configure a SEFAZ em homologação no Base. Deixe em branco para manter a chave salva.'),
+                    TextInput::make('fiscal_webhook_url')
+                        ->label('URL do webhook fiscal Sandbox')
+                        ->disabled()
+                        ->dehydrated(false),
+                ]),
             Section::make('Webhook')
                 ->description('No painel do Asaas, cadastre a URL e cole o token no campo de autenticação. O Asaas envia esse token no header asaas-access-token.')
                 ->schema([
@@ -202,6 +228,9 @@ class AsaasSettingsPage extends Page
         $this->form->fill([
             'environment' => $setting->environment->value,
             'api_key' => '',
+            'fiscal_sandbox_api_key' => '',
+            'base_sandbox_api_key' => '',
+            'fiscal_webhook_url' => route('webhooks.asaas.fiscal-sandbox', ['company' => $company->slug]),
             'is_enabled' => $setting->is_enabled,
             'financial_account_id' => $setting->financial_account_id,
             'webhook_url' => route('webhooks.asaas', ['company' => $company->slug]),

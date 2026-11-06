@@ -28,9 +28,9 @@ class AsaasClient
     /**
      * @return array<string, mixed>
      */
-    public function createCustomer(AsaasEnvironment $environment, string $apiKey, Client $client): array
+    public function createCustomer(AsaasEnvironment $environment, string $apiKey, Client $client, array $address = []): array
     {
-        return $this->send($environment, $apiKey, 'post', '/customers', $this->customerPayload($client));
+        return $this->send($environment, $apiKey, 'post', '/customers', $this->customerPayload($client) + $address);
     }
 
     /**
@@ -40,6 +40,26 @@ class AsaasClient
     public function createPayment(AsaasEnvironment $environment, string $apiKey, array $payload): array
     {
         return $this->send($environment, $apiKey, 'post', '/payments', $payload);
+    }
+
+    public function scheduleInvoice(AsaasEnvironment $environment, string $apiKey, array $payload): array
+    {
+        return $this->send($environment, $apiKey, 'post', '/invoices', $payload);
+    }
+
+    public function findInvoice(AsaasEnvironment $environment, string $apiKey, string $reference): ?array
+    {
+        return $this->send($environment, $apiKey, 'get', '/invoices', ['externalReference' => $reference])['data'][0] ?? null;
+    }
+
+    public function findCustomer(AsaasEnvironment $environment, string $apiKey, Client $client): ?array
+    {
+        $customers = $this->send($environment, $apiKey, 'get', '/customers', [
+            'externalReference' => 'client:'.$client->getKey(),
+            'cpfCnpj' => preg_replace('/\D/', '', (string) $client->document),
+        ]);
+
+        return $customers['data'][0] ?? null;
     }
 
     /**

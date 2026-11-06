@@ -5,6 +5,7 @@ namespace Tests\Feature\Sales;
 use App\Enums\CompanyModule;
 use App\Enums\PaymentMethod;
 use App\Enums\SaleItemType;
+use App\Filament\App\Pages\AsaasSettingsPage;
 use App\Filament\App\Pages\PointOfSalePage;
 use App\Filament\App\Resources\Sales\Pages\ListSales;
 use App\Filament\App\Support\QuickCreateFields;
@@ -56,7 +57,6 @@ class PointOfSalePageTest extends TestCase
     {
         $company = $this->createCompany([
             'enabled_modules' => [
-                CompanyModule::Scheduling->value,
                 CompanyModule::Stock->value,
                 CompanyModule::Finance->value,
                 CompanyModule::Sales->value,
@@ -69,7 +69,11 @@ class PointOfSalePageTest extends TestCase
 
         Livewire::test(ListSales::class)
             ->assertSuccessful()
-            ->assertCanSeeTableRecords([$sale]);
+            ->assertCanSeeTableRecords([$sale])
+            ->assertActionVisible('fiscalSettings')
+            ->assertSeeHtml(AsaasSettingsPage::fiscalSettingsUrl());
+
+        $this->get(AsaasSettingsPage::getUrl())->assertOk()->assertSeeHtml('id="notas-fiscais"');
     }
 
     public function test_admin_can_complete_a_custom_sale_without_a_client_from_the_point_of_sale(): void

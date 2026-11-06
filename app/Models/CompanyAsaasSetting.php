@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'environment',
     'api_key',
+    'fiscal_sandbox_api_key',
+    'base_sandbox_api_key',
     'webhook_token',
     'financial_account_id',
     'is_enabled',
@@ -18,6 +20,8 @@ class CompanyAsaasSetting extends Model
 {
     protected $hidden = [
         'api_key',
+        'fiscal_sandbox_api_key',
+        'base_sandbox_api_key',
         'webhook_token',
     ];
 
@@ -33,6 +37,8 @@ class CompanyAsaasSetting extends Model
         return [
             'environment' => AsaasEnvironment::class,
             'api_key' => 'encrypted',
+            'fiscal_sandbox_api_key' => 'encrypted',
+            'base_sandbox_api_key' => 'encrypted',
             'webhook_token' => 'encrypted',
             'is_enabled' => 'boolean',
         ];
@@ -57,5 +63,11 @@ class CompanyAsaasSetting extends Model
     public function isReady(): bool
     {
         return $this->is_enabled && filled($this->api_key);
+    }
+
+    public function fiscalSandboxKey(): ?string
+    {
+        return $this->fiscal_sandbox_api_key
+            ?? ($this->environment === AsaasEnvironment::Sandbox ? $this->api_key : null);
     }
 }

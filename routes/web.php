@@ -50,6 +50,8 @@ Route::post('/webhooks/evolution/{instance?}', EvolutionWebhookController::class
 
 Route::post('/webhooks/asaas/{company:slug}', AsaasWebhookController::class)
     ->name('webhooks.asaas');
+Route::post('/webhooks/asaas/{company:slug}/fiscal-sandbox', [AsaasWebhookController::class, 'fiscalSandbox'])
+    ->name('webhooks.asaas.fiscal-sandbox');
 
 Route::get('/app/empresa/{company:slug}/clinico/planos/{plan}/imprimir', PrintDentalTreatmentPlanController::class)
     ->middleware('auth')

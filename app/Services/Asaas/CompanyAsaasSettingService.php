@@ -63,6 +63,13 @@ class CompanyAsaasSettingService
                 $setting->api_key = $key;
             }
 
+            foreach (['fiscal_sandbox_api_key', 'base_sandbox_api_key'] as $field) {
+                $fiscalKey = trim((string) ($data[$field] ?? ''));
+                if ($fiscalKey !== '') {
+                    $setting->{$field} = $fiscalKey;
+                }
+            }
+
             $enabled = (bool) ($data['is_enabled'] ?? false);
             if ($enabled && blank($setting->api_key)) {
                 throw ValidationException::withMessages([

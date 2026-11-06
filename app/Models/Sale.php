@@ -103,6 +103,12 @@ class Sale extends Model
         return $this->hasMany(SaleItem::class);
     }
 
+    /** @return HasMany<SaleFiscalDocument, $this> */
+    public function fiscalDocuments(): HasMany
+    {
+        return $this->hasMany(SaleFiscalDocument::class);
+    }
+
     /**
      * @return HasOne<Receivable, $this>
      */
