@@ -139,3 +139,75 @@ h1 em, h2 em { color: var(--gold); font-weight: 500; }
     .hero-secondary { display: block; margin-left: 0; } .nav { gap: 8px; } .nav a { font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .cta { transition: none; } }
+
+/* Plano de lançamento e cadastro rápido TattoFlow. */
+.launch-section { position: relative; padding: 92px 0; border-top: 1px solid var(--line); background: radial-gradient(ellipse at 12% 20%, rgb(201 166 107 / 9%), transparent 55%), #100e0b; }
+.launch-shell { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 80px; width: min(1200px, calc(100% - 96px)); margin: auto; }
+.launch-badge { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 24px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 30px; color: var(--gold-bright); font-size: 9px; letter-spacing: .16em; }
+.launch-badge > span { color: var(--gold); font-size: 15px; }
+.launch-copy h2 { margin: 0 0 24px; font-size: clamp(44px, 4vw, 60px); line-height: 1.04; }
+.launch-description { max-width: 42ch; margin: 0; color: var(--muted); font-size: 16px; }
+.launch-price { display: flex; align-items: baseline; gap: 8px; margin: 26px 0 0; }
+.launch-price > span:first-child { color: var(--gold-bright); font: 500 clamp(52px, 5.5vw, 76px)/1.1 var(--serif); letter-spacing: -.04em; }
+.launch-price > span:last-child { color: var(--muted); font-size: 16px; }
+.launch-price-note { margin: 4px 0 28px; color: var(--muted); font-size: 12px; }
+.launch-features { display: grid; gap: 13px; margin: 0; padding: 25px 0; border-block: 1px solid var(--line); list-style: none; }
+.launch-features li { display: flex; gap: 12px; font-size: 14px; }
+.launch-features li > span { color: var(--gold); }
+.launch-footnote { margin: 22px 0 0; color: var(--muted); font-size: 11px; line-height: 1.8; }
+.launch-form-card { padding: 38px; border: 1px solid rgb(201 166 107 / 38%); border-radius: 14px; background: #181510; box-shadow: 0 24px 80px rgb(0 0 0 / 20%); }
+.launch-form-eyebrow { color: var(--gold); font-size: 9px; letter-spacing: .16em; }
+.launch-form-heading h3 { margin: 12px 0 8px; font: 500 36px/1.1 var(--serif); letter-spacing: -.02em; }
+.launch-form-heading p { margin: 0 0 28px; color: var(--muted); font-size: 13px; }
+.launch-form { display: grid; gap: 17px; }
+.launch-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.launch-field { min-width: 0; }
+.launch-field label { display: block; margin: 0 0 7px; font-size: 12px; font-weight: 400; }
+.launch-field input { width: 100%; min-width: 0; padding: 13px 14px; border: 1px solid #514738; border-radius: 5px; outline: none; background: #100e0b; color: var(--text); font: 300 14px/1.4 var(--sans); transition: border-color .18s, box-shadow .18s; }
+.launch-field input::placeholder { color: #a3998b; opacity: 1; }
+.launch-field input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb(201 166 107 / 15%); }
+.launch-field input[aria-invalid="true"] { border-color: #e8a28f; }
+.launch-password { position: relative; }
+.launch-password input { padding-right: 74px; }
+.launch-password button { position: absolute; inset: 0 10px 0 auto; border: 0; background: transparent; color: var(--gold-bright); font: 400 11px var(--sans); cursor: pointer; }
+.launch-password button:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.launch-error { margin: 7px 0 0; color: #ffc5b6; font-size: 12px; }
+.launch-form > div[aria-live]:empty { display: none; }
+.launch-submit { display: flex; width: 100%; margin: 0; cursor: pointer; font-family: var(--sans); text-align: center; }
+.launch-submit > span { font-size: 14px; line-height: 1.5; }
+.launch-submit > span > span { margin-left: 24px; }
+.launch-submit:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 4px; }
+.launch-submit:disabled { cursor: wait; opacity: .65; }
+.launch-payment-note { margin: -6px 0 0; color: var(--gold-bright); font-size: 11px; text-align: center; }
+.launch-terms { margin: -4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.7; text-align: center; }
+.launch-signin { margin: 24px 0 0; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; text-align: center; }
+.launch-signin a { color: var(--gold-bright); text-underline-offset: 4px; }
+.signup-page-header { grid-template-columns: 1fr auto; }
+@media (max-width: 1150px) { .site-header .nav { gap: 18px; } .site-header .nav a { font-size: 11px; } .launch-shell { gap: 38px; } .launch-form-card { padding: 28px; } }
+@media (max-width: 800px) {
+    .launch-section { padding-block: 64px; }
+    .launch-shell { grid-template-columns: 1fr; gap: 40px; width: min(600px, calc(100% - 56px)); }
+    .launch-copy h2 { font-size: 52px; }
+    .launch-features { grid-template-columns: 1fr 1fr; gap: 14px 22px; }
+    .launch-features li { font-size: 12px; }
+}
+@media (max-width: 540px) {
+    .site-header .nav { gap: 8px; } .site-header .nav a { font-size: 11px; }
+    .hero-secondary { display: block; margin-left: 0; }
+    .launch-section { padding-block: 50px; }
+    .launch-shell { width: calc(100% - 40px); gap: 32px; }
+    .launch-copy h2 { font-size: 43px; }
+    .launch-price > span:first-child { font-size: 64px; }
+    .launch-features { grid-template-columns: 1fr; gap: 12px; }
+    .launch-features li { font-size: 13px; }
+    .launch-form-card { padding: 24px 20px; }
+    .launch-form-heading h3 { font-size: 32px; }
+    .launch-field-row { grid-template-columns: 1fr; gap: 17px; }
+    .launch-field input { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .launch-field input { transition: none; } }
+.launch-announcement { display: block; padding: 10px 24px; background: var(--gold); color: var(--ink); font-size: 12px; text-align: center; text-decoration: none; }
+.launch-announcement > span:first-child { margin-right: 20px; font-size: 9px; font-weight: 500; letter-spacing: .15em; }
+.launch-announcement strong { font-weight: 500; }
+.launch-announcement:hover { background: var(--gold-bright); }
+@media (max-width: 540px) { .launch-announcement { padding: 9px 15px; font-size: 11px; } .launch-announcement > span:first-child { display: block; margin: 0 0 2px; } .announcement-trial { white-space: nowrap; } }

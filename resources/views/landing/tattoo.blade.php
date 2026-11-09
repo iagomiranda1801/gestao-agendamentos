@@ -3,6 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
         <title>TattoFlow — Gestão para estúdios de tatuagem</title>
         <meta name="description" content="Do primeiro oi no WhatsApp ao pedido pronto para orçar. Organize referências, orçamentos e agendamentos do seu estúdio com TattoFlow.">
         <meta name="theme-color" content="#0C0B0A">
@@ -19,11 +20,22 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=cormorant-garamond:500,600|outfit:300,400,500" rel="stylesheet">
         @vite(['resources/css/landing.css', 'resources/js/landing/main.jsx'])
+        @livewireStyles
     </head>
     <body>
+        <a class="launch-announcement" href="#cadastro"><span>LANÇAMENTO TATTOFLOW</span> Seu estúdio completo por <strong>{{ app(\App\Services\Company\CompanySubscriptionService::class)->formatReais(\App\Support\TattooLaunchPlan::priceCents()) }}/mês</strong><span class="announcement-trial"> · 7 dias grátis ↗</span></a>
         <div id="landing">
             <h1>O cliente manda a ideia no WhatsApp. O pedido chega pronto para orçar.</h1>
             <a href="/painel/login">Entrar</a>
         </div>
+        <livewire:signup.tattoo-signup />
+        <footer class="site-footer">
+            <a href="#inicio" aria-label="TattoFlow — voltar ao início">
+                <img src="{{ asset('images/tattoflow/01_Logo_Principal_Fundo_Preto.png') }}" alt="TattoFlow" width="1460" height="708" loading="lazy">
+            </a>
+            <p>Gestão para estúdios de tatuagem.<br>Mais tempo para a sua arte.</p>
+            <a class="text-link" href="/painel/login">Acessar meu estúdio ↗</a>
+        </footer>
+        @livewireScripts
     </body>
 </html>

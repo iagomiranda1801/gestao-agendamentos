@@ -28,6 +28,8 @@ foreach (Segment::hosts('salon') as $salonHost) {
 
 Route::domain((string) config('segments.tattoo.domain'))->group(function (): void {
     Route::view('/', 'landing.tattoo')->name('tattoo.landing');
+    Route::get('/cadastro', \App\Livewire\Signup\TattooSignup::class)
+        ->middleware('throttle:5,1')->name('tattoo.signup');
 });
 
 Route::redirect('/', '/admin');

@@ -34,6 +34,8 @@ use Illuminate\Support\Str;
     'billing_interval',
     'current_period_end',
     'quoted_price_cents',
+    'subscription_plan',
+    'subscription_price_cents',
 ])]
 class Company extends Model
 {
@@ -82,6 +84,7 @@ class Company extends Model
             'billing_interval' => BillingInterval::class,
             'current_period_end' => 'datetime',
             'quoted_price_cents' => 'integer',
+            'subscription_price_cents' => 'integer',
         ];
     }
 

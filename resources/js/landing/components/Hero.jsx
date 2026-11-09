@@ -15,7 +15,7 @@ export function Hero() {
                 <p className="brand">Gestão para estúdios de tatuagem</p>
                 <h1 id="hero-title">Sua arte merece<br /><em>mais tempo.</em></h1>
                 <p className="lede">O cliente manda a ideia no WhatsApp. A TattoFlow organiza os detalhes. Sua equipe recebe o pedido pronto para orçar.</p>
-                <Cta href="#servico">Conheça o fluxo</Cta>
+                <Cta href="#cadastro">Quero meu estúdio organizado</Cta>
                 <a className="hero-secondary" href="/painel/login">Acessar meu estúdio</a>
                 <p className="note">O atendimento flui. O valor continua nas suas mãos.</p>
                 <ul className="collected">

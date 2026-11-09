@@ -9,6 +9,7 @@ use App\Enums\SubscriptionStatus;
 use App\Models\Company;
 use App\Models\ModulePrice;
 use App\Models\PlatformInvoice;
+use App\Support\TattooLaunchPlan;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -73,10 +74,27 @@ class CompanySubscriptionService
             return 0;
         }
 
-        return $this->quoteCents(
-            app(CompanyModuleService::class)->enabledModules($company),
-            $interval,
-        );
+        return (int) collect($this->quoteItemsForCompany($company, $interval))->sum('price_cents');
+    }
+
+    /** @return list<array{module: string, label: string, price_cents: int}> */
+    public function quoteItemsForCompany(Company $company, BillingInterval $interval): array
+    {
+        $modules = app(CompanyModuleService::class)->enabledModules($company);
+        $items = $this->quoteItems($modules, $interval);
+
+        if ($company->isTattooStudio()
+            && $company->subscription_plan === TattooLaunchPlan::KEY
+            && $company->subscription_price_cents !== null
+            && $interval === BillingInterval::Monthly) {
+            $items[] = [
+                'module' => 'tattoflow_launch_adjustment',
+                'label' => 'Condição de lançamento TattoFlow',
+                'price_cents' => $company->subscription_price_cents - (int) collect($items)->sum('price_cents'),
+            ];
+        }
+
+        return $items;
     }
 
     public function outstandingInvoice(Company $company): ?PlatformInvoice
@@ -120,7 +138,7 @@ class CompanySubscriptionService
             ]);
         }
 
-        $items = $this->quoteItems($modules, $interval);
+        $items = $this->quoteItemsForCompany($company, $interval);
         $catalogAmount = (int) collect($items)->sum('price_cents');
         $amount = $amountCents ?? $catalogAmount;
 

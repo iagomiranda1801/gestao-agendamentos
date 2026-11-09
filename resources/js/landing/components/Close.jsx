@@ -7,7 +7,7 @@ export function Close() {
             <p className="brand">Seu estúdio. Seu ritmo.</p>
             <h2 id="close-title">Menos tempo nas mensagens.<br /><em>Mais tempo na arte.</em></h2>
             <p className="lede">Do primeiro oi ao agendamento, cada etapa no seu lugar.</p>
-            <Cta>Entrar no estúdio</Cta>
+            <Cta href="#cadastro">Conhecer o plano de lançamento</Cta>
         </section>
     );
 }

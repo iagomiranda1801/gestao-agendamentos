@@ -2,6 +2,7 @@ const links = [
     ['#servico', 'Como funciona'],
     ['#pedido', 'No seu estúdio'],
     ['#valor', 'Seu orçamento'],
+    ['#cadastro', 'Plano'],
 ];
 
 export function Nav() {

@@ -118,7 +118,8 @@ class SubscriptionExpiredPage extends Page
                 ->map(fn ($module) => $module->label())
                 ->all(),
             'intervalLabel' => $tenant->billing_interval?->label(),
-            'quotedPrice' => $subscriptions->formatReais($tenant->quoted_price_cents),
+            'quotedPrice' => $subscriptions->formatReais($tenant->quoted_price_cents
+                ?? ($tenant->subscription_plan === \App\Support\TattooLaunchPlan::KEY ? $subscriptions->quoteForCompany($tenant) : null)),
             'periodEnd' => $tenant->current_period_end?->timezone($tenant->timezone ?: 'America/Sao_Paulo')->format('d/m/Y'),
             'outstanding' => $outstanding,
             'invoices' => $invoices,

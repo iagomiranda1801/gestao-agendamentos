@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'tattoflow_launch_price_cents' => (int) env('TATTOFLOW_LAUNCH_PRICE_CENTS', 7990),
     'grace_days' => (int) env('SUBSCRIPTION_GRACE_DAYS', 3),
     'renewal_warning_days' => (int) env('SUBSCRIPTION_RENEWAL_WARNING_DAYS', 7),
     'pix_instructions' => env(
