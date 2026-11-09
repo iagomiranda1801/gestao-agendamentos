@@ -89,7 +89,7 @@ class CompanySubscriptionService
             && $interval === BillingInterval::Monthly) {
             $items[] = [
                 'module' => 'tattoflow_launch_adjustment',
-                'label' => 'Condição de lançamento TattoFlow',
+                'label' => 'Condição de lançamento TattooFlow',
                 'price_cents' => $company->subscription_price_cents - (int) collect($items)->sum('price_cents'),
             ];
         }

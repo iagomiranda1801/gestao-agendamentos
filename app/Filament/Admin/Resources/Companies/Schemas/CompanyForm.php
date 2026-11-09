@@ -120,7 +120,7 @@ class CompanyForm
                 Section::make('Assinatura')
                     ->schema([
                         Placeholder::make('promotional_plan')
-                            ->label('Plano promocional TattoFlow')
+                            ->label('Plano promocional TattooFlow')
                             ->visible(fn (?Company $record): bool => $record?->subscription_plan === \App\Support\TattooLaunchPlan::KEY)
                             ->content(fn (?Company $record): string => app(CompanySubscriptionService::class)->formatReais($record?->subscription_price_cents).'/mês — condição registrada no cadastro'),
                         Select::make('subscription_status')

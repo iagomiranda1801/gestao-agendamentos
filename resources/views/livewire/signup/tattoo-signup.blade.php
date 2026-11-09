@@ -66,7 +66,7 @@
                     <p class="launch-payment-note">7 dias grátis · sem cartão de crédito</p>
                     <p class="launch-terms">Depois do teste: {{ $price }}/mês, via PIX com confirmação pela equipe. Nenhuma cobrança automática no cadastro.</p>
                 </form>
-                <p class="launch-signin">Já usa a TattoFlow? <a href="/painel/login">Entrar no estúdio</a></p>
+                <p class="launch-signin">Já usa a TattooFlow? <a href="/painel/login">Entrar no estúdio</a></p>
             @endauth
         </div>
     </div>

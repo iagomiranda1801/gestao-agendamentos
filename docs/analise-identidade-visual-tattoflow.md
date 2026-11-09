@@ -1,5 +1,11 @@
 # Análise da identidade visual TattoFlow
 
+## Correção do kit em 09/11/2026
+
+O usuário substituiu o kit analisado abaixo por `C:\Users\IAGO\Downloads\TattooFlow_Identidade_Visual_Corrigida`. A grafia correta é **TattooFlow**. A análise original abaixo fica como histórico e não define mais a grafia nem os arquivos da marca.
+
+O kit corrigido está em `public/images/tattooflow/`. A landing e o cadastro usam a nova logo, o favicon `09_Favicon.ico` e o ícone de aplicativo do novo kit. A imagem de compartilhamento usa a logo principal corrigida, com suas dimensões reais de 1045 × 395. Os arquivos do kit antigo foram removidos.
+
 Data: 09/11/2026.
 
 ## Material analisado
