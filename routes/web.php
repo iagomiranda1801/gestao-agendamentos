@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AsaasWebhookController;
+use App\Http\Controllers\CompanyLogoController;
 use App\Http\Controllers\EvolutionWebhookController;
 use App\Http\Controllers\PrintDentalTreatmentPlanController;
 use App\Http\Controllers\PwaController;
@@ -42,6 +43,7 @@ Route::get('/manifest.webmanifest', [PwaController::class, 'panelManifest'])->na
 Route::get('/agendar/{company:slug}/manifest.webmanifest', [PwaController::class, 'bookingManifest'])->name('pwa.manifest.booking');
 Route::get('/pedir/{company:slug}/manifest.webmanifest', [PwaController::class, 'ordersManifest'])->name('pwa.manifest.orders');
 Route::get('/offline', [PwaController::class, 'offline'])->name('pwa.offline');
+Route::get('/empresas/{company:slug}/logo', CompanyLogoController::class)->name('company.logo');
 Route::get('/sw.js', [PwaController::class, 'serviceWorker'])->name('pwa.sw');
 
 Route::get('/agendar/{company:slug}', BookingWizard::class)->name('public.booking.show');

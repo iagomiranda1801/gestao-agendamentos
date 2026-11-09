@@ -22,6 +22,9 @@ use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Validation\ValidationException;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Throwable;
 use UnitEnum;
 
 class CompanyProfilePage extends Page
@@ -42,6 +45,8 @@ class CompanyProfilePage extends Page
      * @var array<string, mixed>|null
      */
     public ?array $data = [];
+
+    public bool $removeCurrentLogo = false;
 
     public static function canAccess(): bool
     {
@@ -65,7 +70,7 @@ class CompanyProfilePage extends Page
             'document' => $company->document,
             'phone' => $company->phone,
             'email' => $company->email,
-            'logo_path' => filled($company->logo_path) ? [$company->logo_path] : [],
+            'logo_path' => [],
             'timezone' => $company->timezone,
             'public_page_url' => $this->publicPageUrl($company),
         ]);
@@ -79,16 +84,22 @@ class CompanyProfilePage extends Page
         $company = Filament::getTenant();
 
         $data = $this->form->getState();
+        $newLogoPath = $this->normalizeLogoPath($data['logo_path'] ?? null);
 
         $company->update([
             'name' => $data['name'],
             'document' => $data['document'] ?? null,
             'phone' => $data['phone'] ?? null,
             'email' => $data['email'] ?? null,
-            'logo_path' => $this->normalizeLogoPath($data['logo_path'] ?? null),
-            'logo_disk' => $this->logoDiskFor($company, $data['logo_path'] ?? null),
+            'logo_path' => $newLogoPath ?? ($this->removeCurrentLogo ? null : $company->logo_path),
+            'logo_disk' => $newLogoPath !== null
+                ? (string) config('filesystems.company_logo_disk', 's3')
+                : ($company->logo_disk ?: 'public'),
             'timezone' => $data['timezone'],
         ]);
+
+        $this->removeCurrentLogo = false;
+        $this->form->fill([...$data, 'logo_path' => []]);
 
         Notification::make()
             ->success()
@@ -96,9 +107,17 @@ class CompanyProfilePage extends Page
             ->send();
     }
 
+    public function removeLogo(): void
+    {
+        abort_unless($this->canEditCompany(), 403);
+
+        $this->removeCurrentLogo = true;
+    }
+
     public function defaultForm(Schema $schema): Schema
     {
         return $schema
+            ->model(Filament::getTenant())
             ->statePath('data');
     }
 
@@ -108,6 +127,19 @@ class CompanyProfilePage extends Page
             ->components([
                 Section::make('Identidade')
                     ->schema([
+                        Placeholder::make('current_logo')
+                            ->label('Logo atual')
+                            ->content(fn () => view('filament.app.components.company-logo-preview', ['company' => Filament::getTenant()]))
+                            ->visible(fn (): bool => ! $this->removeCurrentLogo && filled(Filament::getTenant()?->logo_path))
+                            ->columnSpanFull(),
+                        Actions::make([
+                            Action::make('removeLogo')
+                                ->label('Remover logo atual')
+                                ->color('danger')
+                                ->action(fn () => $this->removeLogo()),
+                        ])
+                            ->visible(fn (): bool => $this->canEditCompany() && ! $this->removeCurrentLogo && filled(Filament::getTenant()?->logo_path))
+                            ->columnSpanFull(),
                         FileUpload::make('logo_path')
                             ->label('Logo da empresa')
                             ->helperText(fn (): string => $this->logoHelperText())
@@ -120,8 +152,31 @@ class CompanyProfilePage extends Page
                             })
                             ->visibility('public')
                             ->image()
-                            ->imageEditor()
-                            ->imagePreviewHeight('96')
+                            // Only new uploads enter FilePond. Existing logos are shown separately,
+                            // so their availability never blocks replacing or removing them.
+                            ->fetchFileInformation(false)
+                            ->preventFilePathTampering()
+                            ->previewable(false)
+                            ->saveUploadedFileUsing(function (FileUpload $component, TemporaryUploadedFile $file): string {
+                                $stream = null;
+                                try {
+                                    $path = trim($component->getDirectory().'/'.$component->getUploadedFileNameForStorage($file), '/');
+                                    $stream = $file->readStream();
+                                    if (is_resource($stream) && $component->getDisk()->put($path, $stream)) {
+                                        return $path;
+                                    }
+                                } catch (Throwable $exception) {
+                                    report($exception);
+                                } finally {
+                                    if (is_resource($stream)) {
+                                        fclose($stream);
+                                    }
+                                }
+
+                                throw ValidationException::withMessages([
+                                    'data.logo_path' => 'Não foi possível salvar a logo no armazenamento. Tente novamente ou entre em contato com o suporte.',
+                                ]);
+                            })
                             ->maxSize(2048)
                             ->disabled(fn (): bool => ! $this->canEditCompany())
                             ->columnSpanFull(),
@@ -234,10 +289,10 @@ class CompanyProfilePage extends Page
     protected function logoHelperText(): string
     {
         if ($this->usesPublicOrdersChannel()) {
-            return 'Usada no painel da empresa e na página pública de cardápio e pedidos online. Se ficar vazia, o sistema mostra a logo padrão.';
+            return 'Usada no painel da empresa e na página pública de cardápio e pedidos online. Envie uma imagem de até 2 MB para trocar a logo. Para remover a atual, clique em Remover logo atual e salve.';
         }
 
-        return 'Usada no painel da empresa e na página pública de agendamento. Se ficar vazia, o sistema mostra a logo padrão.';
+        return 'Usada no painel da empresa e na página pública de agendamento. Envie uma imagem de até 2 MB para trocar a logo. Para remover a atual, clique em Remover logo atual e salve.';
     }
 
     protected function normalizeLogoPath(mixed $logoPath): ?string
@@ -247,12 +302,5 @@ class CompanyProfilePage extends Page
         }
 
         return filled($logoPath) ? (string) $logoPath : null;
-    }
-
-    protected function logoDiskFor(Company $company, mixed $logoPath): string
-    {
-        return $this->normalizeLogoPath($logoPath) === $company->logo_path
-            ? ($company->logo_disk ?: 'public')
-            : (string) config('filesystems.company_logo_disk', 's3');
     }
 }

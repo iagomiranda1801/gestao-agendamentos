@@ -14,7 +14,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 #[Fillable([
@@ -169,7 +168,10 @@ class Company extends Model
             return asset((string) $this->logo_path);
         }
 
-        return Storage::disk($this->logo_disk ?: 'public')->url((string) $this->logo_path);
+        return route('company.logo', [
+            'company' => $this->slug,
+            'v' => substr(hash('sha256', ($this->logo_disk ?: 'public').':'.$this->logo_path), 0, 12),
+        ]);
     }
 
     public function activeAdminsCount(): int
