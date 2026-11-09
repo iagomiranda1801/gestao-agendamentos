@@ -10,10 +10,11 @@ const fields = [
 export function Proof() {
     return (
         <section className="section" id="pedido">
-            <p className="kicker">O pedido</p>
-            <h2>Como a equipe vê.</h2>
+            <p className="kicker">02 / No seu estúdio</p>
+            <h2>Uma ideia.<br /><em>Todos os detalhes.</em></h2>
+            <p className="section-intro">Sem procurar informações no histórico da conversa. O que a equipe precisa para orçar fica no mesmo lugar.</p>
             <article className="order">
-                <div className="order-photo" aria-hidden="true" />
+                <div className="order-heading"><span>Pedido de tatuagem</span><span className="order-badge">Aguardando orçamento</span></div>
                 <dl>
                     {fields.map(([label, value]) => (
                         <div key={label}>
@@ -23,7 +24,7 @@ export function Proof() {
                     ))}
                 </dl>
                 <p className="order-status">Foto recebida</p>
-                <a href="/painel/login">Fazer orçamento</a>
+                <p className="order-demo">Demonstração do pedido · dados ilustrativos</p>
             </article>
         </section>
     );

@@ -1,7 +1,8 @@
-export function Cta({ children }) {
+export function Cta({ children, href = '/painel/login' }) {
     return (
-        <a className="cta" href="/painel/login">
+        <a className="cta" href={href}>
             {children}
+            <span aria-hidden="true">↗</span>
         </a>
     );
 }

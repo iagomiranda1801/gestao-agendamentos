@@ -7,7 +7,7 @@ const lines = [
 export function After() {
     return (
         <section className="section" id="depois">
-            <p className="kicker">Depois</p>
+            <p className="kicker">04 / O próximo passo</p>
             <h2>O orçamento segue na conversa.</h2>
             <ul className="after">
                 {lines.map(([title, text]) => (

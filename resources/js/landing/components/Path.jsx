@@ -1,15 +1,13 @@
 const steps = [
-    ['Nome', 'A assistente pede o nome e não aceita uma frase de ideia no lugar.'],
-    ['Preferência de artista', 'Pergunta se há preferência e qual seria, sem citar a equipe.'],
-    ['Desenho e referência', 'Guarda a ideia, o local, o tamanho, o estilo e a foto.'],
-    ['Pedido na fila', 'A equipe vê o pedido completo, com o artista que o cliente falou.'],
-    ['Orçamento enviado', 'Alguém define o valor e manda pelo WhatsApp.'],
+    ['A conversa começa', 'A assistente recebe o cliente e identifica seu nome e a preferência de artista.'],
+    ['A ideia ganha contexto', 'Desenho, local, tamanho, estilo e imagem de referência ficam reunidos no pedido.'],
+    ['Sua equipe assume', 'Com o pedido organizado, a equipe define o valor e envia o orçamento pelo WhatsApp.'],
 ];
 
 export function Path() {
     return (
         <section className="section" id="servico">
-            <p className="kicker">O serviço</p>
+            <p className="kicker">01 / Como funciona</p>
             <h2>Do primeiro oi ao pedido pronto.</h2>
             <ol className="steps">
                 {steps.map(([title, text], index) => (
