@@ -5,6 +5,8 @@ namespace App\Services\WhatsApp;
 use App\Models\CompanyWhatsAppInstance;
 use App\Models\TattooAiConversation;
 use App\Models\WhatsAppBotConversation;
+use App\Services\CarWash\CarWashBotService;
+use App\Services\ServiceOrders\Bot\AssistanceBotService;
 use App\Support\PhoneNormalizer;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -45,7 +47,8 @@ class WhatsAppHumanTakeover
 
     public function pause(string $instance, string $phone): void
     {
-        app(\App\Services\ServiceOrders\Bot\AssistanceBotService::class)->pauseForPhone($instance, $phone);
+        app(AssistanceBotService::class)->pauseForPhone($instance, $phone);
+        app(CarWashBotService::class)->pauseForPhone($instance, $phone);
         $key = $this->phoneKey($phone);
         $minutes = $this->minutes();
 
@@ -63,11 +66,11 @@ class WhatsAppHumanTakeover
                 ->whereIn('phone_normalized', PhoneNormalizer::candidates($phone))
                 ->whereNull('finished_at')
                 ->update(['finished_at' => now(), 'finished_reason' => 'human_takeover']);
-                        $this->persistTattooTakeover($instance, (int) $companyId, $phone);
+            $this->persistTattooTakeover($instance, (int) $companyId, $phone);
         }
     }
 
-        /**
+    /**
      * Estúdio de tatuagem: quando o tatuador responde pelo WhatsApp, a IA fica
      * em silêncio de vez (não só pelas 2h da pausa), mesmo que a conversa
      * ainda não exista porque foi ele quem chamou primeiro. Volta pelo
@@ -93,7 +96,7 @@ class WhatsAppHumanTakeover
         );
     }
 
-public function isPaused(string $instance, string $phone): bool
+    public function isPaused(string $instance, string $phone): bool
     {
         $key = $this->phoneKey($phone);
 

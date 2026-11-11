@@ -10,16 +10,17 @@ use App\Models\CompanySchedulingSetting;
 use App\Models\CompanyWhatsAppInstance;
 use App\Models\WhatsAppBotConversation;
 use App\Services\Beauty\BeautyAIConversationService;
+use App\Services\CarWash\CarWashBotService;
 use App\Services\Company\CompanyModuleService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\ServiceOrders\Bot\AssistanceBotService;
 use App\Services\Tattoo\TattooAIConversationService;
 use App\Services\Tattoo\TattooWhatsAppBotService;
-use App\Support\PhoneNormalizer;
 use App\Services\WhatsApp\Bot\WhatsAppBookingBotService;
 use App\Services\WhatsApp\Bot\WhatsAppOrderLinkBotService;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\WhatsAppHumanTakeover;
+use App\Support\PhoneNormalizer;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -109,6 +110,17 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
             $this->runAiConversation($company, fn () => app(BeautyAIConversationService::class)->handle($company, $instance, $this->remoteJid,
                 $this->phone, $this->text, $this->messageId, $this->imageMime,
                 app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone), $this->pushName));
+
+            return;
+        }
+
+        if ($company->isCarWash() && app(CarWashBotService::class)->enabled($company)) {
+            if (! $instance) {
+                return;
+            }
+            $this->runAiConversation($company, fn () => app(CarWashBotService::class)->receive(
+                $company, $instance, $this->phone, $this->text, $this->messageId,
+            ));
 
             return;
         }
