@@ -124,6 +124,11 @@ class TattooAIConversationService extends WhatsAppAIConversationService
 
                 return $this->nextQuestion($conversation->collected_data ?: [], $conversation);
             } else {
+                $askedMenu = $this->lastOutbound($conversation);
+                if (str_contains($askedMenu, 'escolha uma opcao') || str_contains($askedMenu, 'numero da opcao')) {
+                    return 'É só me mandar o número da opção, de 1 a 6.';
+                }
+
                 return TattooStudioMenu::TEXT;
             }
         }
@@ -225,16 +230,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             $conversation->update(['collected_data' => array_merge($conversation->collected_data ?: [],
                 ['reference_status' => 'received'])]);
             if ($text === '') {
-                $data = $conversation->collected_data ?: [];
-                if ($this->readyForConfirmation($data)) {
-                    $conversation->update(['status' => 'awaiting_confirmation']);
-
-                    return 'Recebi a imagem, obrigado! '.$this->requestSummary($data);
-                }
-
-                return 'Recebi a imagem, obrigado! '.$this->finishReply($conversation, empty($data['name'])
-                    ? $this->askForName($conversation, $data)
-                    : $this->nextQuestion($data, $conversation));
+                return $this->imageOnlyReply($conversation);
             }
         }
         if ($request && in_array($request->status, ['awaiting_review', 'in_review'], true)) {
@@ -333,7 +329,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             $this->logFallback($conversation, $message, 'invalid_details');
         }
         $details = array_intersect_key($validator->valid(), $rules);
-        if (empty($collected['name']) && $this->askedForName($this->lastOutbound($conversation))) {
+        if (empty($collected['name']) && $this->askedForName($this->openQuestion($conversation))) {
             // Resposta ao pedido do nome nunca vira ideia da tatuagem.
             unset($details['description']);
         }
@@ -357,17 +353,17 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         if (! $this->hasUsableDescription($data['description'] ?? null)) {
             unset($data['description'], $data['description_confirmed']);
         }
-        if (isset($data['style']) && preg_match('/^(?:nao sei|nao tenho certeza|a definir|sem preferencia)[!. ]*$/u', $this->normalizedText((string) $data['style']))) {
+        $data = $this->withoutArtistPreference($data);
+        $asked = $this->openQuestion($conversation);
+        if (isset($data['style']) && $this->isStyleShrug($this->normalizedText((string) $data['style']))) {
             $data['style'] = 'A definir';
         }
-        $data = $this->withoutArtistPreference($data);
-        $asked = $this->normalizedText((string) $conversation->messages()->where('direction', 'out')
-            ->where('id', '>', $conversation->context_start_message_id ?? 0)->latest('id')->value('body'));
-        if (empty($data['style']) && str_contains($asked, 'estilo') && preg_match('/\b(nao sei|nao tenho certeza|a definir|sem preferencia)\b/u', $normalized)) {
+        if (empty($data['style']) && str_contains($asked, 'estilo')
+            && ($this->isStyleShrug($normalized) || preg_match('/\b(nao sei|nao tenho certeza|a definir|sem preferencia|tanto faz)\b/u', $normalized))) {
             $data['style'] = 'A definir';
         }
         if (empty($data['reference_status']) && preg_match('/\b(foto|imagem|referencia|inspiracao)\b/u', $asked)) {
-            if (preg_match('/\b(sem foto|nao tenho|sem referencia|nao tenho imagem|nao tenho inspiracao)\b/u', $normalized)) {
+            if ($this->declinesReference($normalized)) {
                 $data['reference_status'] = 'none';
             } elseif (mb_strlen($text) >= 12 && ! str_contains($text, '?')
                 && ! preg_match('/\b(vou mandar|vou enviar|ja mando|um momento|tenho sim)\b/u', $normalized)) {
@@ -377,6 +373,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         }
         $data = $this->sanitizeCollectedName($conversation, $data, $text, $nameBefore);
         $data = $this->acceptOpenAnswer($conversation, $data, $text);
+        $data = $this->keepMeasurementOutOfStyle($data, $text);
         if (! empty($data['name']) && $data['name'] !== $nameBefore) {
             $data['name_source'] = 'customer';
             unset($data['_name_candidate'], $data['_name_candidate_source'], $data['_name_confirm_pending']);
@@ -411,6 +408,11 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         }
         if ($this->readyForConfirmation($data)) {
             $conversation->update(['status' => 'awaiting_confirmation']);
+            if ($this->sameSummaryAlreadySent($conversation, $data)) {
+                return $message->media_mime !== null
+                    ? 'Recebi a imagem, obrigado!'
+                    : 'Se estiver certo, responde *sim*.';
+            }
 
             return $this->requestSummary($data);
         }
@@ -420,22 +422,194 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         if ($this->mentionsUnverifiedFacts($reply) || $this->reintroduces($reply) || $this->asksForArtist($reply)) {
             $reply = '';
         }
-        $reply = $this->withoutReaskedKnownFields($reply, $data);
         if ($reply === '' && $withoutModel && $data['name'] !== $nameBefore) {
             return $this->finishReply($conversation, 'Show'.$this->addressName($data, ', ').'! '.$this->nextQuestion($data, $conversation));
         }
-        if ($reply !== '') {
-            if (! $this->replyAsksForMissingDetail($reply, $data)) {
-                $next = $this->finishReply($conversation, $this->nextQuestion($data, $conversation));
-                if (! str_contains($this->normalizedText($reply), $this->normalizedText($next))) {
-                    $reply = rtrim($reply)."\n\n".$next;
-                }
-            }
 
-            return mb_substr($reply, 0, 1000);
+        return $this->composeCollectionReply($conversation, $data, $reply);
+    }
+
+    /**
+     * Foto sem legenda: agradece uma vez. Não repete a pergunta que já está
+     * na tela nem manda o resumo de novo.
+     */
+    protected function imageOnlyReply(TattooAiConversation $conversation): ?string
+    {
+        $last = $this->lastOutbound($conversation);
+        if (str_contains($last, 'recebi a imagem') || str_contains($last, 'recebi a referencia')) {
+            return null;
+        }
+        $data = $conversation->collected_data ?: [];
+        $ack = 'Recebi a imagem, obrigado!';
+        if ($this->sameSummaryAlreadySent($conversation, $data)) {
+            return $ack;
+        }
+        if ($this->readyForConfirmation($data)) {
+            $conversation->update(['status' => 'awaiting_confirmation']);
+
+            return $ack.' '.$this->requestSummary($data);
+        }
+        $field = $this->missingField($data);
+        if ($field !== null && $this->fieldAsked($last, $field)) {
+            return $ack;
+        }
+        $next = empty($data['name']) ? $this->askForName($conversation, $data) : $this->nextQuestion($data, $conversation);
+
+        return $ack.' '.$next;
+    }
+
+    /**
+     * Uma pergunta por mensagem: o comentário do modelo fica, a pergunta de
+     * outro assunto sai, e o campo que já foi pedido agora não volta.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function composeCollectionReply(TattooAiConversation $conversation, array $data, string $reply): string
+    {
+        $reply = $this->withoutReaskedKnownFields($reply, $data);
+        $missing = $this->missingField($data);
+        $reply = $this->withoutQuestionsExcept($reply, $missing);
+        $alreadyAsked = $missing !== null && $this->fieldAsked($this->lastOutbound($conversation), $missing);
+        if ($alreadyAsked && $missing !== null) {
+            $reply = $this->dropFieldSentences($reply, $missing);
+        }
+        $reply = trim($reply);
+        $asksMissing = $missing !== null && $this->fieldAsked($this->normalizedText($reply), $missing);
+        if ($missing !== null && ! $asksMissing && ! $alreadyAsked) {
+            $next = $this->nextQuestion($data, $conversation);
+            $reply = $reply === '' ? $next : rtrim($reply)."\n\n".$next;
+        }
+        $reply = trim($reply);
+        if ($reply === '' || $this->normalizedText($reply) === $this->lastOutbound($conversation)) {
+            return 'Beleza.';
         }
 
-        return $this->finishReply($conversation, $this->nextQuestion($data, $conversation));
+        return mb_substr($reply, 0, 1000);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function missingField(array $data): ?string
+    {
+        return match (true) {
+            empty($data['name']) => 'name',
+            ! $this->descriptionReady($data) => 'description',
+            empty($data['body_placement']) => 'body',
+            empty($data['size_description']) => 'size',
+            empty($data['style']) => 'style',
+            empty($data['reference_status']) => 'reference',
+            default => null,
+        };
+    }
+
+    protected function fieldAsked(string $normalized, string $field): bool
+    {
+        return match ($field) {
+            'name' => $this->askedForName($normalized),
+            'description' => (bool) preg_match('/\b(ideia|desenho|tatuagem|tattoo|tatuar|elementos)\b/u', $normalized),
+            'body' => (bool) preg_match('/\b(parte do corpo|qual parte|no corpo|corpo)\b/u', $normalized),
+            'size' => (bool) preg_match('/\b(tamanho|em cm|centimetros)\b/u', $normalized),
+            'style' => str_contains($normalized, 'estilo'),
+            'reference' => (bool) preg_match('/\b(foto|imagem|referencia|inspiracao)\b/u', $normalized),
+            default => false,
+        };
+    }
+
+    protected function withoutQuestionsExcept(string $reply, ?string $field): string
+    {
+        return $this->filterSentences($reply, function (string $sentence) use ($field): bool {
+            if (! str_contains($sentence, '?')) {
+                return true;
+            }
+
+            return $field !== null && $this->fieldAsked($this->normalizedText($sentence), $field);
+        });
+    }
+
+    protected function dropFieldSentences(string $reply, string $field): string
+    {
+        return $this->filterSentences($reply, function (string $sentence) use ($field): bool {
+            $normalized = $this->normalizedText($sentence);
+            if (! $this->fieldAsked($normalized, $field)) {
+                return true;
+            }
+
+            return ! str_contains($sentence, '?') && ! str_contains($normalized, 'em cm');
+        });
+    }
+
+    protected function filterSentences(string $reply, callable $keep): string
+    {
+        $parts = preg_split('/(?<=[.!?])\s+/u', trim($reply)) ?: [];
+        $kept = [];
+        foreach ($parts as $part) {
+            $part = trim($part);
+            if ($part !== '' && $keep($part)) {
+                $kept[] = $part;
+            }
+        }
+
+        return trim(implode(' ', $kept));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function sameSummaryAlreadySent(TattooAiConversation $conversation, array $data): bool
+    {
+        if (! $this->readyForConfirmation($data)) {
+            return false;
+        }
+        $last = $this->lastOutbound($conversation);
+        if (! str_contains($last, 'deixa eu confirmar')) {
+            return false;
+        }
+        foreach (['description', 'body_placement', 'size_description', 'style'] as $field) {
+            $piece = $this->normalizedText(mb_substr((string) ($data[$field] ?? ''), 0, 80));
+            if ($piece !== '' && ! str_contains($last, $piece)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * "Creio que uns 30 cm né" é tamanho, não estilo.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function keepMeasurementOutOfStyle(array $data, string $text): array
+    {
+        $style = trim((string) ($data['style'] ?? ''));
+        if ($style !== '' && $this->looksLikeSize($style)) {
+            if (empty($data['size_description']) || ! $this->looksLikeSize((string) $data['size_description'])) {
+                $data['size_description'] = mb_substr($style, 0, 255);
+            }
+            unset($data['style']);
+        }
+        if ($this->looksLikeSize($text) && (empty($data['size_description']) || ! $this->looksLikeSize((string) $data['size_description']))) {
+            $data['size_description'] = mb_substr($this->cleanOpenAnswer($text), 0, 255);
+        }
+
+        return $data;
+    }
+
+    protected function looksLikeSize(string $text): bool
+    {
+        $normalized = $this->normalizedText($text);
+        if (! preg_match('/\d+[.,]?\d*\s*(?:cm|centimetros)\b/u', $normalized)) {
+            return false;
+        }
+        $words = preg_split('/[^a-z0-9]+/u', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $ignore = ['uns', 'umas', 'cm', 'centimetros', 'centimetro', 'cerca', 'de', 'do', 'da', 'que', 'ne', 'creio',
+            'acho', 'mais', 'ou', 'menos', 'tamanho', 'por', 'ai', 'aproximadamente', 'tipo', 'um', 'uma', 'o', 'a',
+            'e', 'pra', 'para', 'ser', 'em', 'no', 'na', 'com', 'eh', 'é'];
+        $content = array_values(array_filter($words, fn (string $word) => ! in_array($word, $ignore, true) && ! preg_match('/^\d+$/', $word)));
+
+        return $content === [];
     }
 
     /**
@@ -456,7 +630,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         }
         Log::info('Tattoo AI quick reply.', ['company_id' => $conversation->company_id,
             'conversation_id' => $conversation->id, 'intent' => $intent]);
-        $asked = $this->lastOutbound($conversation);
+        $asked = $this->openQuestion($conversation);
         if (empty($data['name'])) {
             if ($this->askedForName($asked)) {
                 return $intent === 'greeting' ? 'Opa! Tudo certo por aqui.' : 'Tudo certo por aqui, valeu!';
@@ -488,8 +662,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
      */
     protected function detailsWithoutModel(TattooAiConversation $conversation, array $data, string $text): array
     {
-        $asked = $this->normalizedText((string) $conversation->messages()->where('direction', 'out')
-            ->where('id', '>', $conversation->context_start_message_id ?? 0)->latest('id')->value('body'));
+        $asked = $this->openQuestion($conversation);
         if (empty($data['name'])) {
             $details = [];
             $askedName = $this->askedForName($asked) || $this->nameWasRequested($conversation);
@@ -507,7 +680,7 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         }
 
         return match (true) {
-            ! $this->hasUsableDescription($data['description'] ?? null) && preg_match('/\b(ideia|desenho|tatuagem|tattoo)\b/u', $asked) && mb_strlen($text) >= 5 => ['description' => mb_substr($text, 0, 3000)],
+            ! $this->descriptionReady($data) && $this->askedForDrawing($asked) && ! $this->askedForName($asked) && $this->answeredOpenQuestion($text) => ['description' => mb_substr(trim($text), 0, 3000)],
             empty($data['body_placement']) && preg_match('/\b(corpo|onde|local)\b/u', $asked) && mb_strlen($text) >= 2 => ['body_placement' => mb_substr($this->cleanOpenAnswer($text), 0, 255)],
             empty($data['size_description']) && ! empty($data['description']) && ! empty($data['body_placement'])
                 && str_contains($asked, 'tamanho') && $text !== '' => ['size_description' => mb_substr($this->cleanOpenAnswer($text), 0, 255)],
@@ -1188,6 +1361,67 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             ->where('id', '>', $conversation->context_start_message_id ?? 0)->latest('id')->value('body'));
     }
 
+    /**
+     * Pergunta da coleta que ainda está aberta. Um "oi" no meio ("Opa, Ana!
+     * Tudo bem?") não apaga o que foi perguntado antes.
+     */
+    protected function openQuestion(TattooAiConversation $conversation): string
+    {
+        $bodies = $conversation->messages()->where('direction', 'out')
+            ->where('id', '>', $conversation->context_start_message_id ?? 0)
+            ->latest('id')->limit(8)->pluck('body');
+        foreach ($bodies as $body) {
+            $normalized = $this->normalizedText((string) $body);
+            if ($normalized === '' || $this->isChatAck($normalized)) {
+                continue;
+            }
+
+            return $normalized;
+        }
+
+        return '';
+    }
+
+    /** "Opa, Ana! Tudo bem?" e "Tudo certo por aqui, valeu!" não são pergunta da coleta. */
+    protected function isChatAck(string $normalized): bool
+    {
+        if ($this->askedForName($normalized) || $this->asksCollectionField($normalized)) {
+            return false;
+        }
+        $stripped = trim((string) preg_replace('/\b(?:opa|oi|oie|ola|eae|eai|show|valeu|beleza|fechou|tranquilo|certo|aqui|por|tudo|bem|bom|como|vai|td|joia|otimo|obrigado|obrigada|sim)\b/u', ' ', $normalized));
+        $stripped = trim((string) preg_replace('/[^a-z]+/u', ' ', $stripped));
+
+        return $stripped === '' || (bool) preg_match('/^[a-z]{2,20}$/u', $stripped);
+    }
+
+    protected function asksCollectionField(string $normalized): bool
+    {
+        return $this->askedForDrawing($normalized)
+            || (bool) preg_match('/\b(corpo|onde|local|tamanho|estilo|foto|imagem|referencia|inspiracao)\b/u', $normalized);
+    }
+
+    protected function isStyleShrug(string $normalized): bool
+    {
+        return (bool) preg_match('/^(?:nao sei|nao tenho certeza|a definir|sem preferencia|nao|sem|tanto faz|qualquer|qualquer um|pode ser qualquer)[!. ]*$/u', $normalized);
+    }
+
+    protected function declinesReference(string $normalized): bool
+    {
+        return (bool) preg_match('/^(?:n|nao|sem|nenhuma|nenhum|nao tenho|sem foto|sem imagem|sem referencia|agora nao|nao quero|nao mando|pode ser sem)[!. ]*$/u', $normalized)
+            || (bool) preg_match('/\b(sem foto|nao tenho|sem referencia|nao tenho imagem|nao tenho inspiracao|sem imagem)\b/u', $normalized);
+    }
+
+    /** A mesma frase da bolha anterior não sai de novo. */
+    protected function avoidSameText(TattooAiConversation $conversation, string $reply): string
+    {
+        if ($this->normalizedText($reply) === '' || $this->normalizedText($reply) !== $this->lastOutbound($conversation)) {
+            return $reply;
+        }
+        $alternate = $this->finishReply($conversation, $reply);
+
+        return $alternate === $reply ? 'Pode me responder com outras palavras?' : $alternate;
+    }
+
     protected function nameWasRequested(TattooAiConversation $conversation): bool
     {
         return $conversation->messages()->where('direction', 'out')
@@ -1207,6 +1441,18 @@ class TattooAIConversationService extends WhatsAppAIConversationService
         return (bool) preg_match('/\b(ideia|desenho|tatuagem|tattoo|elementos)\b/u', $asked);
     }
 
+    /**
+     * Resposta de verdade à pergunta aberta: "lobo" e "imagina várias ideias"
+     * contam; "não", "ok" e "quero uma tatuagem" não.
+     */
+    protected function answeredOpenQuestion(string $text): bool
+    {
+        $normalized = $this->normalizedText($text);
+
+        return $this->hasAnswerText($text) && mb_strlen($normalized) >= 3 && ! $this->isRequestPhrase($normalized)
+            && ! preg_match('/^(?:sim|nao|ok|blz|oi|ola|opa|bem|ta|isso|pode|sem|n|valeu|obrigado|obrigada|entendi|certo|claro)[!. ]*$/u', $normalized);
+    }
+
     protected function hasAnswerText(string $text): bool
     {
         $normalized = $this->normalizedText($text);
@@ -1220,12 +1466,12 @@ class TattooAIConversationService extends WhatsAppAIConversationService
      */
     protected function acceptOpenAnswer(TattooAiConversation $conversation, array $data, string $text): array
     {
-        $asked = $this->lastOutbound($conversation);
+        $asked = $this->openQuestion($conversation);
         if ($asked === '' || ! $this->hasAnswerText($text)) {
             return $data;
         }
         if (! $this->descriptionReady($data) && $this->askedForDrawing($asked) && ! $this->askedForName($asked)
-            && mb_strlen(trim($text)) >= 5 && ! $this->isRequestPhrase($this->normalizedText($text))) {
+            && $this->answeredOpenQuestion($text)) {
             $data['description'] = mb_substr(trim($text), 0, 3000);
             $data['description_confirmed'] = true;
         }
@@ -1278,14 +1524,14 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             str_contains($replyNorm, 'qual seu nome') || str_contains($replyNorm, 'como voce se chama') => 'Não peguei seu nome. Como você se chama?',
             str_contains($replyNorm, 'nao peguei seu nome') => 'Me fala só seu primeiro nome?',
             str_contains($replyNorm, 'como voce imagina a tattoo') => 'Me descreve o desenho com outras palavras?',
-            str_contains($replyNorm, 'qual parte do corpo') => 'Em qual parte do corpo fica?',
-            str_contains($replyNorm, 'de que tamanho') => 'Qual o tamanho, em cm?',
+            str_contains($replyNorm, 'qual parte do corpo') => 'Onde no corpo fica?',
+            str_contains($replyNorm, 'de que tamanho') => 'Me fala a medida?',
             str_contains($replyNorm, 'estilo em mente') => 'Se ainda não souber o estilo, pode dizer que tá a definir.',
             str_contains($replyNorm, 'foto de referencia') => 'Tem alguma foto pra mandar? Se não tiver, só falar *sem foto*.',
-            default => 'Pode me responder com outras palavras?',
+            default => 'Beleza.',
         };
 
-        return $this->repeatsQuestion($asked, $alternate) ? 'Pode me responder com outras palavras?' : $alternate;
+        return $this->repeatsQuestion($asked, $alternate) ? 'Beleza.' : $alternate;
     }
 
     /**
@@ -1413,7 +1659,11 @@ class TattooAIConversationService extends WhatsAppAIConversationService
             return false;
         }
 
-        return mb_strlen($normalized) >= 5 && ! preg_match('/^(?:(?:imagino?|imagina|quero|queria|tenho|penso em)\s+)?(?:varias|algumas|muitas) ideias?(?:\s+(?:de tatuagem|para tatuagem))?[.!?]*$|^(?:quero|queria|fazer|ter|tenho)?\s*(?:uma?\s+)?(?:tatuagem|tattoo|ideia)(?:\s+(?:legal|bonita|diferente))?[.!?]*$|^(?:nao sei|ainda nao sei|sem ideia)(?:\s+ainda)?[.!?]*$/u', $normalized);
+        if (preg_match('/^(?:sim|nao|ok|blz|oi|ola|opa|bem|ta|isso|pode|sem|n|valeu|obrigado|obrigada|entendi|certo|claro)[!. ]*$/u', $normalized)) {
+            return false;
+        }
+
+        return mb_strlen($normalized) >= 3 && ! preg_match('/^(?:(?:imagino?|imagina|quero|queria|tenho|penso em)\s+)?(?:varias|algumas|muitas) ideias?(?:\s+(?:de tatuagem|para tatuagem))?[.!?]*$|^(?:quero|queria|fazer|ter|tenho)?\s*(?:uma?\s+)?(?:tatuagem|tattoo|ideia)(?:\s+(?:legal|bonita|diferente))?[.!?]*$|^(?:nao sei|ainda nao sei|sem ideia)(?:\s+ainda)?[.!?]*$/u', $normalized);
     }
 
     /**

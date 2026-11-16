@@ -70,6 +70,9 @@ class GodsTattooFlowTest extends TestCase
         $send('Quero orçamento', 'ai-menu-1');
         $this->assertStringContainsString('1 Fazer orçamento', (string) TattooAiMessage::query()
             ->where('provider_message_id', 'reply:ai-menu-1')->value('body'));
+        $send('quanto fica?', 'ai-menu-1b');
+        $this->assertSame('É só me mandar o número da opção, de 1 a 6.', (string) TattooAiMessage::query()
+            ->where('provider_message_id', 'reply:ai-menu-1b')->value('body'));
         $send('1', 'ai-menu-2');
         $conversation = TattooAiConversation::query()->firstOrFail();
         $this->assertSame(1, $conversation->menu_choice);
@@ -81,7 +84,7 @@ class GodsTattooFlowTest extends TestCase
         $this->artisan('tattoo:send-quote-followups')->assertSuccessful();
         $this->assertNotNull($conversation->fresh()->quote_followup_sent_at, 'Follow-up timestamp missing');
         $this->artisan('tattoo:send-quote-followups')->assertSuccessful();
-        Http::assertSentCount(3); // menu, pergunta e um retorno
+        Http::assertSentCount(4); // menu, lembrete, pergunta e um retorno
 
         $other = '5511888888888';
         $bot->handle($company, $instance, $other.'@s.whatsapp.net', $other, 'oi', 'other-1', null);

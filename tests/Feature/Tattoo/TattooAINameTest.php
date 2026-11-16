@@ -223,6 +223,23 @@ class TattooAINameTest extends TestCase
         $this->assertStringNotContainsString('R$', $reply);
     }
 
+    public function test_model_does_not_send_the_same_question_after_a_short_idea(): void
+    {
+        [$company, $instance] = $this->setupAI();
+        TattooAiConversation::query()->create([
+            'company_id' => $company->id, 'company_whatsapp_instance_id' => $instance->id,
+            'phone_normalized' => $this->phone, 'remote_jid' => $this->phone.'@s.whatsapp.net', 'status' => 'collecting_information',
+            'collected_data' => ['name' => 'Lucas'],
+        ])->messages()->create(['company_id' => $company->id, 'provider_message_id' => 'out-idea', 'direction' => 'out',
+            'status' => 'sent', 'body' => 'Me conta como você imagina a tattoo?']);
+        $this->fakeGemini([['action' => 'ask', 'details' => [], 'reply' => 'Me conta como você imagina a tattoo?']]);
+
+        $reply = $this->send($company, $instance, 'lobo', 'short-1');
+
+        $this->assertSame('lobo', $this->conversation()->collected_data['description']);
+        $this->assertSame('Massa! E vai ser em qual parte do corpo?', $reply);
+    }
+
     public function test_name_prompt_stops_after_two_tries_and_flow_moves_on(): void
     {
         [$company, $instance] = $this->setupAI();
@@ -415,5 +432,109 @@ class TattooAINameTest extends TestCase
         ])->assertOk();
 
         Queue::assertPushed(HandleWhatsAppInboundMessageJob::class, fn ($job) => $job->pushName === 'Lucas' && $job->messageId === 'push-1');
+    }
+
+    public function test_model_comment_keeps_one_question_and_does_not_repeat_the_open_field(): void
+    {
+        [$company, $instance] = $this->setupAI();
+        TattooAiConversation::query()->create([
+            'company_id' => $company->id, 'company_whatsapp_instance_id' => $instance->id,
+            'phone_normalized' => $this->phone, 'remote_jid' => $this->phone.'@s.whatsapp.net', 'status' => 'collecting_information',
+            'collected_data' => ['name' => 'Lucas', 'description' => 'Nessa pegada mesmo', 'description_confirmed' => true, 'body_placement' => 'Braço'],
+        ])->messages()->create(['company_id' => $company->id, 'provider_message_id' => 'out-size', 'direction' => 'out',
+            'status' => 'sent', 'body' => 'E mais ou menos de que tamanho? Pode ser em cm mesmo.']);
+        $this->fakeGemini([['action' => 'ask', 'details' => [],
+            'reply' => "Curti demais a referência!\nQual o tamanho, em cm?"]]);
+
+        $reply = $this->send($company, $instance, ' ', 'size-repeat');
+
+        $this->assertSame('Curti demais a referência!', $reply);
+        $this->assertStringNotContainsString('tamanho', mb_strtolower($reply));
+    }
+
+    public function test_two_questions_from_the_model_collapse_to_the_missing_one(): void
+    {
+        [$company, $instance] = $this->setupAI();
+        TattooAiConversation::query()->create([
+            'company_id' => $company->id, 'company_whatsapp_instance_id' => $instance->id,
+            'phone_normalized' => $this->phone, 'remote_jid' => $this->phone.'@s.whatsapp.net', 'status' => 'collecting_information',
+            'collected_data' => ['name' => 'Lucas', 'description' => 'Nessa pegada mesmo', 'description_confirmed' => true],
+        ])->messages()->create(['company_id' => $company->id, 'provider_message_id' => 'out-idea', 'direction' => 'out',
+            'status' => 'sent', 'body' => 'Me conta como você imagina a tattoo?']);
+        $this->fakeGemini([['action' => 'ask', 'details' => [],
+            'reply' => "Me conta, o que você tá pensando em tatuar?\n\nMassa! E vai ser em qual parte do corpo?"]]);
+
+        $reply = $this->send($company, $instance, 'nessa pegada mesmo', 'one-q');
+
+        $this->assertStringContainsString('qual parte do corpo', mb_strtolower($reply));
+        $this->assertStringNotContainsString('pensando em tatuar', mb_strtolower($reply));
+        $this->assertSame(1, substr_count($reply, '?'));
+    }
+
+    public function test_measurement_is_not_saved_as_the_style(): void
+    {
+        [$company, $instance] = $this->setupAI();
+        TattooAiConversation::query()->create([
+            'company_id' => $company->id, 'company_whatsapp_instance_id' => $instance->id,
+            'phone_normalized' => $this->phone, 'remote_jid' => $this->phone.'@s.whatsapp.net', 'status' => 'collecting_information',
+            'collected_data' => ['name' => 'Lucas', 'description' => 'Nessa pegada mesmo', 'description_confirmed' => true,
+                'body_placement' => 'Braço', 'reference_status' => 'received'],
+        ])->messages()->create(['company_id' => $company->id, 'provider_message_id' => 'out-size', 'direction' => 'out',
+            'status' => 'sent', 'body' => 'E mais ou menos de que tamanho? Pode ser em cm mesmo.']);
+        $this->fakeGemini([['action' => 'save_details', 'details' => ['style' => 'Creio que uns 30 cm né', 'size_description' => 'cerca de 30 cm'],
+            'reply' => '']]);
+
+        $reply = $this->send($company, $instance, 'Creio que uns 30 cm né', 'cm-style');
+
+        $data = $this->conversation()->collected_data;
+        $this->assertArrayNotHasKey('style', $data);
+        $this->assertStringContainsString('30 cm', (string) $data['size_description']);
+        $this->assertStringContainsString('estilo em mente', mb_strtolower($reply));
+        $this->assertStringNotContainsString('Deixa eu confirmar', $reply);
+    }
+
+    public function test_image_does_not_repeat_the_open_question_or_the_summary(): void
+    {
+        [$company, $instance] = $this->setupAI();
+        Storage::fake('local');
+        config(['filesystems.tattoo_disk' => 'local']);
+        $png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/L9sAAAAASUVORK5CYII=';
+        Http::fake(function ($request) use ($png) {
+            if (str_contains($request->url(), 'getBase64FromMediaMessage')) {
+                return Http::response(['base64' => $png]);
+            }
+
+            return Http::response(['key' => ['id' => 'sent']]);
+        });
+        $conversation = TattooAiConversation::query()->create([
+            'company_id' => $company->id, 'company_whatsapp_instance_id' => $instance->id,
+            'phone_normalized' => $this->phone, 'remote_jid' => $this->phone.'@s.whatsapp.net', 'status' => 'collecting_information',
+            'collected_data' => ['name' => 'Lucas', 'description' => 'Cobertura', 'description_confirmed' => true, 'body_placement' => 'Braço'],
+        ]);
+        $conversation->messages()->create(['company_id' => $company->id, 'provider_message_id' => 'out-size', 'direction' => 'out',
+            'status' => 'sent', 'body' => 'E mais ou menos de que tamanho? Pode ser em cm mesmo.']);
+
+        $image = function (string $id) use ($company, $instance): ?string {
+            app(TattooAIConversationService::class)->handle($company, $instance, $this->phone.'@s.whatsapp.net',
+                $this->phone, '', $id, 'image/png');
+
+            return TattooAiMessage::query()->where('provider_message_id', 'reply:'.$id)->value('body');
+        };
+        $reply = $image('img-1');
+        $this->assertSame('Recebi a imagem, obrigado!', $reply);
+
+        $this->assertNull($image('img-2'));
+
+        $conversation->update(['status' => 'awaiting_confirmation', 'collected_data' => [
+            'name' => 'Lucas', 'description' => 'Cobertura de tatuagem antiga', 'description_confirmed' => true,
+            'body_placement' => 'braço, parte externa do bíceps', 'size_description' => 'cerca de 20cm',
+            'style' => 'a definir', 'reference_status' => 'received',
+        ]]);
+        $conversation->messages()->create(['company_id' => $company->id, 'provider_message_id' => 'out-summary', 'direction' => 'out',
+            'status' => 'sent', 'body' => "Deixa eu confirmar se entendi:\nIdeia: Cobertura de tatuagem antiga\nLocal: braço, parte externa do bíceps\nTamanho: cerca de 20cm\nEstilo: a definir\nReferência: imagem recebida."]);
+
+        $again = $image('img-3');
+        $this->assertSame('Recebi a imagem, obrigado!', $again);
+        $this->assertStringNotContainsString('Deixa eu confirmar', $again);
     }
 }

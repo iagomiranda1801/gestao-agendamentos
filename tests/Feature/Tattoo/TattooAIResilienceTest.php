@@ -285,4 +285,41 @@ class TattooAIResilienceTest extends TestCase
         $this->assertDatabaseCount('tattoo_payment_receipts', 0);
         $this->assertSame('waiting_payment_receipt', TattooAiConversation::query()->firstOrFail()->status);
     }
+
+    public function test_greeting_between_answers_does_not_make_the_bot_ask_again(): void
+    {
+        [$company, $instance] = $this->setupStudio();
+        $this->fakeHttp([]);
+
+        $this->send($company, $instance, 'Oi', 'g1');
+        $this->send($company, $instance, 'Ana', 'g2');
+        $this->assertSame('Opa, Ana! Tudo bem?', $this->send($company, $instance, 'Oi', 'g3'));
+        $this->assertSame('Opa, Ana! Tudo bem?', $this->send($company, $instance, 'opa', 'g4'));
+
+        $reply = $this->send($company, $instance, 'lobo', 'g5');
+        $this->assertSame('lobo', TattooAiConversation::query()->firstOrFail()->collected_data['description']);
+        $this->assertSame('Massa! E vai ser em qual parte do corpo?', $reply);
+        $this->assertSame(1, TattooAiMessage::query()->where('direction', 'out')
+            ->pluck('body')->filter(fn ($body) => str_contains((string) $body, 'imagina a tattoo'))->count());
+    }
+
+    public function test_short_no_on_the_photo_question_is_not_asked_again(): void
+    {
+        [$company, $instance] = $this->setupStudio();
+        $this->fakeHttp([]);
+
+        $this->send($company, $instance, 'Oi', 'p1');
+        $this->send($company, $instance, 'Ana', 'p2');
+        $this->send($company, $instance, 'uma rosa', 'p3');
+        $this->send($company, $instance, 'braço', 'p4');
+        $this->send($company, $instance, '10 cm', 'p5');
+        $this->send($company, $instance, 'não', 'p6');
+
+        $reply = $this->send($company, $instance, 'não', 'p7');
+        $data = TattooAiConversation::query()->firstOrFail()->collected_data;
+        $this->assertSame('A definir', $data['style']);
+        $this->assertSame('none', $data['reference_status']);
+        $this->assertStringContainsString('Deixa eu confirmar', $reply);
+        $this->assertStringNotContainsString('foto de referência', $reply);
+    }
 }
