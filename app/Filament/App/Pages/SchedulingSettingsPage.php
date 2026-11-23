@@ -6,12 +6,15 @@ use App\Enums\CompanyModule;
 use App\Enums\Weekday;
 use App\Enums\WhatsAppAutomationType;
 use App\Filament\App\Concerns\RequiresCompanyModule;
+use App\Filament\Forms\Components\AIModelSelect;
 use App\Models\Company;
 use App\Policies\CompanySchedulingSettingPolicy;
+use App\Services\AI\CompanyAIModelCatalog;
 use App\Services\Scheduling\CompanyBusinessHoursService;
 use App\Services\Scheduling\CompanySchedulingSettingService;
-use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
+use App\Services\Tattoo\TattooStudioInfo;
 use App\Services\WhatsApp\Automations\WhatsAppAutomationService;
+use App\Services\WhatsApp\CompanyWhatsAppInstanceService;
 use App\Support\Segment;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -19,7 +22,6 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
-use App\Services\Tattoo\TattooStudioInfo;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
@@ -31,11 +33,12 @@ use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Validation\ValidationException;
-use UnitEnum;
 use Throwable;
+use UnitEnum;
 
 class SchedulingSettingsPage extends Page
 {
@@ -124,6 +127,8 @@ class SchedulingSettingsPage extends Page
             'tattoo_address_message' => $setting->tattoo_address_message ?: TattooStudioInfo::DEFAULT_ADDRESS,
             'ai_provider' => $setting->ai_provider,
             'ai_model' => $setting->ai_model,
+            'ai_model_manual' => false,
+            'ai_model_identifier' => $setting->ai_model,
             'ai_api_key' => '',
             'ai_clear_key' => false,
             'beauty_ai_enabled' => $setting->beauty_ai_enabled,
@@ -157,6 +162,9 @@ class SchedulingSettingsPage extends Page
         $company = Filament::getTenant();
 
         $data = $this->form->getState();
+        if ($this->data['ai_model_manual'] ?? false) {
+            $data['ai_model'] = trim((string) ($this->data['ai_model_identifier'] ?? ''));
+        }
         $setting = app(CompanySchedulingSettingService::class)->getOrCreate($company);
         $newKey = trim((string) ($data['ai_api_key'] ?? ''));
         $clearKey = (bool) ($data['ai_clear_key'] ?? false);
@@ -213,6 +221,53 @@ class SchedulingSettingsPage extends Page
             ->success()
             ->title('Configurações salvas')
             ->send();
+    }
+
+    /** @return array<string, string> */
+    public function aiModelOptions(string $search = '', bool $refresh = false): array
+    {
+        abort_unless(static::canAccess(), 403);
+        $company = Filament::getTenant();
+        $setting = app(CompanySchedulingSettingService::class)->getOrCreate($company);
+        abort_unless((new CompanySchedulingSettingPolicy)->update(auth()->user(), $setting), 403);
+
+        $provider = (string) ($this->data['ai_provider'] ?? '');
+        $key = trim((string) ($this->data['ai_api_key'] ?? ''));
+        if ($this->data['ai_clear_key'] ?? false) {
+            $this->notifyModelCatalogError('Desmarque Remover chave salva para consultar os modelos.');
+
+            return [];
+        }
+        if ($key === '' && $provider === $setting->ai_provider) {
+            $key = (string) $setting->ai_api_key;
+        }
+
+        try {
+            $options = app(CompanyAIModelCatalog::class)->models($company->id, $provider, $key, $refresh);
+        } catch (\RuntimeException $exception) {
+            $this->notifyModelCatalogError($exception->getMessage());
+
+            return [];
+        }
+
+        if ($options === []) {
+            $this->notifyModelCatalogError('Nenhum modelo de texto foi encontrado. Você pode informar o modelo manualmente.');
+        } elseif ($refresh) {
+            Notification::make()->success()->title('Lista de modelos atualizada')->send();
+        }
+
+        $current = $this->data['ai_model'] ?? null;
+        if (is_string($current) && filled($current) && ! isset($options[$current])) {
+            $options[$current] = $current.' (modelo configurado; ausente no catálogo)';
+        }
+        $search = mb_strtolower(mb_substr($search, 0, 120));
+
+        return array_slice(array_filter($options, fn (string $label, string $id): bool => $search === '' || str_contains(mb_strtolower($label.' '.$id), $search), ARRAY_FILTER_USE_BOTH), 0, 100, true);
+    }
+
+    private function notifyModelCatalogError(string $message): void
+    {
+        Notification::make()->warning()->title('Não foi possível carregar os modelos')->body($message)->send();
     }
 
     public function defaultForm(Schema $schema): Schema
@@ -497,14 +552,47 @@ class SchedulingSettingsPage extends Page
                             ->maxLength(3000)->visible(fn (): bool => (bool) Filament::getTenant()?->isSalon()),
                         Select::make('ai_provider')->label('Provedor de IA')
                             ->options(['gemini' => 'Gemini', 'openai' => 'OpenAI', 'openrouter' => 'OpenRouter'])
+                            ->live()
+                            ->afterStateUpdated(function (Set $set): void {
+                                $set('ai_model', null);
+                                $set('ai_model_identifier', null);
+                            })
                             ->helperText('O consumo será feito na conta vinculada à chave informada.'),
-                        TextInput::make('ai_model')->label('Modelo')
-                            ->placeholder('Ex.: gemini-2.5-flash, gpt-4.1-mini, openai/gpt-4.1-mini')
-                            ->maxLength(120),
                         TextInput::make('ai_api_key')->label('Chave de API da empresa')
                             ->password()->maxLength(500)
+                            ->live(onBlur: true)
                             ->helperText('Deixe vazio para manter a chave salva. Ela não é exibida novamente.'),
+                        Toggle::make('ai_model_manual')->label('Informar modelo manualmente')
+                            ->live()->dehydrated(false)
+                            ->afterStateUpdated(function (Get $get, Set $set, bool $state): void {
+                                if ($state) {
+                                    $set('ai_model_identifier', $get('ai_model'));
+                                } else {
+                                    $set('ai_model', $get('ai_model_identifier'));
+                                }
+                            }),
+                        AIModelSelect::make('ai_model')->label('Modelo')
+                            ->native(false)->searchable()->dynamicOptions()
+                            ->getSearchResultsUsing(fn (string $search): array => $this->aiModelOptions($search))
+                            ->getOptionLabelUsing(fn ($value): ?string => filled($value) ? (string) $value : null)
+                            ->placeholder('Selecione um modelo de IA')
+                            ->loadingMessage('Carregando modelos do provedor…')
+                            ->searchingMessage('Buscando modelos…')
+                            ->noOptionsMessage('Nenhum modelo disponível. Atualize a lista ou use o preenchimento manual.')
+                            ->noSearchResultsMessage('Nenhum modelo encontrado para esta busca.')
+                            ->helperText('A lista não garante saldo nem suporte a imagens e PDFs. Você também pode informar o modelo manualmente.')
+                            ->visible(fn (Get $get): bool => ! $get('ai_model_manual'))
+                            ->disabled(fn (Get $get): bool => blank($get('ai_provider')) || (bool) $get('ai_clear_key')),
+                        TextInput::make('ai_model_identifier')->label('Identificador do modelo')
+                            ->placeholder('Ex.: gemini-2.5-flash, gpt-4.1-mini, openai/gpt-4.1-mini')
+                            ->maxLength(120)->dehydrated(false)
+                            ->visible(fn (Get $get): bool => (bool) $get('ai_model_manual')),
+                        Actions::make([
+                            Action::make('refreshAIModels')->label('Atualizar modelos')
+                                ->action(fn () => $this->aiModelOptions(refresh: true)),
+                        ])->visible(fn (Get $get): bool => ! $get('ai_model_manual')),
                         Toggle::make('ai_clear_key')->label('Remover chave salva')
+                            ->live()
                             ->helperText('Desative o atendimento com IA antes de remover a chave.'),
                     ])
                     ->columns(1)
