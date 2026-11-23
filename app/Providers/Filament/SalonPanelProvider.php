@@ -30,7 +30,7 @@ class SalonPanelProvider extends AppPanelProvider
             ->login(SalonLogin::class)
             ->viteTheme('resources/css/filament/salao/theme.css')
             ->brandLogoHeight((string) Segment::get('salon', 'logo_height'))
-            ->favicon(fn (): string => Segment::media('salon', 'favicon') ?? asset('images/salao/favicon.svg'))
+            ->favicon(fn (): string => Segment::media('salon', 'favicon') ?? asset('images/bellana/icon-32.png'))
             ->colors([
                 'primary' => Color::hex(Segment::themeColor('salon')),
             ]);

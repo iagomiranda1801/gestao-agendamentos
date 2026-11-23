@@ -140,6 +140,6 @@ class TattooSegmentTest extends TestCase
         SegmentSetting::query()->where('segment', 'salon')->delete();
         Segment::flush();
 
-        $this->assertSame('Agendaqui Beleza', Segment::get('salon', 'name'));
+        $this->assertSame(config('segments.salon.name'), Segment::get('salon', 'name'));
     }
 }

@@ -13,18 +13,25 @@
     <meta property="og:type" content="website">
     <meta property="og:title" content="Bellana | Beleza & Inteligência">
     <meta property="og:description" content="Seu talento cuida da beleza. A Bellana cuida da gestão.">
+    <meta property="og:url" content="{{ url('/') }}">
+    <meta property="og:image" content="{{ asset('images/bellana/og-image.jpg') }}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Bellana, Beleza & Inteligência">
+    <meta name="twitter:card" content="summary_large_image">
     <title>Bellana | Beleza & Inteligência</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/bellana/icon-32.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/bellana/apple-touch-icon.png') }}">    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root{--wine:#5B0D2B;--dark:#300919;--rose:#C76B7E;--pink:#E8B4B9;--cream:#F8EDE8;--gold:#D9A47B}
         *{box-sizing:border-box}html{scroll-behavior:smooth}
-        body{margin:0;font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark)}
+        body{margin:0;font-family:Poppins,sans-serif;background:var(--cream);color:var(--dark)}
         h1,h2,h3,.brand{font-family:Montserrat,sans-serif}a{text-decoration:none}
         header{background:var(--dark);color:#fff}
         .nav{max-width:1120px;margin:auto;display:flex;justify-content:space-between;align-items:center;padding:22px 24px}
-        .brand{font-size:28px;font-weight:700;letter-spacing:-1.6px;color:#fff}.brand span{color:var(--gold)}
+        .brand{font-size:28px;font-weight:700;letter-spacing:-1.6px;color:#fff}.brand span{color:var(--gold)}.brand img{display:block;height:50px;width:auto}
         .navlinks{display:flex;gap:25px;align-items:center}.navlinks a{color:#f8e5e7;font-size:14px}
         .btn{display:inline-block;background:var(--gold);color:var(--dark)!important;border-radius:10px;padding:15px 22px;font-weight:800;text-align:center;box-shadow:0 6px 20px #0002}
         .btn.outline{border:1px solid #e9c9c9;background:transparent;color:#fff!important;box-shadow:none}
@@ -59,19 +66,19 @@
         .chatbar{background:#fff;border-radius:12px;padding:15px;margin-bottom:15px;font-weight:700;color:#284d37}
         .bubble{background:#fff;border-radius:12px 12px 12px 2px;padding:14px;margin:10px 35px 10px 0;line-height:1.5;font-size:14px}
         .bubble.right{background:#d0f6c9;border-radius:12px 12px 2px 12px;margin:10px 0 10px 35px}
-        .pricing{background:linear-gradient(145deg,var(--dark),var(--wine));color:#fff}
+        .pricing{background:linear-gradient(145deg,rgba(48,9,25,.88),rgba(91,13,43,.84)),url('{{ asset('images/bellana/pattern.webp') }}') center/380px repeat;color:#fff}
         .pricebox{max-width:550px;margin:38px auto 0;background:#fff;color:var(--dark);padding:38px;border-radius:24px;box-shadow:0 25px 55px #0003}
         .price{font-family:Montserrat;font-size:56px;font-weight:800;letter-spacing:-2px;color:var(--wine)}.price small{font-size:18px;font-weight:500}
         .pricebox ul{padding-left:20px;line-height:2.1;color:#634e58}.pricebox .btn{display:block;margin-top:14px}.pricebox .btn:first-of-type{margin-top:25px}
         .faq{max-width:750px;margin:30px auto 0}.faq details{padding:21px 0;border-bottom:1px solid #dfcdd0}.faq summary{font-weight:700;cursor:pointer}.faq p{color:#745c67;line-height:1.6}.faq a{color:var(--wine);font-weight:700}
-        .footer{background:var(--dark);color:#edd6d9;padding:35px 24px;text-align:center}.footer small{display:block;margin-top:10px;opacity:.8}
-        @media(max-width:760px){.navlinks a:not(.btn){display:none}.hero{padding:55px 20px 75px}.heroGrid,.split{grid-template-columns:1fr}.heroGrid{gap:42px}.features{grid-template-columns:1fr}.section{padding:65px 20px}.pricebox{padding:28px}.price{font-size:47px}}
+        .footer{background:var(--dark);color:#edd6d9;padding:35px 24px;text-align:center}.footer small{display:block;margin-top:10px;opacity:.8}.footer .brand img{height:64px;margin:0 auto 6px}
+        @media(max-width:760px){.navlinks a:not(.btn){display:none}.nav .brand img{height:40px}.hero{padding:55px 20px 75px}.heroGrid,.split{grid-template-columns:1fr}.heroGrid{gap:42px}.features{grid-template-columns:1fr}.section{padding:65px 20px}.pricebox{padding:28px}.price{font-size:47px}}
     </style>
 </head>
 <body>
 <header>
     <nav class="nav">
-        <a href="#inicio" class="brand" aria-label="Bellana, voltar ao início">bella<span>na.</span></a>
+        <a href="#inicio" class="brand" aria-label="Bellana, voltar ao início"><img src="{{ asset('images/bellana/logo-horizontal-light.webp') }}" alt="Bellana" width="178" height="50"></a>
         <div class="navlinks">
             <a href="#recursos">Recursos</a>
             <a href="#como-funciona">Como funciona</a>
@@ -100,7 +107,7 @@
             </div>
             <div class="mock" aria-label="Exemplo da tela de agenda da Bellana">
                 <div class="mockhead">
-                    <strong>bellana. <span style="font-weight:400;font-size:11px">/ Agenda da semana</span></strong>
+                    <strong style="display:flex;align-items:center;gap:6px"><img src="{{ asset('images/bellana/logo-horizontal-wine.webp') }}" alt="Bellana" width="86" height="24"><span style="font-weight:400;font-size:11px">/ Agenda da semana</span></strong>
                     <span class="pill">Exemplo</span>
                 </div>
                 <p style="font-weight:700">Bom dia! ✨</p>
@@ -200,7 +207,7 @@
     </section>
 </main>
 <footer class="footer">
-    <div class="brand">bella<span>na.</span></div>
+    <div class="brand"><img src="{{ asset('images/bellana/logo-horizontal-light.webp') }}" alt="Bellana" width="228" height="64" loading="lazy"></div>
     <small>Beleza & Inteligência • Uma solução da IM Soluções Digitais</small>
     <small>© {{ now()->year }} Bellana</small>
 </footer>

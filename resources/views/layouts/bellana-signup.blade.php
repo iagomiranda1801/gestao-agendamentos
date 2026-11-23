@@ -6,16 +6,17 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#300919">
     <title>Crie sua conta | Bellana</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/bellana/icon-32.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/bellana/apple-touch-icon.png') }}">    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root{--wine:#5B0D2B;--dark:#300919;--rose:#C76B7E;--pink:#E8B4B9;--cream:#F8EDE8;--gold:#D9A47B}
         *{box-sizing:border-box}
-        body{margin:0;font-family:'DM Sans',sans-serif;background:linear-gradient(145deg,var(--dark),var(--wine));color:var(--dark);min-height:100vh}
+        body{margin:0;font-family:Poppins,sans-serif;background:linear-gradient(145deg,var(--dark),var(--wine));color:var(--dark);min-height:100vh}
         h1,h2,h3,.brand{font-family:Montserrat,sans-serif}a{text-decoration:none}
         .nav{max-width:1120px;margin:auto;display:flex;justify-content:space-between;align-items:center;padding:22px 24px}
-        .brand{font-size:28px;font-weight:700;letter-spacing:-1.6px;color:#fff}.brand span{color:var(--gold)}
+        .brand{font-size:28px;font-weight:700;letter-spacing:-1.6px;color:#fff}.brand span{color:var(--gold)}.brand img{display:block;height:50px;width:auto}
         .nav .login{color:#f8e5e7;font-size:14px}
         .signup{max-width:1120px;margin:auto;padding:30px 24px 80px;display:grid;grid-template-columns:1fr 1fr;gap:50px;align-items:start}
         .copy{color:#fff}.eyebrow{text-transform:uppercase;letter-spacing:2px;font-size:12px;color:#efb8bb;font-weight:800}
@@ -41,7 +42,7 @@
 </head>
 <body>
     <nav class="nav">
-        <a href="{{ route('bellana.landing') }}" class="brand" aria-label="Bellana, voltar ao início">bella<span>na.</span></a>
+        <a href="{{ route('bellana.landing') }}" class="brand" aria-label="Bellana, voltar ao início"><img src="{{ asset('images/bellana/logo-horizontal-light.webp') }}" alt="Bellana" width="178" height="50"></a>
         <a class="login" href="{{ \Filament\Facades\Filament::getPanel(\App\Support\Segment::panelId('salon'))->getLoginUrl() }}">Já tenho uma conta ↗</a>
     </nav>
     <main>{{ $slot }}</main>

@@ -36,17 +36,17 @@ return [
             CompanyProfile::Salon->value,
         ],
 
-        'name' => env('SALON_BRAND_NAME', 'Agendaqui Beleza'),
+        'name' => env('SALON_BRAND_NAME', 'Bellana'),
 
-        'tagline' => env('SALON_BRAND_TAGLINE', 'Gestão para salões, estética e bem-estar'),
+        'tagline' => env('SALON_BRAND_TAGLINE', 'Beleza & Inteligência'),
 
-        'logo' => 'images/salao/logo.svg',
+        'logo' => 'images/bellana/logo-horizontal-wine.webp',
 
-        'favicon' => 'images/salao/favicon.svg',
+        'favicon' => 'images/bellana/icon-32.png',
 
         'logo_height' => '2.75rem',
 
-        'primary_color' => '#b4426e',
+        'primary_color' => '#5B0D2B',
 
         'login' => [
             'eyebrow' => 'Para salões, estética e bem-estar',

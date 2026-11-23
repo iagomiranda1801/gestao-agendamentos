@@ -33,7 +33,7 @@ class SalonSegmentTest extends TestCase
             ->assertOk()
             ->assertSee('salon-auth', false)
             ->assertSee('Headline do salão de teste')
-            ->assertSee('images/salao/logo.svg', false);
+            ->assertSee('images/bellana/logo-horizontal-wine.webp', false);
 
         $this->get(rtrim((string) config('app.url'), '/').'/app/login')
             ->assertOk()
