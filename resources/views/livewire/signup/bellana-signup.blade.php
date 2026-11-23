@@ -20,7 +20,7 @@
             <span class="tag">Bem-vinda de volta</span>
             <h2>Você já está conectada.</h2>
             <p class="sub">Acesse o painel para continuar.</p>
-            <a class="btn" href="{{ \Filament\Facades\Filament::getPanel(\App\Support\Segment::DEFAULT_PANEL)->getUrl() }}">Acessar meu painel</a>
+            <a class="btn" href="{{ \Filament\Facades\Filament::getPanel(\App\Support\Segment::panelId('salon'))->getUrl() }}">Acessar meu painel</a>
         @else
             <span class="tag">Poucos dados, tudo pronto</span>
             <h2>Vamos criar sua conta?</h2>

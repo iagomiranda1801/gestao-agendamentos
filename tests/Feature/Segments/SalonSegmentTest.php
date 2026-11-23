@@ -41,9 +41,9 @@ class SalonSegmentTest extends TestCase
             ->assertDontSee('salon-auth', false);
     }
 
-    public function test_salon_domain_root_redirects_to_salon_panel(): void
+    public function test_salon_domain_root_shows_the_bellana_landing(): void
     {
-        $this->get("http://{$this->salonHost}/")->assertRedirect("http://{$this->salonHost}/painel");
+        $this->get("http://{$this->salonHost}/")->assertOk()->assertSee('Bellana');
     }
 
     public function test_admin_and_app_are_not_available_on_salon_domain(): void
@@ -139,6 +139,7 @@ class SalonSegmentTest extends TestCase
     {
         $this->get("http://{$this->salonHost}/cadastro")
             ->assertOk()
+            ->assertSee('Vamos criar sua conta?')
             ->assertDontSee('id="businessProfile"', false);
 
         request()->headers->set('HOST', $this->salonHost);

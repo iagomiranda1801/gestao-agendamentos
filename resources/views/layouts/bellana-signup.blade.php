@@ -42,7 +42,7 @@
 <body>
     <nav class="nav">
         <a href="{{ route('bellana.landing') }}" class="brand" aria-label="Bellana, voltar ao início">bella<span>na.</span></a>
-        <a class="login" href="{{ \Filament\Facades\Filament::getPanel(\App\Support\Segment::DEFAULT_PANEL)->getLoginUrl() }}">Já tenho uma conta ↗</a>
+        <a class="login" href="{{ \Filament\Facades\Filament::getPanel(\App\Support\Segment::panelId('salon'))->getLoginUrl() }}">Já tenho uma conta ↗</a>
     </nav>
     <main>{{ $slot }}</main>
     @livewireScripts

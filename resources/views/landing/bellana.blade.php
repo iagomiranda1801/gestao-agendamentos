@@ -76,6 +76,7 @@
             <a href="#recursos">Recursos</a>
             <a href="#como-funciona">Como funciona</a>
             <a href="#preco">Planos</a>
+            <a href="{{ \Filament\Facades\Filament::getPanel(\App\Support\Segment::panelId('salon'))->getLoginUrl() }}">Entrar</a>
             <a href="{{ $signupUrl }}" class="btn">Testar grátis</a>
         </div>
     </nav>

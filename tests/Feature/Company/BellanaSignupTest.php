@@ -18,6 +18,7 @@ use App\Support\BellanaLaunchPlan;
 use App\Support\Segment;
 use Database\Seeders\ModulePriceSeeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\URL;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -29,6 +30,8 @@ class BellanaSignupTest extends TestCase
         $this->withoutVite();
         $this->seed(ModulePriceSeeder::class);
         config(['subscriptions.bellana_launch_price_cents' => 7990]);
+        URL::forceRootUrl('http://salao.localhost');
+        request()->headers->set('HOST', 'salao.localhost');
     }
 
     public function test_signup_page_shows_the_launch_offer(): void
@@ -55,7 +58,7 @@ class BellanaSignupTest extends TestCase
             ->assertHasNoErrors();
 
         $company = Company::query()->where('slug', 'studio-bela')->firstOrFail();
-        $component->assertRedirect(Dashboard::getUrl(['tenant' => $company], panel: Segment::panelIdForCompany($company)));
+        $component->assertRedirect(Dashboard::getUrl(['tenant' => $company], panel: Segment::panelId('salon')));
 
         $user = User::query()->where('email', 'carla@bela.test')->firstOrFail();
         $this->assertAuthenticatedAs($user);
@@ -72,6 +75,16 @@ class BellanaSignupTest extends TestCase
         $this->assertTrue($company->schedulingSetting->whatsapp_bot_enabled);
         $this->assertFalse((bool) $company->schedulingSetting->beauty_ai_enabled);
         $this->assertDatabaseCount('platform_invoices', 0);
+    }
+
+    public function test_quick_signup_is_not_available_outside_the_salon_domain(): void
+    {
+        config(['segments.salon.enabled' => false]);
+        $this->get(rtrim((string) config('app.url'), '/').'/bellana/cadastro')->assertNotFound();
+
+        URL::forceRootUrl('http://localhost');
+        request()->headers->set('HOST', 'localhost');
+        Livewire::test(BellanaSignup::class)->assertNotFound();
     }
 
     public function test_invalid_or_duplicate_registration_does_not_create_a_company(): void

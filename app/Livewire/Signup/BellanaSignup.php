@@ -27,8 +27,15 @@ class BellanaSignup extends Component
 
     public string $password = '';
 
+    public function mount(): void
+    {
+        abort_unless(Segment::current() === 'salon', 404);
+    }
+
     public function submit(BellanaSignupService $signup): void
     {
+        abort_unless(Segment::current() === 'salon', 404);
+
         if (Auth::check()) {
             $this->addError('signup', 'Você já está conectada. Acesse seu painel ou saia para criar outra conta.');
 
@@ -74,7 +81,7 @@ class BellanaSignup extends Component
         Auth::login($result['user']);
         session()->regenerate();
 
-        $panelId = Segment::panelIdForCompany($result['company']);
+        $panelId = Segment::panelId('salon');
         Filament::setCurrentPanel($panelId);
         Filament::setTenant($result['company'], isQuiet: true);
 

@@ -12,6 +12,7 @@ use App\Http\Controllers\TattooReceiptController;
 use App\Livewire\PublicBooking\BookingWizard;
 use App\Livewire\PublicBooking\ManageAppointment;
 use App\Livewire\PublicOrders\OrderWizard;
+use App\Livewire\Signup\BellanaSignup;
 use App\Livewire\Signup\CompanySignupWizard;
 use App\Support\Segment;
 use Illuminate\Support\Facades\Route;
@@ -21,9 +22,19 @@ Route::get('/os/orcamento/{token}', [ServiceOrderDocumentController::class, 'quo
 Route::post('/os/orcamento/{token}', [ServiceOrderDocumentController::class, 'decide'])->where('token', '[A-Za-z0-9]{64}')->middleware('throttle:10,1')->name('service-orders.decide');
 Route::get('/os/fotos/{photo}', [ServiceOrderDocumentController::class, 'photo'])->name('service-orders.photo');
 
-foreach (Segment::hosts('salon') as $salonHost) {
-    Route::domain($salonHost)->group(function (): void {
-        Route::redirect('/', '/painel');
+// O domínio principal do salão (SALON_DOMAIN) é a Bellana: landing na raiz e cadastro
+// rápido em /cadastro. Os aliases (SALON_DOMAIN_ALIASES) seguem direto para o painel.
+foreach (Segment::hosts('salon') as $index => $salonHost) {
+    Route::domain($salonHost)->group(function () use ($index): void {
+        if ($index > 0) {
+            Route::redirect('/', '/painel');
+
+            return;
+        }
+
+        Route::view('/', 'landing.bellana')->name('bellana.landing');
+        Route::get('/cadastro', BellanaSignup::class)
+            ->middleware('throttle:5,1')->name('bellana.signup');
     });
 }
 
@@ -35,9 +46,9 @@ Route::domain((string) config('segments.tattoo.domain'))->group(function (): voi
 
 Route::redirect('/', '/admin');
 
-Route::view('/bellana', 'landing.bellana')->name('bellana.landing');
-Route::get('/bellana/cadastro', \App\Livewire\Signup\BellanaSignup::class)
-    ->middleware('throttle:5,1')->name('bellana.signup');
+// Endereços antigos da Bellana, agora no domínio do salão.
+Route::get('/bellana', fn () => Segment::isEnabled('salon') ? redirect()->away(Segment::baseUrl('salon'), 301) : abort(404));
+Route::get('/bellana/cadastro', fn () => Segment::isEnabled('salon') ? redirect()->away(Segment::baseUrl('salon').'/cadastro', 301) : abort(404));
 
 Route::get('/cadastro', CompanySignupWizard::class)
     ->middleware('throttle:5,1')
