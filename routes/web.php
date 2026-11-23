@@ -36,6 +36,8 @@ Route::domain((string) config('segments.tattoo.domain'))->group(function (): voi
 Route::redirect('/', '/admin');
 
 Route::view('/bellana', 'landing.bellana')->name('bellana.landing');
+Route::get('/bellana/cadastro', \App\Livewire\Signup\BellanaSignup::class)
+    ->middleware('throttle:5,1')->name('bellana.signup');
 
 Route::get('/cadastro', CompanySignupWizard::class)
     ->middleware('throttle:5,1')

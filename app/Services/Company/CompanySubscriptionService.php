@@ -9,7 +9,7 @@ use App\Enums\SubscriptionStatus;
 use App\Models\Company;
 use App\Models\ModulePrice;
 use App\Models\PlatformInvoice;
-use App\Support\TattooLaunchPlan;
+use App\Support\LaunchPlans;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -83,13 +83,12 @@ class CompanySubscriptionService
         $modules = app(CompanyModuleService::class)->enabledModules($company);
         $items = $this->quoteItems($modules, $interval);
 
-        if ($company->isTattooStudio()
-            && $company->subscription_plan === TattooLaunchPlan::KEY
+        if (LaunchPlans::appliesTo($company)
             && $company->subscription_price_cents !== null
             && $interval === BillingInterval::Monthly) {
             $items[] = [
-                'module' => 'tattoflow_launch_adjustment',
-                'label' => 'Condição de lançamento TattooFlow',
+                'module' => LaunchPlans::adjustmentModule($company->subscription_plan),
+                'label' => 'Condição de lançamento '.LaunchPlans::name($company->subscription_plan),
                 'price_cents' => $company->subscription_price_cents - (int) collect($items)->sum('price_cents'),
             ];
         }

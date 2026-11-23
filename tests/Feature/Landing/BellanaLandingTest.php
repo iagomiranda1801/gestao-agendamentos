@@ -9,14 +9,16 @@ use Tests\TestCase;
 
 class BellanaLandingTest extends TestCase
 {
-    public function test_bellana_page_links_to_salon_signup(): void
+    public function test_bellana_page_links_to_bellana_signup_with_configured_price(): void
     {
-        config(['services.bellana.whatsapp_url' => null]);
+        config(['services.bellana.whatsapp_url' => null, 'subscriptions.bellana_launch_price_cents' => 8990]);
 
         $this->get(route('bellana.landing'))
             ->assertOk()
             ->assertSee('Bellana')
-            ->assertSee(route('signup.company', ['perfil' => CompanyProfile::Salon->value]), false)
+            ->assertSee(route('bellana.signup'), false)
+            ->assertSee('R$ 89,90')
+            ->assertDontSee('R$ 79,90')
             ->assertDontSee('Falar no WhatsApp')
             ->assertDontSee('mailto:', false)
             ->assertDontSee('ilustrativ');

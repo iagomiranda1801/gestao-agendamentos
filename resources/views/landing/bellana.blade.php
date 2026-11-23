@@ -1,5 +1,6 @@
 @php
-    $signupUrl = route('signup.company', ['perfil' => \App\Enums\CompanyProfile::Salon->value]);
+    $signupUrl = route('bellana.signup');
+    $price = app(\App\Services\Company\CompanySubscriptionService::class)->formatReais(\App\Support\BellanaLaunchPlan::priceCents());
     $whatsappUrl = config('services.bellana.whatsapp_url');
 @endphp
 <!doctype html>
@@ -167,7 +168,7 @@
             <div class="pricebox" style="text-align:left">
                 <span class="pill">Oferta de lançamento</span>
                 <h3 style="margin:18px 0 5px">Bellana • Plano de lançamento</h3>
-                <div class="price">R$ 79,90<small>/mês</small></div>
+                <div class="price">{{ $price }}<small>/mês</small></div>
                 <ul>
                     <li>Agenda por profissional e link de agendamento online</li>
                     <li>Assistente com IA no WhatsApp</li>
@@ -191,7 +192,7 @@
                 <details><summary>Para quem é a Bellana?</summary><p>Para salões de beleza, clínicas de estética e profissionais autônomos do setor de beleza.</p></details>
                 <details><summary>A IA marca horário sozinha?</summary><p>Sim. Ela usa os serviços, as profissionais e os horários que você cadastrou para oferecer só horários livres e criar o agendamento. Se a cliente precisar de uma pessoa, a conversa passa para a sua equipe.</p></details>
                 <details><summary>Preciso de outro número de WhatsApp?</summary><p>Não. Você conecta o WhatsApp do seu negócio e a assistente responde por ele.</p></details>
-                <details><summary>Quanto custa?</summary><p>Na oferta de lançamento, R$ 79,90 por mês, com 7 dias grátis para testar antes.</p></details>
+                <details><summary>Quanto custa?</summary><p>Na oferta de lançamento, {{ $price }} por mês, com 7 dias grátis para testar antes.</p></details>
                 <details><summary>Como começo?</summary><p><a href="{{ $signupUrl }}">Crie sua conta</a> e teste por 7 dias.@if (filled($whatsappUrl)) Se preferir, <a href="{{ $whatsappUrl }}" target="_blank" rel="noopener">fale com a gente no WhatsApp</a>.@endif</p></details>
             </div>
         </div>
