@@ -56,7 +56,9 @@ class CompanySignupWizard extends Component
 
     public function mount(): void
     {
-        $this->businessProfile = $this->segmentProfile() ?? $this->businessProfile;
+        $requestedProfile = CompanyProfile::tryFrom((string) request()->query('perfil', ''))?->value;
+
+        $this->businessProfile = $this->segmentProfile() ?? $requestedProfile ?? $this->businessProfile;
         $this->selectedModules = $this->profileModules($this->businessProfile);
     }
 

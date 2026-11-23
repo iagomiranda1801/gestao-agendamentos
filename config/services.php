@@ -62,6 +62,11 @@ return [
         ],
     ],
 
+    // Botao de WhatsApp da landing Bellana (/bellana). Vazio esconde o botao. Ex.: https://wa.me/5585999999999
+    'bellana' => [
+        'whatsapp_url' => env('BELLANA_WHATSAPP_URL'),
+    ],
+
     'ai' => [
         'timeout' => (int) env('AI_TIMEOUT', 30),
     ],

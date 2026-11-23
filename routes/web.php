@@ -35,6 +35,8 @@ Route::domain((string) config('segments.tattoo.domain'))->group(function (): voi
 
 Route::redirect('/', '/admin');
 
+Route::view('/bellana', 'landing.bellana')->name('bellana.landing');
+
 Route::get('/cadastro', CompanySignupWizard::class)
     ->middleware('throttle:5,1')
     ->name('signup.company');
