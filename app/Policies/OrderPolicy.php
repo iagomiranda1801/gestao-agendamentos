@@ -59,4 +59,36 @@ class OrderPolicy
         return $this->recordBelongsToAccessibleTenant($user, $order->company)
             && $this->userCanManageOrders($user, $order->company);
     }
+
+    public function operateFloor(User $user): bool
+    {
+        return $this->userCanAccessKitchen($user);
+    }
+
+    public function manageFloor(User $user, Order $order): bool
+    {
+        return $order->isFloorOrder()
+            && $order->isOpen()
+            && $this->recordBelongsToAccessibleTenant($user, $order->company)
+            && $this->userCanAccessKitchen($user, $order->company);
+    }
+
+    public function cancelFloor(User $user, Order $order): bool
+    {
+        return $this->manageFloor($user, $order);
+    }
+
+    public function printReceipt(User $user, Order $order): bool
+    {
+        if (! $this->recordBelongsToAccessibleTenant($user, $order->company)) {
+            return false;
+        }
+
+        if ($this->userCanViewOrders($user, $order->company)) {
+            return true;
+        }
+
+        return $order->isFloorOrder()
+            && $this->userCanAccessKitchen($user, $order->company);
+    }
 }

@@ -81,6 +81,11 @@ class CompanyOrderSettingService
             );
         }
 
+        if (array_key_exists('receipt_paper_mm', $data)) {
+            $paper = (int) $data['receipt_paper_mm'];
+            $data['receipt_paper_mm'] = in_array($paper, [58, 80], true) ? $paper : 80;
+        }
+
         foreach (['delivery_fee_cents', 'min_order_cents'] as $centsField) {
             if (array_key_exists($centsField, $data)) {
                 $data[$centsField] = max(0, (int) $data[$centsField]);

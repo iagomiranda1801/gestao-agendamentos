@@ -4,8 +4,10 @@ namespace Tests\Feature\Orders;
 
 use App\Enums\CompanyModule;
 use App\Enums\CompanyRole;
+use App\Filament\App\Pages\FloorServicePage;
 use App\Filament\App\Pages\KitchenDisplayPage;
 use App\Filament\App\Pages\OrderSettingsPage;
+use App\Filament\App\Resources\DiningTables\DiningTableResource;
 use App\Filament\App\Resources\MenuCategories\MenuCategoryResource;
 use App\Filament\App\Resources\OnlineMenus\OnlineMenuResource;
 use App\Filament\App\Resources\Orders\OrderResource;
@@ -32,6 +34,8 @@ class OrderModuleGatingTest extends TestCase
         $this->assertFalse(OnlineMenuResource::canViewAny());
         $this->assertFalse(MenuCategoryResource::canViewAny());
         $this->assertFalse(KitchenDisplayPage::canAccess());
+        $this->assertFalse(FloorServicePage::canAccess());
+        $this->assertFalse(DiningTableResource::canViewAny());
         $this->assertFalse(OrderSettingsPage::canAccess());
     }
 
@@ -48,6 +52,9 @@ class OrderModuleGatingTest extends TestCase
         $this->assertTrue(OnlineMenuResource::canViewAny());
         $this->assertTrue(MenuCategoryResource::canViewAny());
         $this->assertTrue(KitchenDisplayPage::canAccess());
+        $this->assertTrue(FloorServicePage::canAccess());
+        $this->assertTrue(DiningTableResource::canViewAny());
+        $this->assertTrue(DiningTableResource::shouldRegisterNavigation());
         $this->assertTrue(OrderSettingsPage::canAccess());
     }
 
@@ -60,6 +67,8 @@ class OrderModuleGatingTest extends TestCase
         Filament::setCurrentPanel('app');
 
         $this->assertTrue(KitchenDisplayPage::canAccess());
+        $this->assertTrue(FloorServicePage::canAccess());
+        $this->assertFalse(DiningTableResource::canViewAny());
         $this->assertFalse(OrderSettingsPage::canAccess());
         $this->assertFalse(OrderResource::canViewAny());
         $this->assertFalse(MenuCategoryResource::canViewAny());
@@ -75,6 +84,8 @@ class OrderModuleGatingTest extends TestCase
         Filament::setCurrentPanel('app');
 
         $this->assertTrue(KitchenDisplayPage::canAccess());
+        $this->assertTrue(FloorServicePage::canAccess());
+        $this->assertFalse(DiningTableResource::canViewAny());
         $this->assertTrue(OrderResource::canViewAny());
         $this->assertTrue(OrderResource::shouldRegisterNavigation());
         $this->assertFalse(OrderSettingsPage::canAccess());

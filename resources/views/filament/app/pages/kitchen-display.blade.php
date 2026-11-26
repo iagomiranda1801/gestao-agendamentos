@@ -256,6 +256,9 @@
                     @if (filled($order->kitchenFulfillmentDetail()))
                         <p class="kitchen-card__notes">{{ $order->kitchenFulfillmentDetail() }}</p>
                     @endif
+                    @if ($order->isFloorOrder() && ! $order->canAdvance() && $order->status === OrderStatus::Ready)
+                        <p class="kitchen-card__notes">Feche a conta na tela de Comandas.</p>
+                    @endif
                     <div class="kitchen-card__actions">
                         @if ($order->canAdvance() && auth()->user()?->can('advance', $order))
                             <x-filament::button

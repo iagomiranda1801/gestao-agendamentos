@@ -19,6 +19,20 @@ class ViewOrder extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('receipt')
+                ->label('Imprimir cupom')
+                ->icon('heroicon-o-printer')
+                ->url(function (Order $record): string {
+                    /** @var Company $company */
+                    $company = Filament::getTenant();
+
+                    return route('orders.receipt', [
+                        'company' => $company,
+                        'order' => $record,
+                    ]);
+                })
+                ->openUrlInNewTab()
+                ->visible(fn (Order $record): bool => auth()->user()?->can('printReceipt', $record) ?? false),
             Action::make('advance')
                 ->label(fn (Order $record): string => $record->nextStatus()?->label() ?? 'Avançar')
                 ->visible(fn (Order $record): bool => $record->canAdvance() && (auth()->user()?->can('advance', $record) ?? false))

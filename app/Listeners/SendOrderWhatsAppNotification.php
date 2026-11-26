@@ -11,6 +11,10 @@ class SendOrderWhatsAppNotification
 {
     public function handle(OrderCreated|OrderStatusChanged $event): void
     {
+        if ($event->order->isFloorOrder()) {
+            return;
+        }
+
         $status = $event instanceof OrderCreated
             ? OrderStatus::Received
             : $event->to;

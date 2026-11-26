@@ -7,6 +7,7 @@ use App\Enums\OrderFulfillment;
 use App\Enums\OrderStatus;
 use App\Filament\App\Pages\KitchenDisplayPage;
 use App\Filament\App\Resources\Orders\Pages\ListOrders;
+use App\Models\DiningTable;
 use App\Models\Order;
 use App\Services\Orders\CompanyOrderSettingService;
 use App\Services\Orders\OrderService;
@@ -302,7 +303,11 @@ class KitchenDisplayTest extends TestCase
             'customer_name' => 'Cliente Local',
             'customer_phone' => '34988887773',
         ]);
-        $dineIn->forceFill(['table_id' => 4])->save();
+        $table = DiningTable::factory()->forCompany($setup['company'])->create([
+            'number' => 4,
+            'name' => null,
+        ]);
+        $dineIn->forceFill(['table_id' => $table->getKey()])->save();
 
         $completed = $service->createPublic($setup['company'], [
             'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],

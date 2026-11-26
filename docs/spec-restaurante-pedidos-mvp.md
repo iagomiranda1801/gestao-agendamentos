@@ -1,11 +1,11 @@
 # Especificação — Pedidos para restaurante (MVP)
 
 **Status:** implementada  
-**Versão:** 1.4  
-**Data:** 14/09/2026  
+**Versão:** 1.5  
+**Data:** 26/11/2026  
 **Produto:** Agendaqui
 
-> Primeira versão para um cliente piloto de restaurante/food service. Mesas, garçom, iFood, modificadores complexos e multi-cozinha ficam fora deste MVP.
+> Primeira versão para um cliente piloto de restaurante/food service. iFood, modificadores complexos e multi-cozinha ficam fora deste MVP. Comandas presenciais por mesa e cupom não fiscal entraram na versão 1.5.
 
 ## 1. Objetivo
 
@@ -24,10 +24,10 @@ O módulo é vendável no mesmo padrão de cobrança dos demais (`CompanyModule`
 1. Novo perfil `CompanyProfile::Restaurant` (`restaurant`), rótulo **Restaurante ou food service**. Módulos padrão: Pedidos + WhatsApp. Financeiro, Vendas e Estoque são opcionais.
 2. Novo módulo `CompanyModule::Orders` (`orders`), rótulo **Pedidos**. Preço de entrada: R$ 49 / mês (semestral ×5, anual ×10).
 3. Rota pública própria: `/pedir/{slug}`. Não reutiliza `/agendar/{slug}`.
-4. Entidade central é `Order` (comanda), não `Appointment`. Totais ficam no próprio pedido. Ao concluir, se o módulo **Vendas** estiver ativo, o pedido gera uma `Sale` e preenche `orders.sale_id`. `table_id` permanece nulo neste MVP.
+4. Entidade central é `Order` (comanda), não `Appointment`. Totais ficam no próprio pedido. Ao concluir, se o módulo **Vendas** estiver ativo, o pedido gera uma `Sale` e preenche `orders.sale_id`. Pedido online continua com `table_id` nulo. Comanda presencial grava `table_id` na mesa e `channel = floor`.
 5. Tela da cozinha é página Filament/Livewire sempre aberta, com polling de 4s.
 6. Sem gateway de pagamento: o cliente paga na retirada, na entrega ou no local.
-7. UI de mesas fica de fora. Pedidos `dine_in` entram pelo link público quando `dine_in_enabled` está ligado; `table_id` permanece nulo (sem mapa, reserva ou atribuição de mesa).
+7. Pedidos `dine_in` do link público continuam sem mesa quando `dine_in_enabled` está ligado. A comanda presencial é outra superfície (`/app/empresa/{slug}/comandas`) e não depende desse interruptor.
 
 ## 3. Status do pedido
 
@@ -106,8 +106,8 @@ Empresas que não são restaurante (salão, clínica, etc.) continuam no bot de 
 
 ## 8. Fora do escopo (fase B)
 
-- mapa de mesas, reserva de mesa e atribuição de `table_id`
-- garçom / comanda presencial
+- transferir ou juntar mesas e dividir a conta
+- reserva de mesa
 - iFood e outros marketplaces
 - modificadores/adicionais complexos (além de tamanhos/preço por tamanho)
 - regras de combo, meio-a-meio
@@ -117,11 +117,11 @@ Empresas que não são restaurante (salão, clínica, etc.) continuam no bot de 
 
 ## 9. Venda na conclusão
 
-A criação da venda acontece **somente** em `OrderService::transition` ao entrar em `completed` (cozinha e histórico usam o mesmo caminho).
+No pedido online, a venda nasce em `OrderService::transition` ao entrar em `completed` (cozinha e histórico usam o mesmo caminho). A comanda presencial conclui em `FloorOrderService::close`, que chama o mesmo `OrderSaleService`.
 
 | Condição | Efeito |
 |---|---|
-| Módulo **Vendas** (`sales`) ativo | Cria `Sale` + itens, liga `orders.sale_id`, origem `online_order` (“Pedido online”). Sem pagamentos: conta a receber em aberto (cliente paga na retirada, na entrega ou no local). |
+| Módulo **Vendas** (`sales`) ativo | Cria `Sale` + itens e liga `orders.sale_id`. Pedido online usa origem `online_order` (“Pedido online”), sem pagamentos: conta a receber em aberto. Comanda presencial usa origem `floor_order` (“Comanda”). |
 | Vendas **não** ativo | Pedido conclui normalmente; `sale_id` fica nulo; nenhum erro. |
 | Pedido já tem `sale_id` (ou `sales.reference_key` = `order:{id}`) | Não cria segunda venda. Reconcluir `completed → completed` é no-op idempotente. |
 | Retirada, entrega e comer no local | Mesmo tratamento financeiro. Taxa de entrega vira item avulso “Taxa de entrega” (só na entrega). |
@@ -130,4 +130,22 @@ A criação da venda acontece **somente** em `OrderService::transition` ao entra
 | Financeiro (`finance`) | Não é gate extra. O `SaleService` já abre o recebível como nas demais vendas do PDV. Caixa/ledger de entrada só quando alguém registrar o pagamento na conta a receber. |
 | Estoque | Sem caminho novo. Cardápio online nasce com `tracks_stock = false`. Se o produto controla estoque, vale a regra já existente do PDV (saldo insuficiente **impede** a conclusão). |
 | Sem usuário autenticado na transição | A conclusão do pedido não falha; a venda é adiada até uma transição idempotente com usuário (a cozinha sempre tem usuário). |
-| Configuração “exigir pagamento na finalização” do PDV | Pedido online ignora essa trava (`allow_unpaid`): o combinado do MVP é pagar na retirada, na entrega ou no local. |
+| Configuração “exigir pagamento na finalização” do PDV | Pedido online ignora essa trava (`allow_unpaid`): o combinado do MVP é pagar na retirada, na entrega ou no local. Comanda presencial grava a forma de pagamento no pedido. Se existir conta financeira padrão de recebimento, a venda já nasce paga nela; sem essa conta, a venda fica em aberto e o cupom ainda mostra a forma escolhida. |
+
+## 10. Comandas por mesa (presencial)
+
+Cadastro por empresa em **Cadastro de mesas** (`dining_tables`: número único, nome opcional, ordem, ativa). Quem gerencia pedidos (admin/gerente) cadastra. Quem opera a cozinha (incluindo recepção e colaborador) usa a tela **Comandas**.
+
+- Uma mesa ativa tem no máximo uma comanda aberta (`orders.channel = floor`, `fulfillment = dine_in`, status não terminal).
+- Abrir a comanda não exige telefone. O nome do cliente é opcional; sem nome, a comanda usa o rótulo da mesa.
+- Itens saem do cadastro de produtos de venda (não só do cardápio online), com quantidade, observação e tamanho quando o produto tem variante. O preço é o snapshot da hora do lançamento.
+- Enquanto a comanda está aberta, dá para lançar e remover itens. Item novo em comanda já “pronta” ou “preparando” volta o pedido para **Recebido**, para a cozinha ver a nova leva.
+- A cozinha mostra “Mesa N” (ou “Mesa N — nome”) e pode avançar até **Pronto**. Quem fecha a conta é a tela de comandas, com forma de pagamento. Fechar conclui o pedido, gera a venda pelo fluxo já existente e libera a mesa.
+- Cancelar a comanda também libera a mesa. Com itens, o motivo é obrigatório.
+- Comanda vazia não aparece na cozinha e não pode ser fechada como conta.
+
+## 11. Cupom não fiscal
+
+Rota autenticada `/app/empresa/{slug}/pedidos/{order}/cupom`, impressão pelo navegador (`window.print`), sem QZ Tray nem ESC/POS. Largura 80 mm ou 58 mm em **Configurações de pedidos** (`receipt_paper_mm`).
+
+O cupom traz nome e documento da empresa, mesa, data/hora no fuso da empresa, itens, quantidades, valores, total, forma de pagamento e o aviso **Cupom não fiscal**. Comanda ainda aberta imprime a conferência (“ainda não paga”). Dá para imprimir antes de fechar, ao fechar (a tela abre o cupom) e de novo no histórico do pedido. NFC-e continua fora.

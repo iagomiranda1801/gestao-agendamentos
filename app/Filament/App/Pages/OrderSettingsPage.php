@@ -13,6 +13,7 @@ use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -80,6 +81,7 @@ class OrderSettingsPage extends Page
             'page_description' => $setting->page_description,
             'confirmation_message' => $setting->confirmation_message,
             'primary_color' => $setting->primary_color,
+            'receipt_paper_mm' => $setting->receiptPaperMm(),
         ]);
     }
 
@@ -106,7 +108,7 @@ class OrderSettingsPage extends Page
                     ->label('Permitir entrega'),
                 Toggle::make('dine_in_enabled')
                     ->label('Comer no local')
-                    ->helperText('Aceitar pedidos para consumo no local. Sem escolha de mesa.')
+                    ->helperText('Aceitar pedidos online para consumo no local. As comandas do salão ficam na tela Comandas.')
                     ->columnSpanFull(),
                 TextInput::make('delivery_fee_reais')
                     ->label('Taxa de entrega')
@@ -148,6 +150,18 @@ class OrderSettingsPage extends Page
                     ->rows(3)
                     ->columnSpanFull(),
             ])->columns(2),
+            Section::make('Cupom não fiscal')->schema([
+                Select::make('receipt_paper_mm')
+                    ->label('Largura do papel')
+                    ->options([
+                        80 => '80 mm',
+                        58 => '58 mm',
+                    ])
+                    ->default(80)
+                    ->required()
+                    ->native(false)
+                    ->helperText('Impressão pelo navegador, na térmica instalada no Windows. O cupom não tem valor fiscal.'),
+            ]),
         ]);
     }
 
@@ -171,6 +185,7 @@ class OrderSettingsPage extends Page
             'page_description' => $state['page_description'] ?? null,
             'confirmation_message' => $state['confirmation_message'] ?? null,
             'primary_color' => $state['primary_color'] ?? null,
+            'receipt_paper_mm' => (int) ($state['receipt_paper_mm'] ?? 80),
         ]);
 
         Notification::make()->success()->title('Configurações de pedidos salvas')->send();

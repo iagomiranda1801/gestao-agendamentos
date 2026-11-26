@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Enums\OrderChannel;
 use App\Enums\OrderFulfillment;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
 use App\Support\Money;
 use Database\Factories\OrderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,6 +21,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'idempotency_key',
     'status',
     'fulfillment',
+    'channel',
+    'payment_method',
     'customer_name',
     'customer_phone',
     'customer_phone_normalized',
@@ -56,6 +61,8 @@ class Order extends Model
             'number' => 'integer',
             'status' => OrderStatus::class,
             'fulfillment' => OrderFulfillment::class,
+            'channel' => OrderChannel::class,
+            'payment_method' => PaymentMethod::class,
             'subtotal_cents' => 'integer',
             'delivery_fee_cents' => 'integer',
             'total_cents' => 'integer',
@@ -100,6 +107,55 @@ class Order extends Model
     public function sale(): BelongsTo
     {
         return $this->belongsTo(Sale::class);
+    }
+
+    /**
+     * @return BelongsTo<DiningTable, $this>
+     */
+    public function diningTable(): BelongsTo
+    {
+        return $this->belongsTo(DiningTable::class, 'table_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function openedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'opened_by_user_id');
+    }
+
+    /**
+     * @param  Builder<Order>  $query
+     * @return Builder<Order>
+     */
+    public function scopeOpen(Builder $query): Builder
+    {
+        return $query->whereNotIn('status', [
+            OrderStatus::Completed->value,
+            OrderStatus::Cancelled->value,
+        ]);
+    }
+
+    public function isFloorOrder(): bool
+    {
+        return $this->channel === OrderChannel::Floor;
+    }
+
+    public function isOpen(): bool
+    {
+        return $this->status !== null && ! $this->status->isTerminal();
+    }
+
+    public function diningTableLabel(): ?string
+    {
+        if ($this->table_id === null) {
+            return null;
+        }
+
+        $table = $this->diningTable;
+
+        return $table?->displayLabel() ?? ('Mesa '.$this->table_id);
     }
 
     public function formattedTotal(): string
@@ -147,14 +203,20 @@ class Order extends Model
     {
         return match ($this->fulfillment) {
             OrderFulfillment::Delivery => $this->shortDeliveryAddress(),
-            OrderFulfillment::DineIn => $this->table_id ? 'Mesa '.$this->table_id : null,
+            OrderFulfillment::DineIn => $this->diningTableLabel(),
             default => null,
         };
     }
 
     public function nextStatus(): ?OrderStatus
     {
-        return $this->status?->next($this->fulfillment);
+        $next = $this->status?->next($this->fulfillment);
+
+        if ($this->isFloorOrder() && $next === OrderStatus::Completed) {
+            return null;
+        }
+
+        return $next;
     }
 
     public function canAdvance(): bool

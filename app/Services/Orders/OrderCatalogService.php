@@ -2,6 +2,7 @@
 
 namespace App\Services\Orders;
 
+use App\Enums\ProductType;
 use App\Models\Company;
 use App\Models\MenuCategory;
 use App\Models\Product;
@@ -79,6 +80,33 @@ class OrderCatalogService
         }
 
         return 'Sem categoria';
+    }
+
+    /**
+     * Produtos de venda ativos do cadastro, inclusive fora do cardápio online.
+     *
+     * @return Collection<int, Product>
+     */
+    public function sellableProducts(Company $company): Collection
+    {
+        return Product::query()
+            ->where('company_id', $company->getKey())
+            ->active()
+            ->where('type', ProductType::Sale->value)
+            ->with('activeVariants')
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function findSellable(Company $company, int $productId): ?Product
+    {
+        return Product::query()
+            ->where('company_id', $company->getKey())
+            ->active()
+            ->where('type', ProductType::Sale->value)
+            ->with('activeVariants')
+            ->whereKey($productId)
+            ->first();
     }
 
     public function findAvailable(Company $company, int $productId): ?Product
