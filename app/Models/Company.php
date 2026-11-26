@@ -134,6 +134,34 @@ class Company extends Model
         return $this->business_profile === CompanyProfile::Restaurant;
     }
 
+    public function formattedDocument(): ?string
+    {
+        $raw = trim((string) $this->document);
+
+        if ($raw === '') {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $raw) ?? '';
+
+        if (strlen($digits) === 14) {
+            return substr($digits, 0, 2).'.'
+                .substr($digits, 2, 3).'.'
+                .substr($digits, 5, 3).'/'
+                .substr($digits, 8, 4).'-'
+                .substr($digits, 12, 2);
+        }
+
+        if (strlen($digits) === 11) {
+            return substr($digits, 0, 3).'.'
+                .substr($digits, 3, 3).'.'
+                .substr($digits, 6, 3).'-'
+                .substr($digits, 9, 2);
+        }
+
+        return $raw;
+    }
+
     public function isTattooStudio(): bool
     {
         return $this->business_profile === CompanyProfile::TattooStudio;
@@ -281,6 +309,14 @@ class Company extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    /**
+     * @return HasMany<DiningTable, $this>
+     */
+    public function diningTables(): HasMany
+    {
+        return $this->hasMany(DiningTable::class);
     }
 
     public function dentalClinicSetting(): HasOne

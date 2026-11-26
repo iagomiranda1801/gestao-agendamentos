@@ -2,8 +2,10 @@
 
 namespace App\Filament\App\Resources\Orders\Schemas;
 
+use App\Enums\OrderChannel;
 use App\Enums\OrderFulfillment;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
 use App\Models\Company;
 use App\Models\Order;
 use App\Support\CompanyDateTime;
@@ -31,6 +33,17 @@ class OrderInfolist
                 TextEntry::make('fulfillment')
                     ->label('Tipo')
                     ->formatStateUsing(fn (OrderFulfillment $state): string => $state->label()),
+                TextEntry::make('channel')
+                    ->label('Origem')
+                    ->formatStateUsing(fn (?OrderChannel $state): string => $state?->label() ?? 'Pedido online'),
+                TextEntry::make('table_id')
+                    ->label('Mesa')
+                    ->placeholder('—')
+                    ->state(fn (Order $record): ?string => $record->diningTableLabel()),
+                TextEntry::make('payment_method')
+                    ->label('Pagamento')
+                    ->placeholder('—')
+                    ->formatStateUsing(fn (?PaymentMethod $state): string => $state?->label() ?? '—'),
                 TextEntry::make('created_at')
                     ->label('Recebido em')
                     ->state(function (Order $record): string {

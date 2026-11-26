@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'page_description',
     'confirmation_message',
     'primary_color',
+    'receipt_paper_mm',
 ])]
 class CompanyOrderSetting extends Model
 {
@@ -44,6 +45,7 @@ class CompanyOrderSetting extends Model
             'min_order_cents' => 'integer',
             'orders_whatsapp_notify' => 'boolean',
             'whatsapp_order_link_bot_enabled' => 'boolean',
+            'receipt_paper_mm' => 'integer',
         ];
     }
 
@@ -53,5 +55,12 @@ class CompanyOrderSetting extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function receiptPaperMm(): int
+    {
+        return in_array((int) $this->receipt_paper_mm, [58, 80], true)
+            ? (int) $this->receipt_paper_mm
+            : 80;
     }
 }

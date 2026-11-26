@@ -2,11 +2,14 @@
 
 namespace App\Services\Orders;
 
+use App\DataTransferObjects\Financial\PaymentData;
 use App\Enums\CompanyModule;
+use App\Enums\PaymentMethod;
 use App\Enums\ProductType;
 use App\Enums\SaleItemType;
 use App\Enums\SaleOrigin;
 use App\Models\Company;
+use App\Models\FinancialAccount;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Sale;
@@ -60,16 +63,18 @@ class OrderSaleService
             return $existing;
         }
 
-        $order->loadMissing(['items.product']);
+        $order->loadMissing(['items.product', 'diningTable']);
+
+        $payments = $order->isFloorOrder() ? $this->floorPayments($company, $order) : [];
 
         $sale = $this->sales->complete($company, $user, [
-            'origin' => SaleOrigin::OnlineOrder->value,
+            'origin' => $order->isFloorOrder() ? SaleOrigin::FloorOrder->value : SaleOrigin::OnlineOrder->value,
             'reference_key' => $referenceKey,
-            'allow_unpaid' => true,
+            'allow_unpaid' => $payments === [],
             'sold_at' => $order->completed_at ?? now(),
             'notes' => $this->saleNotes($order),
             'items' => $this->saleItems($order),
-            'payments' => [],
+            'payments' => $payments,
         ]);
 
         $order->forceFill(['sale_id' => $sale->getKey()])->save();
@@ -125,8 +130,58 @@ class OrderSaleService
         return $items;
     }
 
+    /**
+     * @return list<PaymentData>
+     */
+    protected function floorPayments(Company $company, Order $order): array
+    {
+        $method = $order->payment_method instanceof PaymentMethod
+            ? $order->payment_method
+            : PaymentMethod::tryFrom((string) $order->payment_method);
+
+        if ($method === null || (int) $order->total_cents < 1) {
+            return [];
+        }
+
+        $account = FinancialAccount::query()
+            ->where('company_id', $company->getKey())
+            ->where('is_active', true)
+            ->where('is_default_receipt_account', true)
+            ->first();
+
+        if ($account === null) {
+            return [];
+        }
+
+        return [
+            new PaymentData(
+                amount: Money::fromCents((int) $order->total_cents),
+                feeAmount: '0.00',
+                method: $method,
+                paidAt: $order->completed_at ?? now(),
+                financialAccountId: (int) $account->getKey(),
+                notes: 'Comanda '.$order->displayNumber(),
+            ),
+        ];
+    }
+
     protected function saleNotes(Order $order): string
     {
+        if ($order->isFloorOrder()) {
+            $lines = array_filter([
+                'Comanda '.$order->displayNumber().' ('.$order->public_code.')',
+                $order->diningTableLabel(),
+                $order->customer_name,
+                $order->payment_method?->label(),
+            ]);
+
+            if (filled($order->notes)) {
+                $lines[] = (string) $order->notes;
+            }
+
+            return implode("\n", $lines);
+        }
+
         $lines = [
             'Pedido online '.$order->displayNumber().' ('.$order->public_code.')',
             $order->fulfillment?->label().' — '.$order->customer_name.' — '.$order->customer_phone,

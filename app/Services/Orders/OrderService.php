@@ -3,6 +3,7 @@
 namespace App\Services\Orders;
 
 use App\Enums\CompanyModule;
+use App\Enums\OrderChannel;
 use App\Enums\OrderFulfillment;
 use App\Enums\OrderStatus;
 use App\Events\OrderCreated;
@@ -392,6 +393,7 @@ class OrderService
                         'idempotency_key' => $idempotencyKey,
                         'status' => OrderStatus::Received,
                         'fulfillment' => $fulfillment,
+                        'channel' => OrderChannel::Online,
                         'customer_name' => $customerName,
                         'customer_phone' => $phone,
                         'customer_phone_normalized' => $phoneNormalized,

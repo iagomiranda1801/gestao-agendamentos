@@ -313,7 +313,8 @@ class KitchenDisplayPage extends Page
                 fn (OrderStatus $status): string => $status->value,
                 OrderStatus::kitchenColumns(),
             ))
-            ->with('items')
+            ->whereHas('items')
+            ->with(['items', 'diningTable'])
             ->orderBy('created_at')
             ->get();
     }

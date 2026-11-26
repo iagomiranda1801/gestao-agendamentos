@@ -3,6 +3,7 @@
 use App\Http\Controllers\AsaasWebhookController;
 use App\Http\Controllers\CompanyLogoController;
 use App\Http\Controllers\EvolutionWebhookController;
+use App\Http\Controllers\OrderReceiptController;
 use App\Http\Controllers\PrintDentalTreatmentPlanController;
 use App\Http\Controllers\PwaController;
 use App\Http\Controllers\ServiceOrderDocumentController;
@@ -14,6 +15,7 @@ use App\Livewire\PublicBooking\ManageAppointment;
 use App\Livewire\PublicOrders\OrderWizard;
 use App\Livewire\Signup\BellanaSignup;
 use App\Livewire\Signup\CompanySignupWizard;
+use App\Livewire\Signup\TattooSignup;
 use App\Support\Segment;
 use Illuminate\Support\Facades\Route;
 
@@ -40,7 +42,7 @@ foreach (Segment::hosts('salon') as $index => $salonHost) {
 
 Route::domain((string) config('segments.tattoo.domain'))->group(function (): void {
     Route::view('/', 'landing.tattoo')->name('tattoo.landing');
-    Route::get('/cadastro', \App\Livewire\Signup\TattooSignup::class)
+    Route::get('/cadastro', TattooSignup::class)
         ->middleware('throttle:5,1')->name('tattoo.signup');
 });
 
@@ -75,6 +77,11 @@ Route::post('/webhooks/asaas/{company:slug}/fiscal-sandbox', [AsaasWebhookContro
 Route::get('/app/empresa/{company:slug}/clinico/planos/{plan}/imprimir', PrintDentalTreatmentPlanController::class)
     ->middleware('auth')
     ->name('dental.treatment-plan.print');
+
+Route::get('/app/empresa/{company:slug}/pedidos/{order}/cupom', OrderReceiptController::class)
+    ->middleware('auth')
+    ->scopeBindings()
+    ->name('orders.receipt');
 
 Route::get('/app/empresa/{company:slug}/tatuagem/fotos/{image}', TattooImageController::class)
     ->middleware('auth')

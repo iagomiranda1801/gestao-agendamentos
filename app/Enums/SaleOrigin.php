@@ -9,6 +9,7 @@ enum SaleOrigin: string
     case QuickSale = 'quick_sale';
     case AttendanceCheckout = 'attendance_checkout';
     case OnlineOrder = 'online_order';
+    case FloorOrder = 'floor_order';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum SaleOrigin: string
             self::QuickSale => 'Venda rápida',
             self::AttendanceCheckout => 'Checkout de atendimento',
             self::OnlineOrder => 'Pedido online',
+            self::FloorOrder => 'Comanda',
         };
     }
 

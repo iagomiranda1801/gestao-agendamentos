@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Order;
 use App\Support\CompanyDateTime;
 use App\Support\Money;
+use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
@@ -40,6 +41,10 @@ class OrdersTable
                     ->label('Tipo')
                     ->badge()
                     ->formatStateUsing(fn (OrderFulfillment $state): string => $state->label()),
+                TextColumn::make('table_id')
+                    ->label('Mesa')
+                    ->placeholder('—')
+                    ->formatStateUsing(fn (Order $record): string => $record->diningTableLabel() ?? '—'),
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
@@ -83,6 +88,20 @@ class OrdersTable
             ->defaultSort('created_at', 'desc')
             ->recordActions([
                 ViewAction::make(),
+                Action::make('receipt')
+                    ->label('Cupom')
+                    ->icon('heroicon-o-printer')
+                    ->url(function (Order $record): string {
+                        /** @var Company $company */
+                        $company = Filament::getTenant();
+
+                        return route('orders.receipt', [
+                            'company' => $company,
+                            'order' => $record,
+                        ]);
+                    })
+                    ->openUrlInNewTab()
+                    ->visible(fn (Order $record): bool => auth()->user()?->can('printReceipt', $record) ?? false),
             ])
             ->searchable();
     }
