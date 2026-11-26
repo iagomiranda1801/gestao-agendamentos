@@ -11,6 +11,7 @@ use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
@@ -21,6 +22,11 @@ class ServicesTable
     {
         return $table
             ->columns([
+                ImageColumn::make('image_path')
+                    ->label('Foto')
+                    ->disk('public')
+                    ->circular()
+                    ->toggleable(),
                 TextColumn::make('sort_order')
                     ->label('Ordem')
                     ->sortable(),

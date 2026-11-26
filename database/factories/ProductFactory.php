@@ -30,6 +30,7 @@ class ProductFactory extends Factory
             'barcode' => null,
             'type' => ProductType::Consumable,
             'description' => fake()->optional()->sentence(),
+            'image_path' => null,
             'reference_unit_cost' => fake()->randomFloat(6, 0.01, 100),
             'sale_price' => fake()->randomFloat(2, 1, 200),
             'minimum_stock' => fake()->randomFloat(4, 0, 50),

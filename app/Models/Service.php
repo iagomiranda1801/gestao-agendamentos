@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicImage;
 use Database\Factories\ServiceFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,6 +17,7 @@ use Illuminate\Support\Str;
     'name',
     'slug',
     'description',
+    'image_path',
     'price',
     'duration_minutes',
     'buffer_before_minutes',
@@ -33,12 +35,19 @@ class Service extends Model
     /** @use HasFactory<ServiceFactory> */
     use HasFactory;
 
+    use HasPublicImage;
+
     /**
      * @var list<string>
      */
     protected $guarded = [
         'company_id',
     ];
+
+    public static function publicImageDirectoryPrefix(): string
+    {
+        return 'services';
+    }
 
     protected static function booted(): void
     {

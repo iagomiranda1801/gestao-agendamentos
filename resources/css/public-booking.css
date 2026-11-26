@@ -555,6 +555,15 @@ body.booking-body {
     color: var(--booking-primary);
 }
 
+.booking-service-card__photo {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+    border-radius: 0.5rem;
+    background: #f1f5f9;
+}
+
 /* Professional list */
 
 .booking-option-list {
@@ -1080,6 +1089,20 @@ body.booking-body {
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
+}
+
+.booking-option__photo {
+    width: 4.5rem;
+    height: 4.5rem;
+    object-fit: cover;
+    border-radius: 0.625rem;
+    flex-shrink: 0;
+    background: #f1f5f9;
+}
+
+.booking-option__content {
+    flex: 1;
+    min-width: 0;
 }
 
 .order-carted-size {

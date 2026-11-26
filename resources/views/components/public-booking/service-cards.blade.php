@@ -39,6 +39,14 @@
                 aria-hidden="true"
             ></span>
 
+            @if ($service->imageUrl())
+                <img
+                    src="{{ e($service->imageUrl()) }}"
+                    alt=""
+                    class="booking-service-card__photo"
+                >
+            @endif
+
             <h3 class="booking-service-card__name">{{ e($service->name) }}</h3>
 
             @if (filled($service->description))

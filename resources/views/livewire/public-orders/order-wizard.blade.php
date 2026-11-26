@@ -61,6 +61,13 @@
                                 @endphp
                                 <div class="booking-option booking-option--menu" wire:key="menu-{{ $product->getKey() }}">
                                     <div class="booking-option__row">
+                                        @if ($product->imageUrl())
+                                            <img
+                                                src="{{ e($product->imageUrl()) }}"
+                                                alt=""
+                                                class="booking-option__photo"
+                                            >
+                                        @endif
                                         <div class="booking-option__content">
                                             <p class="booking-option__title">{{ e($product->name) }}</p>
                                             @if (filled($product->description))

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ProductType;
+use App\Models\Concerns\HasPublicImage;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'barcode',
     'type',
     'description',
+    'image_path',
     'reference_unit_cost',
     'sale_price',
     'minimum_stock',
@@ -35,6 +37,8 @@ class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */
     use HasFactory;
+
+    use HasPublicImage;
 
     /**
      * @var list<string>
@@ -59,6 +63,11 @@ class Product extends Model
             'prep_time_minutes' => 'integer',
             'is_active' => 'boolean',
         ];
+    }
+
+    public static function publicImageDirectoryPrefix(): string
+    {
+        return 'products';
     }
 
     /**

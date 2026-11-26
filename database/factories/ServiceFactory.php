@@ -26,6 +26,7 @@ class ServiceFactory extends Factory
             'name' => ucfirst($name),
             'slug' => Str::slug($name),
             'description' => fake()->optional()->sentence(),
+            'image_path' => null,
             'price' => fake()->randomFloat(2, 25, 200),
             'duration_minutes' => fake()->numberBetween(15, 120),
             'color' => fake()->optional()->hexColor(),

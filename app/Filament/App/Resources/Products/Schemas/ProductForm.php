@@ -7,8 +7,10 @@ use App\Enums\ProductType;
 use App\Filament\App\Resources\OnlineMenus\Schemas\OnlineMenuFields;
 use App\Models\Company;
 use App\Models\MeasurementUnit;
+use App\Models\Product;
 use App\Services\Company\CompanyModuleService;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -64,6 +66,24 @@ class ProductForm
                         Textarea::make('description')
                             ->label('Descrição')
                             ->rows(3)
+                            ->columnSpanFull(),
+                        FileUpload::make('image_path')
+                            ->label('Foto')
+                            ->helperText('Opcional. JPEG, PNG ou WebP até 2 MB.')
+                            ->disk('public')
+                            ->directory(function (): string {
+                                $company = Filament::getTenant();
+
+                                return Product::publicImageDirectory(
+                                    $company instanceof Company ? (int) $company->getKey() : 0,
+                                );
+                            })
+                            ->visibility('public')
+                            ->image()
+                            ->imageEditor()
+                            ->imagePreviewHeight('160')
+                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                            ->maxSize(2048)
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
