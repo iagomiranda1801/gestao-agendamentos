@@ -84,6 +84,22 @@ enum OrderStatus: string
     }
 
     /**
+     * @return list<self>
+     */
+    public static function visibleKitchenColumns(?OrderFulfillment $fulfillment = null): array
+    {
+        if ($fulfillment !== null && $fulfillment !== OrderFulfillment::Delivery) {
+            return [
+                self::Received,
+                self::Preparing,
+                self::Ready,
+            ];
+        }
+
+        return self::kitchenColumns();
+    }
+
+    /**
      * @return array<string, string>
      */
     public static function options(): array

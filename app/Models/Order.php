@@ -129,6 +129,29 @@ class Order extends Model
         return $parts === [] ? null : implode(', ', $parts);
     }
 
+    public function shortDeliveryAddress(): ?string
+    {
+        $parts = array_filter([
+            $this->delivery_address,
+            $this->delivery_neighborhood,
+        ], fn (?string $part): bool => filled($part));
+
+        if ($parts !== []) {
+            return implode(', ', $parts);
+        }
+
+        return $this->formattedDeliveryAddress();
+    }
+
+    public function kitchenFulfillmentDetail(): ?string
+    {
+        return match ($this->fulfillment) {
+            OrderFulfillment::Delivery => $this->shortDeliveryAddress(),
+            OrderFulfillment::DineIn => $this->table_id ? 'Mesa '.$this->table_id : null,
+            default => null,
+        };
+    }
+
     public function nextStatus(): ?OrderStatus
     {
         return $this->status?->next($this->fulfillment);

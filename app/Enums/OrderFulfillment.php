@@ -51,6 +51,24 @@ enum OrderFulfillment: string
         return $this === self::Delivery;
     }
 
+    public function color(): string
+    {
+        return match ($this) {
+            self::Delivery => 'info',
+            self::Pickup => 'warning',
+            self::DineIn => 'success',
+        };
+    }
+
+    public function icon(): string
+    {
+        return match ($this) {
+            self::Delivery => 'heroicon-o-truck',
+            self::Pickup => 'heroicon-o-shopping-bag',
+            self::DineIn => 'heroicon-o-home-modern',
+        };
+    }
+
     public function isEnabled(CompanyOrderSetting $setting): bool
     {
         return match ($this) {

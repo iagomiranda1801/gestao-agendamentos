@@ -36,4 +36,19 @@ class OrderStatusTest extends TestCase
         $this->assertTrue(OrderStatus::Completed->isTerminal());
         $this->assertFalse(OrderStatus::Ready->isTerminal());
     }
+
+    public function test_visible_kitchen_columns_hide_out_for_delivery_for_pickup_and_dine_in(): void
+    {
+        $this->assertSame(OrderStatus::kitchenColumns(), OrderStatus::visibleKitchenColumns());
+        $this->assertSame(OrderStatus::kitchenColumns(), OrderStatus::visibleKitchenColumns(OrderFulfillment::Delivery));
+
+        $this->assertSame(
+            [OrderStatus::Received, OrderStatus::Preparing, OrderStatus::Ready],
+            OrderStatus::visibleKitchenColumns(OrderFulfillment::Pickup),
+        );
+        $this->assertSame(
+            [OrderStatus::Received, OrderStatus::Preparing, OrderStatus::Ready],
+            OrderStatus::visibleKitchenColumns(OrderFulfillment::DineIn),
+        );
+    }
 }

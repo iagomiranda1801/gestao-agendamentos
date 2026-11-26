@@ -3,6 +3,7 @@
 namespace App\Filament\App\Pages;
 
 use App\Enums\CompanyModule;
+use App\Enums\OrderFulfillment;
 use App\Enums\OrderStatus;
 use App\Filament\App\Concerns\RequiresCompanyModule;
 use App\Models\Company;
@@ -18,6 +19,7 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 use UnitEnum;
 
 class KitchenDisplayPage extends Page
@@ -38,12 +40,22 @@ class KitchenDisplayPage extends Page
 
     protected string $view = 'filament.app.pages.kitchen-display';
 
+    public const FULFILLMENT_FILTER_ALL = 'todos';
+
     public ?int $cancelingOrderId = null;
 
     public string $cancelReason = '';
 
+    #[Url(as: 'tipo')]
+    public string $fulfillmentFilter = self::FULFILLMENT_FILTER_ALL;
+
     #[Locked]
     public ?int $kitchenTenantId = null;
+
+    /**
+     * @var Collection<int, Order>|null
+     */
+    protected ?Collection $activeKitchenOrdersCache = null;
 
     public static function canAccess(): bool
     {
@@ -66,6 +78,58 @@ class KitchenDisplayPage extends Page
         abort_unless(static::canAccess(), 403);
 
         $this->kitchenTenantId = $this->tenantCompany()->getKey();
+        $this->fulfillmentFilter = $this->normalizeFulfillmentFilter($this->fulfillmentFilter);
+    }
+
+    public function updatedFulfillmentFilter(mixed $value): void
+    {
+        $this->fulfillmentFilter = $this->normalizeFulfillmentFilter(is_string($value) ? $value : '');
+    }
+
+    public function setFulfillmentFilter(string $filter): void
+    {
+        $this->fulfillmentFilter = $this->normalizeFulfillmentFilter($filter);
+    }
+
+    public function selectedFulfillment(): ?OrderFulfillment
+    {
+        return OrderFulfillment::tryFrom($this->normalizeFulfillmentFilter($this->fulfillmentFilter));
+    }
+
+    /**
+     * @return list<OrderStatus>
+     */
+    public function visibleKitchenColumns(): array
+    {
+        return OrderStatus::visibleKitchenColumns($this->selectedFulfillment());
+    }
+
+    /**
+     * @return list<array{value: string, label: string, count: int}>
+     */
+    public function fulfillmentTabs(): array
+    {
+        $orders = $this->activeKitchenOrders();
+
+        $tabs = [
+            [
+                'value' => self::FULFILLMENT_FILTER_ALL,
+                'label' => 'Todos',
+                'count' => $orders->count(),
+            ],
+        ];
+
+        foreach ([OrderFulfillment::Delivery, OrderFulfillment::Pickup, OrderFulfillment::DineIn] as $fulfillment) {
+            $tabs[] = [
+                'value' => $fulfillment->value,
+                'label' => $fulfillment->label(),
+                'count' => $orders
+                    ->filter(fn (Order $order): bool => $order->fulfillment === $fulfillment)
+                    ->count(),
+            ];
+        }
+
+        return $tabs;
     }
 
     /**
@@ -73,19 +137,16 @@ class KitchenDisplayPage extends Page
      */
     public function kitchenOrders(): Collection
     {
-        $company = $this->tenantCompany();
+        $orders = $this->activeKitchenOrders();
+        $fulfillment = $this->selectedFulfillment();
 
-        $orders = Order::query()
-            ->where('company_id', $company->getKey())
-            ->whereIn('status', array_map(
-                fn (OrderStatus $status): string => $status->value,
-                OrderStatus::kitchenColumns(),
-            ))
-            ->with('items')
-            ->orderBy('created_at')
-            ->get();
+        if ($fulfillment !== null) {
+            $orders = $orders
+                ->filter(fn (Order $order): bool => $order->fulfillment === $fulfillment)
+                ->values();
+        }
 
-        return collect(OrderStatus::kitchenColumns())
+        return collect($this->visibleKitchenColumns())
             ->mapWithKeys(fn (OrderStatus $status): array => [
                 $status->value => $orders
                     ->filter(fn (Order $order): bool => $this->orderMatchesKitchenStatus($order, $status))
@@ -101,6 +162,7 @@ class KitchenDisplayPage extends Page
         abort_unless($user !== null && $user->can('advance', $order), 403);
 
         app(OrderService::class)->advance($this->tenantCompany(), $order, $user);
+        $this->forgetActiveKitchenOrders();
 
         Notification::make()
             ->success()
@@ -134,6 +196,7 @@ class KitchenDisplayPage extends Page
         abort_unless($user !== null && $user->can('cancel', $order), 403);
 
         app(OrderService::class)->cancel($this->tenantCompany(), $order, $this->cancelReason, $user);
+        $this->forgetActiveKitchenOrders();
 
         $this->cancelingOrderId = null;
         $this->cancelReason = '';
@@ -231,6 +294,42 @@ class KitchenDisplayPage extends Page
         }
 
         Filament::setTenant($company, isQuiet: true);
+    }
+
+    /**
+     * @return Collection<int, Order>
+     */
+    protected function activeKitchenOrders(): Collection
+    {
+        if ($this->activeKitchenOrdersCache !== null) {
+            return $this->activeKitchenOrdersCache;
+        }
+
+        $company = $this->tenantCompany();
+
+        return $this->activeKitchenOrdersCache = Order::query()
+            ->where('company_id', $company->getKey())
+            ->whereIn('status', array_map(
+                fn (OrderStatus $status): string => $status->value,
+                OrderStatus::kitchenColumns(),
+            ))
+            ->with('items')
+            ->orderBy('created_at')
+            ->get();
+    }
+
+    protected function forgetActiveKitchenOrders(): void
+    {
+        $this->activeKitchenOrdersCache = null;
+    }
+
+    protected function normalizeFulfillmentFilter(string $value): string
+    {
+        if ($value === self::FULFILLMENT_FILTER_ALL || OrderFulfillment::tryFrom($value) !== null) {
+            return $value;
+        }
+
+        return self::FULFILLMENT_FILTER_ALL;
     }
 
     protected function orderMatchesKitchenStatus(Order $order, OrderStatus $status): bool

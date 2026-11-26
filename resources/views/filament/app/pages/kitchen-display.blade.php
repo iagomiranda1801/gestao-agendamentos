@@ -6,19 +6,70 @@
 
     $company = Filament::getTenant();
     $columns = $this->kitchenOrders();
+    $visibleStatuses = $this->visibleKitchenColumns();
     $companyIsTenant = $company instanceof \App\Models\Company;
 @endphp
 
 <div
-    class="kitchen-display"
+    class="kitchen-board"
     wire:poll.4s
 >
     <style>
+        .kitchen-board {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .kitchen-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .kitchen-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            border: 1px solid rgb(226 232 240);
+            background: white;
+            border-radius: 999px;
+            padding: 0.4rem 0.85rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: rgb(51 65 85);
+            cursor: pointer;
+        }
+
+        .kitchen-tab:hover {
+            border-color: rgb(148 163 184);
+        }
+
+        .kitchen-tab--active {
+            background: rgb(15 23 42);
+            color: white;
+            border-color: rgb(15 23 42);
+        }
+
+        .kitchen-tab__count {
+            font-size: 0.75rem;
+            font-weight: 700;
+            background: rgb(241 245 249);
+            color: rgb(51 65 85);
+            border-radius: 999px;
+            padding: 0.05rem 0.45rem;
+        }
+
+        .kitchen-tab--active .kitchen-tab__count {
+            background: rgb(255 255 255 / 0.18);
+            color: white;
+        }
+
         .kitchen-display {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
             gap: 1rem;
-            min-height: calc(100dvh - 10rem);
+            min-height: calc(100dvh - 13rem);
         }
 
         .kitchen-column {
@@ -99,9 +150,59 @@
             font-size: 0.875rem;
             margin: 0.5rem 0 0;
         }
+
+        .kitchen-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            border-radius: 999px;
+            padding: 0.15rem 0.5rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+
+        .kitchen-badge__icon {
+            width: 0.85rem;
+            height: 0.85rem;
+            flex-shrink: 0;
+        }
+
+        .kitchen-badge--info {
+            background: rgb(239 246 255);
+            color: rgb(29 78 216);
+        }
+
+        .kitchen-badge--warning {
+            background: rgb(255 251 235);
+            color: rgb(180 83 9);
+        }
+
+        .kitchen-badge--success {
+            background: rgb(236 253 245);
+            color: rgb(21 128 61);
+        }
     </style>
 
-    @foreach (OrderStatus::kitchenColumns() as $status)
+    <div class="kitchen-tabs" role="tablist" aria-label="Filtrar pedidos por tipo">
+        @foreach ($this->fulfillmentTabs() as $tab)
+            <button
+                type="button"
+                role="tab"
+                class="kitchen-tab {{ $this->fulfillmentFilter === $tab['value'] ? 'kitchen-tab--active' : '' }}"
+                wire:key="kitchen-tab-{{ $tab['value'] }}"
+                wire:click.prevent="setFulfillmentFilter('{{ $tab['value'] }}')"
+                aria-selected="{{ $this->fulfillmentFilter === $tab['value'] ? 'true' : 'false' }}"
+            >
+                {{ $tab['label'] }}
+                <span class="kitchen-tab__count">{{ $tab['count'] }}</span>
+            </button>
+        @endforeach
+    </div>
+
+    <div class="kitchen-display">
+    @foreach ($visibleStatuses as $status)
         @php
             $orders = $columns[$status->value] ?? collect();
         @endphp
@@ -115,7 +216,24 @@
                 <article class="kitchen-card" wire:key="kitchen-order-{{ $order->getKey() }}">
                     <div class="kitchen-card__top">
                         <span class="kitchen-card__number">{{ $order->displayNumber() }}</span>
-                        <span>{{ $order->fulfillment?->label() }}</span>
+                        @if ($order->fulfillment)
+                            <span class="kitchen-badge kitchen-badge--{{ $order->fulfillment->color() }}">
+                                @if ($order->fulfillment === \App\Enums\OrderFulfillment::Delivery)
+                                    <svg class="kitchen-badge__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h11v10H3zM14 11h4.5L21 14.5V17h-7M6.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm9 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/>
+                                    </svg>
+                                @elseif ($order->fulfillment === \App\Enums\OrderFulfillment::Pickup)
+                                    <svg class="kitchen-badge__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 8h12l-1 12H7L6 8Zm3 0V7a3 3 0 0 1 6 0v1"/>
+                                    </svg>
+                                @else
+                                    <svg class="kitchen-badge__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 3v7a2 2 0 1 0 4 0V3M7 3v0M9 3v7M11 3v7M9 10v11M16 3c1.5 1 2 3.2 2 5.2V21M16 8h2"/>
+                                    </svg>
+                                @endif
+                                {{ $order->fulfillment->label() }}
+                            </span>
+                        @endif
                     </div>
                     <p class="kitchen-card__meta">
                         {{ $order->customer_name }}
@@ -135,8 +253,8 @@
                     @if (filled($order->notes))
                         <p class="kitchen-card__notes">Obs.: {{ $order->notes }}</p>
                     @endif
-                    @if ($order->fulfillment?->usesDeliveryAddress() && filled($order->formattedDeliveryAddress()))
-                        <p class="kitchen-card__notes">{{ $order->formattedDeliveryAddress() }}</p>
+                    @if (filled($order->kitchenFulfillmentDetail()))
+                        <p class="kitchen-card__notes">{{ $order->kitchenFulfillmentDetail() }}</p>
                     @endif
                     <div class="kitchen-card__actions">
                         @if ($order->canAdvance() && auth()->user()?->can('advance', $order))
@@ -167,6 +285,7 @@
             @endforelse
         </section>
     @endforeach
+    </div>
 
     @if ($this->cancelingOrderId)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">

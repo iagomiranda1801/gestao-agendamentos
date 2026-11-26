@@ -15,4 +15,11 @@ class OrderFulfillmentTest extends TestCase
         $this->assertFalse(OrderFulfillment::DineIn->usesDeliveryAddress());
         $this->assertContains(OrderFulfillment::DineIn, OrderFulfillment::publicOptions());
     }
+
+    public function test_fulfillment_badge_colors(): void
+    {
+        $this->assertSame('info', OrderFulfillment::Delivery->color());
+        $this->assertSame('warning', OrderFulfillment::Pickup->color());
+        $this->assertSame('success', OrderFulfillment::DineIn->color());
+    }
 }

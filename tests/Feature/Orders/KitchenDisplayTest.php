@@ -274,4 +274,136 @@ class KitchenDisplayTest extends TestCase
             ->call('startCancel', $order->id)
             ->assertForbidden();
     }
+
+    public function test_kitchen_tabs_count_active_orders_and_filter_by_fulfillment(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $admin = $this->createCompanyUser($setup['company']);
+        $service = app(OrderService::class);
+
+        $pickup = $service->createPublic($setup['company'], [
+            'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],
+            'fulfillment' => OrderFulfillment::Pickup,
+            'customer_name' => 'Cliente Retirada',
+            'customer_phone' => '34988887771',
+        ]);
+        $delivery = $service->createPublic($setup['company'], [
+            'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],
+            'fulfillment' => OrderFulfillment::Delivery,
+            'customer_name' => 'Cliente Entrega',
+            'customer_phone' => '34988887772',
+            'delivery_address' => 'Rua das Flores, 100',
+            'delivery_neighborhood' => 'Centro',
+            'delivery_city' => 'Uberlândia',
+        ]);
+        $dineIn = $service->createPublic($setup['company'], [
+            'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],
+            'fulfillment' => OrderFulfillment::DineIn,
+            'customer_name' => 'Cliente Local',
+            'customer_phone' => '34988887773',
+        ]);
+        $dineIn->forceFill(['table_id' => 4])->save();
+
+        $completed = $service->createPublic($setup['company'], [
+            'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],
+            'fulfillment' => OrderFulfillment::Pickup,
+            'customer_name' => 'Cliente Concluído',
+            'customer_phone' => '34988887774',
+        ]);
+        $completed->forceFill([
+            'status' => OrderStatus::Completed,
+            'completed_at' => now(),
+        ])->save();
+
+        $this->assertSame(OrderStatus::Completed, $completed->fresh()->status);
+
+        $this->authenticateForAppTenant($admin, $setup['company']);
+
+        $page = Livewire::test(KitchenDisplayPage::class)
+            ->assertSuccessful()
+            ->assertSet('fulfillmentFilter', KitchenDisplayPage::FULFILLMENT_FILTER_ALL)
+            ->assertSee('Todos', false)
+            ->assertSee('Cliente Retirada', false)
+            ->assertSee('Cliente Entrega', false)
+            ->assertSee('Cliente Local', false)
+            ->assertDontSee('Cliente Concluído', false)
+            ->assertSee('Saiu para entrega', false)
+            ->assertSee('Rua das Flores, 100', false)
+            ->assertSee('Mesa 4', false);
+
+        $this->assertSame([
+            ['value' => 'todos', 'label' => 'Todos', 'count' => 3],
+            ['value' => 'delivery', 'label' => 'Entrega', 'count' => 1],
+            ['value' => 'pickup', 'label' => 'Retirada', 'count' => 1],
+            ['value' => 'dine_in', 'label' => 'Comer no local', 'count' => 1],
+        ], $page->instance()->fulfillmentTabs());
+
+        $page->call('setFulfillmentFilter', OrderFulfillment::Pickup->value)
+            ->assertSet('fulfillmentFilter', 'pickup')
+            ->assertSee('Cliente Retirada', false)
+            ->assertDontSee('Cliente Entrega', false)
+            ->assertDontSee('Cliente Local', false)
+            ->assertDontSee('Saiu para entrega', false);
+
+        $this->assertSame(
+            [OrderStatus::Received, OrderStatus::Preparing, OrderStatus::Ready],
+            $page->instance()->visibleKitchenColumns(),
+        );
+        $this->assertArrayNotHasKey(
+            OrderStatus::OutForDelivery->value,
+            $page->instance()->kitchenOrders()->all(),
+        );
+
+        $page->call('setFulfillmentFilter', OrderFulfillment::Delivery->value)
+            ->assertSet('fulfillmentFilter', 'delivery')
+            ->assertSee('Cliente Entrega', false)
+            ->assertSee('Saiu para entrega', false)
+            ->assertDontSee('Cliente Retirada', false)
+            ->assertDontSee('Cliente Local', false);
+
+        $page->call('setFulfillmentFilter', OrderFulfillment::DineIn->value)
+            ->assertSet('fulfillmentFilter', 'dine_in')
+            ->assertSee('Cliente Local', false)
+            ->assertSee('Mesa 4', false)
+            ->assertDontSee('Saiu para entrega', false)
+            ->assertDontSee('Cliente Entrega', false);
+    }
+
+    public function test_kitchen_fulfillment_filter_is_restored_from_query_string(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $admin = $this->createCompanyUser($setup['company']);
+        $service = app(OrderService::class);
+
+        $service->createPublic($setup['company'], [
+            'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],
+            'fulfillment' => OrderFulfillment::Pickup,
+            'customer_name' => 'Só Retirada',
+            'customer_phone' => '34988887775',
+        ]);
+        $service->createPublic($setup['company'], [
+            'items' => [['product_id' => $setup['burger']->id, 'quantity' => 1]],
+            'fulfillment' => OrderFulfillment::Delivery,
+            'customer_name' => 'Só Entrega',
+            'customer_phone' => '34988887776',
+            'delivery_address' => 'Av. Brasil, 50',
+        ]);
+
+        $this->authenticateForAppTenant($admin, $setup['company']);
+
+        Livewire::withQueryParams(['tipo' => 'pickup'])
+            ->test(KitchenDisplayPage::class)
+            ->assertSuccessful()
+            ->assertSet('fulfillmentFilter', 'pickup')
+            ->assertSee('Só Retirada', false)
+            ->assertDontSee('Só Entrega', false)
+            ->assertDontSee('Saiu para entrega', false);
+
+        Livewire::withQueryParams(['tipo' => 'invalido'])
+            ->test(KitchenDisplayPage::class)
+            ->assertSuccessful()
+            ->assertSet('fulfillmentFilter', KitchenDisplayPage::FULFILLMENT_FILTER_ALL)
+            ->assertSee('Só Retirada', false)
+            ->assertSee('Só Entrega', false);
+    }
 }
