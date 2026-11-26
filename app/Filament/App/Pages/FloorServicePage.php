@@ -12,6 +12,7 @@ use App\Models\DiningTable;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Policies\OrderPolicy;
+use App\Services\Orders\DiningTableService;
 use App\Services\Orders\FloorOrderService;
 use App\Services\Orders\OrderCatalogService;
 use App\Support\Money;
@@ -23,6 +24,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 use UnitEnum;
 
 class FloorServicePage extends Page
@@ -63,6 +65,22 @@ class FloorServicePage extends Page
 
     public string $cancelReason = '';
 
+    /** Filtro de área do salão (nome da mesa em minúsculas) ou "todas". */
+    #[Url(as: 'area')]
+    public string $areaFilter = self::AREA_ALL;
+
+    public string $search = '';
+
+    public string $categoryFilter = '';
+
+    public string $newTableNumber = '';
+
+    public string $newTableArea = '';
+
+    public const AREA_ALL = 'todas';
+
+    public const AREA_NONE = '__sem_area';
+
     public static function canAccess(): bool
     {
         if (! static::tenantHasRequiredModule()) {
@@ -97,7 +115,177 @@ class FloorServicePage extends Page
         $this->selectedTableId = (int) $table->getKey();
         $this->guestName = '';
         $this->cancelReason = '';
+        $this->search = '';
+        $this->categoryFilter = '';
         $this->resetItemForm();
+    }
+
+    public function closeDrawer(): void
+    {
+        $this->selectedTableId = null;
+        $this->guestName = '';
+        $this->cancelReason = '';
+        $this->search = '';
+        $this->categoryFilter = '';
+        $this->resetItemForm();
+    }
+
+    public function setArea(string $area): void
+    {
+        $this->areaFilter = $area === '' ? self::AREA_ALL : $area;
+    }
+
+    public function setCategory(string $category): void
+    {
+        $this->categoryFilter = $this->categoryFilter === $category ? '' : $category;
+    }
+
+    /**
+     * Toque num produto: sem tamanhos entra direto; com tamanhos abre a escolha.
+     */
+    public function pickProduct(int $productId): void
+    {
+        $product = collect($this->catalog())->firstWhere('id', $productId);
+
+        if ($product === null) {
+            return;
+        }
+
+        if ($product['variants'] !== []) {
+            $this->productId = (string) $productId;
+            $this->variantId = '';
+
+            return;
+        }
+
+        $this->quickAdd($productId);
+    }
+
+    /**
+     * Lança uma unidade. Se a linha igual já existe (mesmo produto/tamanho, sem observação),
+     * soma na linha em vez de criar outra.
+     */
+    public function quickAdd(int $productId, ?int $variantId = null): void
+    {
+        $this->hasNotifiedValidationError = false;
+        $order = $this->selectedOrder();
+        $user = auth()->user();
+
+        if ($order === null || $user === null) {
+            return;
+        }
+
+        abort_unless($user->can('manageFloor', $order), 403);
+
+        $notes = trim($this->itemNotes);
+        $existing = $notes === '' ? $order->items->first(
+            fn (OrderItem $item): bool => (int) $item->product_id === $productId
+                && (int) ($item->product_variant_id ?? 0) === (int) ($variantId ?? 0)
+                && blank($item->notes)
+                && (int) $item->quantity < 99,
+        ) : null;
+
+        try {
+            if ($existing !== null) {
+                app(FloorOrderService::class)->changeItemQuantity(
+                    $this->tenantCompany(),
+                    $order,
+                    $existing,
+                    (int) $existing->quantity + 1,
+                    $user,
+                );
+            } else {
+                app(FloorOrderService::class)->addItem(
+                    $this->tenantCompany(),
+                    $order,
+                    $productId,
+                    1,
+                    $notes,
+                    $variantId,
+                    $user,
+                );
+            }
+        } catch (ValidationException $exception) {
+            $this->notifyValidationException($exception);
+
+            return;
+        }
+
+        $this->resetItemForm();
+    }
+
+    public function incrementItem(int $itemId): void
+    {
+        $this->shiftItemQuantity($itemId, 1);
+    }
+
+    public function decrementItem(int $itemId): void
+    {
+        $this->shiftItemQuantity($itemId, -1);
+    }
+
+    protected function shiftItemQuantity(int $itemId, int $delta): void
+    {
+        $this->hasNotifiedValidationError = false;
+        $order = $this->selectedOrder();
+        $user = auth()->user();
+
+        if ($order === null || $user === null) {
+            return;
+        }
+
+        abort_unless($user->can('manageFloor', $order), 403);
+
+        $item = OrderItem::query()
+            ->whereKey($itemId)
+            ->where('order_id', $order->getKey())
+            ->firstOrFail();
+
+        $target = (int) $item->quantity + $delta;
+
+        if ($target < 1 || $target > 99) {
+            return;
+        }
+
+        try {
+            app(FloorOrderService::class)->changeItemQuantity($this->tenantCompany(), $order, $item, $target, $user);
+        } catch (ValidationException $exception) {
+            $this->notifyValidationException($exception);
+        }
+    }
+
+    public function createTable(): void
+    {
+        $this->hasNotifiedValidationError = false;
+
+        abort_unless(DiningTableResource::canCreate(), 403);
+
+        $company = $this->tenantCompany();
+        $number = trim($this->newTableNumber);
+
+        if ($number === '') {
+            $number = (string) (((int) DiningTable::query()->where('company_id', $company->getKey())->max('number')) + 1);
+        }
+
+        try {
+            $table = app(DiningTableService::class)->create($company, [
+                'number' => (int) $number,
+                'name' => $this->newTableArea,
+            ]);
+        } catch (ValidationException $exception) {
+            $this->notifyValidationException($exception);
+
+            return;
+        }
+
+        $this->newTableNumber = '';
+
+        Notification::make()->success()->title('Mesa criada')->body($table->displayLabel())->send();
+    }
+
+    public function canCreateTable(): bool
+    {
+        return DiningTableResource::canCreate();
     }
 
     public function openTab(): void
@@ -231,6 +419,8 @@ class FloorServicePage extends Page
             ->title('Conta fechada')
             ->body('A mesa foi liberada.')
             ->send();
+
+        $this->closeDrawer();
     }
 
     public function cancelTab(): void
@@ -258,9 +448,85 @@ class FloorServicePage extends Page
             return;
         }
 
-        $this->cancelReason = '';
-
         Notification::make()->success()->title('Comanda cancelada')->body('A mesa foi liberada.')->send();
+
+        $this->closeDrawer();
+    }
+
+    public function areaKey(DiningTable $table): string
+    {
+        $name = trim((string) $table->name);
+
+        return $name === '' ? self::AREA_NONE : mb_strtolower($name);
+    }
+
+    public function areaLabel(DiningTable $table): string
+    {
+        $name = trim((string) $table->name);
+
+        return $name === '' ? 'Sem área' : $name;
+    }
+
+    /**
+     * Áreas na ordem em que aparecem no mapa.
+     *
+     * @param  Collection<int, DiningTable>  $tables
+     * @return array<string, string>
+     */
+    public function areas(Collection $tables): array
+    {
+        $areas = [];
+
+        foreach ($tables as $table) {
+            $areas[$this->areaKey($table)] ??= $this->areaLabel($table);
+        }
+
+        return $areas;
+    }
+
+    /**
+     * @param  Collection<int, DiningTable>  $tables
+     * @return array{free: int, busy: int, total_cents: int}
+     */
+    public function summary(Collection $tables): array
+    {
+        $busy = 0;
+        $totalCents = 0;
+
+        foreach ($tables as $table) {
+            $order = $table->currentOrder();
+
+            if ($order !== null) {
+                $busy++;
+                $totalCents += (int) $order->total_cents;
+            }
+        }
+
+        return ['free' => $tables->count() - $busy, 'busy' => $busy, 'total_cents' => $totalCents];
+    }
+
+    public function elapsedLabel(Order $order): string
+    {
+        $since = $order->received_at ?? $order->created_at;
+
+        if ($since === null) {
+            return '';
+        }
+
+        $minutes = max(0, (int) floor($since->diffInMinutes(now(), true)));
+
+        if ($minutes < 60) {
+            return $minutes.' min';
+        }
+
+        $rest = $minutes % 60;
+
+        return intdiv($minutes, 60).'h'.($rest > 0 ? str_pad((string) $rest, 2, '0', STR_PAD_LEFT) : '');
+    }
+
+    public function itemCount(Order $order): int
+    {
+        return (int) $order->items->sum('quantity');
     }
 
     /**
@@ -295,16 +561,19 @@ class FloorServicePage extends Page
     }
 
     /**
-     * @return list<array{id: int, name: string, price: string, variants: list<array{id: int, name: string, price: string}>}>
+     * @return list<array{id: int, name: string, category: string, image: ?string, price: string, variants: list<array{id: int, name: string, price: string}>}>
      */
     public function catalog(): array
     {
         return app(OrderCatalogService::class)
             ->sellableProducts($this->tenantCompany())
+            ->load('menuCategory')
             ->map(function ($product): array {
                 return [
                     'id' => (int) $product->getKey(),
                     'name' => (string) $product->name,
+                    'category' => (string) ($product->menuCategory?->name ?? $product->online_order_category ?? ''),
+                    'image' => $product->imageUrl(),
                     'price' => Money::formatCents(app(OrderCatalogService::class)->displayPriceCents($product)),
                     'variants' => $product->activeVariants->map(fn ($variant): array => [
                         'id' => (int) $variant->getKey(),

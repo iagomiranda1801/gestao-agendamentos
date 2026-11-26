@@ -116,6 +116,48 @@ class FloorOrderService
         });
     }
 
+    /**
+     * Ajusta a quantidade de uma linha da comanda (1 a 99). Para zerar, use removeItem.
+     * Aumentar a quantidade devolve a comanda para a cozinha, como um item novo.
+     */
+    public function changeItemQuantity(Company $company, Order $order, OrderItem $item, int $quantity, ?User $user = null): Order
+    {
+        $this->assertCompanyCanUseFloor($company);
+
+        if ($quantity < 1 || $quantity > 99) {
+            throw ValidationException::withMessages([
+                'quantity' => 'A quantidade deve ficar entre 1 e 99. Para tirar o item, remova a linha.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($company, $order, $item, $quantity, $user): Order {
+            $locked = $this->lockOpenFloorOrder($company, $order);
+
+            /** @var OrderItem $line */
+            $line = OrderItem::query()
+                ->whereKey($item->getKey())
+                ->where('order_id', $locked->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $increased = $quantity > (int) $line->quantity;
+
+            if ($quantity !== (int) $line->quantity) {
+                $line->quantity = $quantity;
+                $line->line_total_cents = (int) $line->unit_price_cents * $quantity;
+                $line->save();
+
+                $this->recalculateTotals($locked);
+
+                if ($increased) {
+                    $this->returnToKitchen($company, $locked, $user);
+                }
+            }
+
+            return $locked->fresh(['items', 'diningTable']) ?? $locked;
+        });
+    }
+
     public function close(Company $company, Order $order, PaymentMethod|string $method, User $user): Order
     {
         $this->assertCompanyCanUseFloor($company);
