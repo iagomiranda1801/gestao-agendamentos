@@ -86,6 +86,11 @@ class FloorServicePage extends Page
         $this->floorTenantId = $this->tenantCompany()->getKey();
     }
 
+    public function updatedProductId(): void
+    {
+        $this->variantId = '';
+    }
+
     public function selectTable(int $tableId): void
     {
         $table = $this->findTable($tableId);

@@ -40,6 +40,7 @@
         .floor-btn--primary { background: rgb(15 23 42); color: white; }
         .floor-btn--ghost { background: white; border: 1px solid rgb(203 213 225); color: rgb(15 23 42); }
         .floor-btn--danger { background: white; border: 1px solid rgb(252 165 165); color: rgb(185 28 28); }
+        .floor-btn:disabled { opacity: 0.55; cursor: wait; }
         .floor-empty { padding: 1.5rem; border: 1px dashed rgb(203 213 225); border-radius: 1rem; color: rgb(71 85 105); }
         .floor-note { color: rgb(100 116 139); font-size: 0.8rem; }
     </style>
@@ -86,7 +87,7 @@
                         </label>
                     </div>
                     <div class="floor-actions">
-                        <button type="button" class="floor-btn floor-btn--primary" wire:click="openTab">Abrir comanda</button>
+                        <button type="button" class="floor-btn floor-btn--primary" wire:click="openTab" wire:loading.attr="disabled" wire:target="openTab">Abrir comanda</button>
                     </div>
                 @else
                     <div>
@@ -123,7 +124,7 @@
                                         </td>
                                         <td class="num">{{ $item->formattedLineTotal() }}</td>
                                         <td class="num">
-                                            <button type="button" class="floor-btn floor-btn--danger" wire:click="removeItem({{ $item->getKey() }})">Remover</button>
+                                            <button type="button" class="floor-btn floor-btn--danger" wire:click="removeItem({{ $item->getKey() }})" wire:loading.attr="disabled" wire:target="removeItem">Remover</button>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -166,7 +167,7 @@
                         </label>
                     </div>
                     <div class="floor-actions">
-                        <button type="button" class="floor-btn floor-btn--primary" wire:click="addItem">Lançar item</button>
+                        <button type="button" class="floor-btn floor-btn--primary" wire:click="addItem" wire:loading.attr="disabled" wire:target="addItem">Lançar item</button>
                         @if ($this->receiptUrl($order))
                             <a class="floor-btn floor-btn--ghost" href="{{ $this->receiptUrl($order) }}" target="_blank" rel="noopener">Imprimir conferência</a>
                         @endif
@@ -183,7 +184,7 @@
                         </label>
                     </div>
                     <div class="floor-actions">
-                        <button type="button" class="floor-btn floor-btn--primary" wire:click="closeTab">Fechar conta</button>
+                        <button type="button" class="floor-btn floor-btn--primary" wire:click="closeTab" wire:loading.attr="disabled" wire:target="closeTab">Fechar conta</button>
                     </div>
 
                     <div class="floor-form">
@@ -193,7 +194,7 @@
                         </label>
                     </div>
                     <div class="floor-actions">
-                        <button type="button" class="floor-btn floor-btn--danger" wire:click="cancelTab">Cancelar comanda</button>
+                        <button type="button" class="floor-btn floor-btn--danger" wire:click="cancelTab" wire:loading.attr="disabled" wire:target="cancelTab">Cancelar comanda</button>
                     </div>
                 @endif
             </section>

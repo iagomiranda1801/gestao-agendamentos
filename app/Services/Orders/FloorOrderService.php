@@ -17,6 +17,7 @@ use App\Models\OrderStatusHistory;
 use App\Models\User;
 use App\Services\Company\CompanyModuleService;
 use App\Support\PublicBookingTextSanitizer;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -84,6 +85,7 @@ class FloorOrderService
         return DB::transaction(function () use ($company, $order, $productId, $quantity, $notes, $variantId, $user): Order {
             $locked = $this->lockOpenFloorOrder($company, $order);
             $snapshot = $this->snapshotItem($company, $productId, $quantity, $notes, $variantId);
+            $this->assertNotADoubleSubmit($locked, $snapshot);
 
             $item = new OrderItem($snapshot);
             $item->order()->associate($locked);
@@ -308,6 +310,26 @@ class FloorOrderService
             'line_total_cents' => $unitPrice * $quantity,
             'notes' => PublicBookingTextSanitizer::sanitize($notes, 240),
         ];
+    }
+
+    /**
+     * @param  array{product_id: int, product_variant_id: int|null, quantity: int, notes: string|null}  $snapshot
+     */
+    protected function assertNotADoubleSubmit(Order $order, array $snapshot): void
+    {
+        $fingerprint = sha1(implode('|', [
+            $order->getKey(),
+            $snapshot['product_id'],
+            $snapshot['product_variant_id'] ?? 0,
+            $snapshot['quantity'],
+            (string) ($snapshot['notes'] ?? ''),
+        ]));
+
+        if (! Cache::add('floor-order-item:'.$fingerprint, 1, now()->addSeconds(2))) {
+            throw ValidationException::withMessages([
+                'items' => 'Este item acabou de ser lançado. Aguarde um instante para lançar de novo.',
+            ]);
+        }
     }
 
     protected function recalculateTotals(Order $order): void

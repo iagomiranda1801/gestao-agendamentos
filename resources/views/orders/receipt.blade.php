@@ -112,6 +112,11 @@
 
     @if ($order->status === OrderStatus::Completed)
         <p>Pagamento: {{ $order->payment_method?->label() ?? 'Não informado' }}</p>
+    @elseif ($order->status === OrderStatus::Cancelled)
+        <p><strong>{{ $order->isFloorOrder() ? 'Comanda cancelada' : 'Pedido cancelado' }}</strong></p>
+        @if (filled($order->cancel_reason))
+            <p>Motivo: {{ $order->cancel_reason }}</p>
+        @endif
     @else
         <p><strong>Conferência da conta — ainda não paga</strong></p>
     @endif

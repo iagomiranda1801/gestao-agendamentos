@@ -20,6 +20,7 @@ use App\Models\Sale;
 use App\Services\Orders\CompanyOrderSettingService;
 use App\Services\Orders\FloorOrderService;
 use App\Services\Orders\OrderService;
+use App\Services\Product\ProductVariantService;
 use Filament\Facades\Filament;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -392,5 +393,80 @@ class FloorServiceTest extends TestCase
         $this->authenticateForAppTenant($user, $company);
 
         Livewire::test(FloorServicePage::class)->assertForbidden();
+    }
+
+    public function test_cancelled_receipt_does_not_look_like_an_open_bill(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $user = $this->createCompanyUser($setup['company']);
+        $table = DiningTable::factory()->forCompany($setup['company'])->create(['number' => 2]);
+        $floor = app(FloorOrderService::class);
+        $order = $floor->open($setup['company'], $table, $user);
+        $order = $floor->addItem($setup['company'], $order, $setup['burger']->id, 1, user: $user);
+        $cancelled = $floor->cancel($setup['company'], $order, 'Cliente desistiu', $user);
+
+        $this->actingAs($user)
+            ->get(route('orders.receipt', ['company' => $setup['company'], 'order' => $cancelled]))
+            ->assertOk()
+            ->assertSee('Comanda cancelada')
+            ->assertSee('Cliente desistiu')
+            ->assertDontSee('ainda não paga')
+            ->assertDontSee('Conferência da conta');
+    }
+
+    public function test_repeating_the_same_item_immediately_does_not_charge_it_twice(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $user = $this->createCompanyUser($setup['company']);
+        $table = DiningTable::factory()->forCompany($setup['company'])->create(['number' => 1]);
+        $floor = app(FloorOrderService::class);
+        $order = $floor->open($setup['company'], $table, $user);
+
+        $order = $floor->addItem($setup['company'], $order, $setup['burger']->id, 1, 'sem gelo', user: $user);
+
+        try {
+            $floor->addItem($setup['company'], $order->fresh(), $setup['burger']->id, 1, 'sem gelo', user: $user);
+            $this->fail('O segundo clique não pode lançar o mesmo item de novo.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('items', $exception->errors());
+        }
+
+        $fresh = $order->fresh('items');
+        $this->assertCount(1, $fresh->items);
+        $this->assertSame(2500, $fresh->total_cents);
+
+        $withOtherNote = $floor->addItem($setup['company'], $fresh, $setup['burger']->id, 1, 'com gelo', user: $user);
+        $this->assertCount(2, $withOtherNote->items);
+    }
+
+    public function test_changing_the_product_clears_the_previous_size(): void
+    {
+        $setup = $this->createRestaurantSetup();
+        $user = $this->createCompanyUser($setup['company']);
+        $table = DiningTable::factory()->forCompany($setup['company'])->create(['number' => 4]);
+        app(ProductVariantService::class)->sync($setup['burger'], [
+            ['name' => 'Média', 'price' => 28, 'is_default' => true, 'is_active' => true],
+            ['name' => 'Grande', 'price' => 32, 'is_default' => false, 'is_active' => true],
+        ]);
+        app(ProductVariantService::class)->sync($setup['soda'], [
+            ['name' => 'Lata', 'price' => 7, 'is_default' => true, 'is_active' => true],
+            ['name' => '1L', 'price' => 12, 'is_default' => false, 'is_active' => true],
+        ]);
+        $grande = $setup['burger']->fresh()->activeVariants->firstWhere('name', 'Grande');
+
+        $this->authenticateForAppTenant($user, $setup['company']);
+
+        Livewire::test(FloorServicePage::class)
+            ->call('selectTable', $table->id)
+            ->call('openTab')
+            ->set('productId', (string) $setup['burger']->id)
+            ->set('variantId', (string) $grande->id)
+            ->set('productId', (string) $setup['soda']->id)
+            ->assertSet('variantId', '')
+            ->call('addItem');
+
+        $order = Order::query()->where('table_id', $table->id)->first();
+        $this->assertNotNull($order);
+        $this->assertSame(0, $order->items()->count());
     }
 }
