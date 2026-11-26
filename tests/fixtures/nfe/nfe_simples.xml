@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+  <infNFe Id="NFe35261199888777000155550010000000551000000551" versao="4.00">
+    <ide>
+      <natOp>COMPRA</natOp>
+      <mod>55</mod>
+      <serie>2</serie>
+      <nNF>55</nNF>
+      <dEmi>2026-11-22</dEmi>
+    </ide>
+    <emit>
+      <CNPJ>99888777000155</CNPJ>
+      <xNome>MERCEARIA ATACADO LTDA</xNome>
+    </emit>
+    <dest>
+      <CPF>12345678909</CPF>
+      <xNome>CONSUMIDOR</xNome>
+    </dest>
+    <det nItem="1">
+      <prod>
+        <cProd>0042</cProd>
+        <cEAN>7890000000017</cEAN>
+        <xProd>ARROZ BRANCO 5KG</xProd>
+        <NCM>10063021</NCM>
+        <uCom>UN</uCom>
+        <qCom>4.0000</qCom>
+        <vUnCom>25.5000000000</vUnCom>
+        <vProd>102.00</vProd>
+        <cEANTrib>7890000000017</cEANTrib>
+        <uTrib>UN</uTrib>
+        <qTrib>4.0000</qTrib>
+        <vUnTrib>25.5000000000</vUnTrib>
+      </prod>
+    </det>
+    <total>
+      <ICMSTot>
+        <vProd>102.00</vProd>
+        <vFrete>0.00</vFrete>
+        <vDesc>0.00</vDesc>
+        <vNF>102.00</vNF>
+      </ICMSTot>
+    </total>
+  </infNFe>
+</NFe>

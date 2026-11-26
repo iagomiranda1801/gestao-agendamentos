@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'document_number',
     'external_reference',
     'reference_key',
+    'nfe_access_key',
     'occurred_at',
     'notes',
     'total_amount',

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nfeProc [
+  <!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+  <NFe>
+    <infNFe Id="NFe35261111222333000181550010000012341000012345" versao="4.00">
+      <emit><xNome>&xxe;</xNome></emit>
+    </infNFe>
+  </NFe>
+</nfeProc>
