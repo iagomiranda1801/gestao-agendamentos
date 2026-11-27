@@ -56,6 +56,9 @@ class AppPanelProvider extends PanelProvider
             ->login(AppLogin::class)
             ->viteTheme('resources/css/filament/app/theme.css')
             ->maxContentWidth(Width::Full)
+            ->sidebarWidth('14rem')
+            ->collapsedSidebarWidth('4rem')
+            ->sidebarCollapsibleOnDesktop()
             ->brandName(fn (): string => filament()->getTenant()?->name ?? Branding::name())
             ->brandLogo(function (): ?string {
                 $tenant = filament()->getTenant();

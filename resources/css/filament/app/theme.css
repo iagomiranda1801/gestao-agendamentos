@@ -1,4 +1,5 @@
 @import '../../../../vendor/filament/filament/resources/css/theme.css';
+@import '../compact-shell.css';
 
 @source '../../../../app/Filament/App/**/*';
 @source '../../../../resources/views/filament/app/**/*';
@@ -77,11 +78,6 @@
 }
 
 /* App shell: light blue workspace with clear white work surfaces */
-
-.fi-panel-app {
-    --sidebar-width: 16rem;
-    --collapsed-sidebar-width: 4.25rem;
-}
 
 .fi-panel-app .fi-sidebar,
 .fi-panel-app .fi-sidebar nav {
