@@ -71,6 +71,22 @@ return [
         'timeout' => (int) env('AI_TIMEOUT', 30),
     ],
 
+    // Transcrição de áudios do WhatsApp (nota de voz) por um modelo Gemini via OpenRouter.
+    // A chave é a própria da empresa quando ela usa o provedor OpenRouter; senão vale esta.
+    'openrouter' => [
+        'api_key' => env('OPENROUTER_API_KEY'),
+        'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
+        'audio_model' => env('OPENROUTER_AUDIO_MODEL', 'google/gemini-2.5-flash'),
+        // Caminho do ffmpeg (opcional): se o provedor recusar ogg, converte para mp3 e tenta de novo.
+        'ffmpeg_path' => env('OPENROUTER_FFMPEG_PATH'),
+    ],
+
+    'whatsapp_audio' => [
+        'enabled' => (bool) env('WHATSAPP_AUDIO_ENABLED', true),
+        'max_seconds' => (int) env('WHATSAPP_AUDIO_MAX_SECONDS', 180),
+        'max_bytes' => (int) env('WHATSAPP_AUDIO_MAX_BYTES', 10 * 1024 * 1024),
+    ],
+
     'tabela_peliculas' => [
         'url' => env('TABELA_PELICULAS_API_URL', 'https://tabelapeliculas.com.br/index'),
     ],

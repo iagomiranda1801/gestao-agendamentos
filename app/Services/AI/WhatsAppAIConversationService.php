@@ -10,6 +10,7 @@ use App\Models\CompanyWhatsAppInstance;
 use App\Models\TattooAiConversation;
 use App\Models\TattooAiMessage;
 use App\Models\WhatsAppContact;
+use App\Services\WhatsApp\Audio\AudioTranscription;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Services\WhatsApp\Outbound\WhatsAppOutboundGate;
 use App\Services\WhatsApp\WhatsAppHumanTakeover;
@@ -58,13 +59,14 @@ abstract class WhatsAppAIConversationService
     }
 
     public function handle(Company $company, CompanyWhatsAppInstance $instance, string $jid, string $phone,
-        string $text, ?string $messageId, ?string $mediaMime, bool $paused = false, ?string $pushName = null): void
+        string $text, ?string $messageId, ?string $mediaMime, bool $paused = false, ?string $pushName = null,
+        ?AudioTranscription $audio = null): void
     {
         $phone = PhoneNormalizer::normalize($phone);
         if (! $phone || ! $messageId) {
             return;
         }
-        $out = Cache::lock("wa:ai:{$company->id}:{$phone}", 150)->block(10, function () use ($company, $instance, $jid, $phone, $text, $messageId, $mediaMime, $paused, $pushName): ?TattooAiMessage {
+        $out = Cache::lock("wa:ai:{$company->id}:{$phone}", 150)->block(10, function () use ($company, $instance, $jid, $phone, $text, $messageId, $mediaMime, $paused, $pushName, $audio): ?TattooAiMessage {
             $conversation = TattooAiConversation::query()->firstOrCreate(
                 ['company_whatsapp_instance_id' => $instance->id, 'phone_normalized' => $phone],
                 ['company_id' => $company->id, 'remote_jid' => $jid, 'status' => 'collecting_information'],
@@ -74,7 +76,14 @@ abstract class WhatsAppAIConversationService
             $incoming = TattooAiMessage::query()->firstOrCreate(
                 ['company_id' => $company->id, 'provider_message_id' => $messageId],
                 ['tattoo_ai_conversation_id' => $conversation->id, 'direction' => 'in',
-                    'body' => mb_substr($text, 0, 4000), 'media_mime' => $mediaMime],
+                    'body' => mb_substr($audio?->isFailure() ? '[áudio não transcrito]' : $text, 0, 4000), 'media_mime' => $mediaMime]
+                    + ($audio === null ? [] : [
+                        'source' => $audio->isOk() ? 'audio' : 'audio_failed',
+                        'audio_seconds' => $audio->seconds,
+                        'transcription_model' => $audio->model,
+                        'transcription_input_tokens' => $audio->inputTokens,
+                        'transcription_output_tokens' => $audio->outputTokens,
+                    ]),
             );
             if ($incoming->tattoo_ai_conversation_id !== $conversation->id || $incoming->status === 'processed') {
                 return null;
@@ -85,7 +94,7 @@ abstract class WhatsAppAIConversationService
 
                 return null;
             }
-            $reply = $this->replyWithoutSilence($conversation, $incoming);
+            $reply = $audio?->isFailure() ? $audio->notice() : $this->replyWithoutSilence($conversation, $incoming);
             $out = null;
             if ($reply !== null && trim($reply) !== '') {
                 $out = $conversation->messages()->firstOrCreate(

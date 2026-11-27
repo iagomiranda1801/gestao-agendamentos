@@ -16,6 +16,8 @@ use App\Services\Scheduling\CompanySchedulingSettingService;
 use App\Services\ServiceOrders\Bot\AssistanceBotService;
 use App\Services\Tattoo\TattooAIConversationService;
 use App\Services\Tattoo\TattooWhatsAppBotService;
+use App\Services\WhatsApp\Audio\AudioTranscription;
+use App\Services\WhatsApp\Audio\WhatsAppAudioService;
 use App\Services\WhatsApp\Bot\WhatsAppBookingBotService;
 use App\Services\WhatsApp\Bot\WhatsAppOrderLinkBotService;
 use App\Services\WhatsApp\EvolutionApiClient;
@@ -24,6 +26,7 @@ use App\Support\PhoneNormalizer;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -40,7 +43,13 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
         public ?string $messageId = null,
         public ?string $imageMime = null,
         public ?string $pushName = null,
+        public ?string $audioMime = null,
+        public ?int $audioSeconds = null,
+        public ?int $audioBytes = null,
     ) {}
+
+    /** Resultado da transcrição desta mensagem (só existe durante o handle). */
+    private ?AudioTranscription $audio = null;
 
     public function handle(
         WhatsAppBookingBotService $bot,
@@ -70,6 +79,9 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
 
         if ($company->isTechnicalAssistance()) {
             if ($instance) {
+                if ($this->applyAudio($company, $client)) {
+                    return;
+                }
                 $this->runAiConversation($company, fn () => app(AssistanceBotService::class)->receive(
                     $company, $instance, $this->phone, $this->text, $this->messageId,
                 ));
@@ -82,9 +94,12 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
             if (! $company->is_active || ! $modules->hasModule($company, CompanyModule::WhatsApp)) {
                 return;
             }
+            if ($this->applyAudio($company, $client, replyOnFailure: false)) {
+                return;
+            }
             $this->runAiConversation($company, fn () => app(TattooAIConversationService::class)->handle($company, $instance, $this->remoteJid,
                 $this->phone, $this->text, $this->messageId, $this->imageMime,
-                app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone), $this->pushName));
+                app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone), $this->pushName, $this->audio));
 
             return;
         }
@@ -107,15 +122,21 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
 
                 return;
             }
+            if ($this->applyAudio($company, $client, replyOnFailure: false)) {
+                return;
+            }
             $this->runAiConversation($company, fn () => app(BeautyAIConversationService::class)->handle($company, $instance, $this->remoteJid,
                 $this->phone, $this->text, $this->messageId, $this->imageMime,
-                app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone), $this->pushName));
+                app(WhatsAppHumanTakeover::class)->isPaused($this->instanceName, $this->phone), $this->pushName, $this->audio));
 
             return;
         }
 
         if ($company->isCarWash() && app(CarWashBotService::class)->enabled($company)) {
             if (! $instance) {
+                return;
+            }
+            if ($this->applyAudio($company, $client)) {
                 return;
             }
             $this->runAiConversation($company, fn () => app(CarWashBotService::class)->receive(
@@ -139,6 +160,9 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
                 return;
             }
 
+            if ($this->applyAudio($company, $client)) {
+                return;
+            }
             $reply = $orderLinkBot->handleIncoming($company, $this->phone, $this->text, $this->messageId);
             $this->sendReply($company, $client, $reply);
 
@@ -162,6 +186,9 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
 
                 return;
             }
+            if ($this->applyAudio($company, $client)) {
+                return;
+            }
             $reply = app(TattooWhatsAppBotService::class)->handleIncoming($company, $instance, $this->remoteJid, $this->phone, $this->text, $this->messageId, $this->imageMime);
             $this->sendReply($company, $client, $reply);
 
@@ -178,6 +205,10 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
             return;
         }
 
+        if ($this->applyAudio($company, $client)) {
+            return;
+        }
+
         $reply = $bot->handleIncoming(
             company: $company,
             instance: $instance,
@@ -188,6 +219,49 @@ class HandleWhatsAppInboundMessageJob implements ShouldQueue
         );
 
         $this->sendReply($company, $client, $reply);
+    }
+
+    /**
+     * Se a mensagem é uma nota de voz sem texto, transcreve e usa a transcrição
+     * como se o cliente tivesse digitado. Só é chamado depois de saber que o
+     * bot vai atender, para não gastar com empresas sem o bot ligado.
+     *
+     * Retorna true quando o job deve parar aqui (voltou para a fila, ou o
+     * áudio não pôde ser lido e o cliente já foi avisado).
+     */
+    protected function applyAudio(Company $company, EvolutionApiClient $client, bool $replyOnFailure = true): bool
+    {
+        if ($this->audioMime === null || trim($this->text) !== '' || blank($this->messageId)) {
+            return false;
+        }
+
+        if ($this->audio === null) {
+            try {
+                $this->audio = app(WhatsAppAudioService::class)->transcribe(
+                    $company, $this->instanceName, (string) $this->messageId, $this->audioSeconds, $this->audioBytes,
+                );
+            } catch (LockTimeoutException) {
+                $this->release(5);
+
+                return true;
+            }
+        }
+
+        if ($this->audio->isOk()) {
+            $this->text = $this->audio->text;
+
+            return false;
+        }
+
+        if (! $replyOnFailure) {
+            return false;
+        }
+
+        if (Cache::add("wa:audio:notice:{$company->getKey()}:{$this->messageId}", true, now()->addDay())) {
+            $this->sendReply($company, $client, $this->audio->notice());
+        }
+
+        return true;
     }
 
     protected function humanIsHandlingConversation(): bool

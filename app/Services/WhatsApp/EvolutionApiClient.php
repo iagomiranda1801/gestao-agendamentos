@@ -125,6 +125,36 @@ class EvolutionApiClient
         return $response->json() ?? [];
     }
 
+    /**
+     * Baixa a mídia de uma mensagem recebida (imagem, PDF ou áudio) já em base64.
+     *
+     * @return array{base64: string, mimetype: ?string}
+     */
+    public function getMedia(string $instance, string $messageId): array
+    {
+        $response = $this->http()->acceptJson()->timeout(45)
+            ->post($this->url('/chat/getBase64FromMediaMessage/'.$this->resolveInstance($instance)), [
+                'message' => ['key' => ['id' => $messageId]],
+                'convertToMp4' => false,
+            ]);
+
+        if ($response->failed()) {
+            throw new RequestException($response);
+        }
+
+        $base64 = $response->json('base64');
+        if (! is_string($base64) || $base64 === '') {
+            throw new RuntimeException('A Evolution não retornou o conteúdo da mídia.');
+        }
+
+        $mimetype = $response->json('mimetype');
+
+        return [
+            'base64' => str_contains($base64, ',') ? explode(',', $base64, 2)[1] : $base64,
+            'mimetype' => is_string($mimetype) ? $mimetype : null,
+        ];
+    }
+
     public function getMediaBase64(string $instance, string $messageId): string
     {
         $response = $this->http()->acceptJson()->timeout(45)

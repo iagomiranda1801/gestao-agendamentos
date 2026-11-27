@@ -37,6 +37,14 @@ class TattooManualQuoteService
         return $setting !== null && $this->matchesArtist($setting, $phone);
     }
 
+    /** O estúdio tem o número do tatuador configurado (orçamento manual ativo). */
+    public function isEnabledFor(string $instanceName): bool
+    {
+        [$company, $setting] = $this->context($instanceName);
+
+        return $company !== null && $setting !== null;
+    }
+
     /** Mensagem manual (fromMe) do estúdio para um cliente. */
     public function detectFromOutbound(string $instanceName, string $phone, string $text, ?string $messageId): ?TattooManualQuoteDetection
     {

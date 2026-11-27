@@ -4,6 +4,7 @@ namespace App\Services\WhatsApp;
 
 use App\Enums\WhatsAppCampaignRecipientStatus;
 use App\Jobs\HandleWhatsAppInboundMessageJob;
+use App\Jobs\TranscribeWhatsAppAudioJob;
 use App\Models\EvolutionWebhookEvent;
 use App\Models\WhatsAppCampaignRecipient;
 use App\Services\Tattoo\TattooManualQuoteService;
@@ -67,9 +68,18 @@ class EvolutionWebhookService
         }
 
         $text = $this->extractText($payload);
+        $audio = $text === '' ? $this->audioInfo($payload) : null;
+        $manualQuotes = app(TattooManualQuoteService::class);
+
+        // Nota de voz do tatuador no número pessoal dele: transcreve e trata como resposta digitada.
+        if ($audio !== null && $manualQuotes->isArtistPhone($instance, $phone)) {
+            $this->dispatchAudioJob($event, $instance, $phone, $audio, TranscribeWhatsAppAudioJob::ARTIST_REPLY);
+
+            return;
+        }
 
         // Número pessoal do tatuador: responde "1/2" do orçamento detectado, nunca vira cliente.
-        if (app(TattooManualQuoteService::class)->handleArtistMessage($instance, $phone, $text)) {
+        if ($manualQuotes->handleArtistMessage($instance, $phone, $text)) {
             return;
         }
 
@@ -83,6 +93,9 @@ class EvolutionWebhookService
             messageId: (string) ($event->message_id ?? ''),
             imageMime: $this->imageMime($payload),
             pushName: $this->pushName($payload),
+            audioMime: $audio['mime'] ?? null,
+            audioSeconds: $audio['seconds'] ?? null,
+            audioBytes: $audio['bytes'] ?? null,
         );
     }
 
@@ -136,6 +149,54 @@ class EvolutionWebhookService
         }
 
         return '';
+    }
+
+    /**
+     * Nota de voz (audioMessage, com ptt = gravada na hora) da mensagem.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{mime: string, seconds: ?int, bytes: ?int}|null
+     */
+    protected function audioInfo(array $payload): ?array
+    {
+        foreach (['data.message.audioMessage', 'data.0.message.audioMessage'] as $path) {
+            $audio = Arr::get($payload, $path);
+
+            if (! is_array($audio)) {
+                continue;
+            }
+
+            $mime = is_string($audio['mimetype'] ?? null) ? strtolower(trim(explode(';', $audio['mimetype'], 2)[0])) : 'audio/ogg';
+            $seconds = $audio['seconds'] ?? null;
+            $bytes = $audio['fileLength'] ?? null;
+
+            return [
+                'mime' => $mime !== '' ? $mime : 'audio/ogg',
+                'seconds' => is_numeric($seconds) ? (int) $seconds : null,
+                'bytes' => is_numeric($bytes) ? (int) $bytes : null,
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array{mime: string, seconds: ?int, bytes: ?int}  $audio
+     */
+    protected function dispatchAudioJob(EvolutionWebhookEvent $event, string $instance, string $phone, array $audio, string $purpose): void
+    {
+        if (blank($event->message_id)) {
+            return;
+        }
+
+        TranscribeWhatsAppAudioJob::dispatch(
+            instanceName: $instance,
+            phone: $phone,
+            messageId: (string) $event->message_id,
+            purpose: $purpose,
+            audioSeconds: $audio['seconds'],
+            audioBytes: $audio['bytes'],
+        );
     }
 
     protected function imageMime(array $payload): ?string
@@ -222,7 +283,15 @@ class EvolutionWebhookService
         $takeover->pause($instance, $phone);
 
         try {
-            $manualQuotes->detectFromOutbound($instance, $phone, $this->extractText($payload), $event->message_id);
+            $outboundText = $this->extractText($payload);
+            $outboundAudio = $outboundText === '' ? $this->audioInfo($payload) : null;
+
+            if ($outboundAudio !== null) {
+                // Orçamento falado pelo tatuador: transcreve em segundo plano e detecta o valor.
+                $this->dispatchAudioJob($event, $instance, $phone, $outboundAudio, TranscribeWhatsAppAudioJob::OUTBOUND_QUOTE);
+            } else {
+                $manualQuotes->detectFromOutbound($instance, $phone, $outboundText, $event->message_id);
+            }
         } catch (\Throwable $exception) {
             Log::warning('Tattoo manual quote detection failed.', ['instance' => $instance, 'error' => $exception->getMessage()]);
         }
